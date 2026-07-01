@@ -1,0 +1,12 @@
+name: typing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  typing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typing placeholder
+        run: echo "Run mypy"

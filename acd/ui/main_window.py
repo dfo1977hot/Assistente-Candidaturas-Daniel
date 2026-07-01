@@ -12,6 +12,11 @@ from acd.presentation.pages.company_page import CompanyPage
 from acd.presentation.pages.curriculum_page import CurriculumPage
 from acd.presentation.pages.interview_page import InterviewPage
 from acd.presentation.pages.job_page import JobPage
+from acd.presentation.pages.workflow_page import WorkflowPage
+from acd.presentation.pages.analytics_page import AnalyticsPage
+from acd.presentation.pages.career_page import CareerPage
+from acd.presentation.pages.assistant_page import AssistantPage
+from acd.presentation.pages.agent_console_page import AgentConsolePage
 from acd.ui.sidebar import Sidebar
 from acd.ui.dashboard import Dashboard
 
@@ -42,6 +47,11 @@ class MainWindow(QMainWindow):
         self.application_page = ApplicationPage()
         self.interview_page = InterviewPage()
         self.curriculum_page = CurriculumPage()
+        self.workflow_page = WorkflowPage()
+        self.analytics_page = AnalyticsPage()
+        self.career_page = CareerPage()
+        self.assistant_page = AssistantPage()
+        self.agent_console_page = AgentConsolePage()
 
         self.stack.addWidget(self.dashboard)
         self.stack.addWidget(self.company_page)
@@ -49,6 +59,11 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.application_page)
         self.stack.addWidget(self.interview_page)
         self.stack.addWidget(self.curriculum_page)
+        self.stack.addWidget(self.workflow_page)
+        self.stack.addWidget(self.analytics_page)
+        self.stack.addWidget(self.career_page)
+        self.stack.addWidget(self.assistant_page)
+        self.stack.addWidget(self.agent_console_page)
 
         self.router = Router()
         self.router.set_stack(self.stack)
@@ -58,6 +73,11 @@ class MainWindow(QMainWindow):
         self.router.register("applications", self.application_page)
         self.router.register("interviews", self.interview_page)
         self.router.register("curricula", self.curriculum_page)
+        self.router.register("workflows", self.workflow_page)
+        self.router.register("analytics", self.analytics_page)
+        self.router.register("career", self.career_page)
+        self.router.register("assistant", self.assistant_page)
+        self.router.register("agent_console", self.agent_console_page)
 
         self.sidebar.itemClicked.connect(self._on_sidebar_item_clicked)
 
@@ -87,5 +107,15 @@ class MainWindow(QMainWindow):
             self.router.navigate("interviews")
         elif "Currículos" in label:
             self.router.navigate("curricula")
+        elif "Workflow" in label:
+            self.router.navigate("workflows")
+        elif "Análise" in label or "Analytics" in label:
+            self.router.navigate("analytics")
+        elif "Planejamento" in label or "Carreira" in label:
+            self.router.navigate("career")
+        elif "Assistente" in label or "IA" in label:
+            self.router.navigate("assistant")
+        elif "Agentes" in label:
+            self.router.navigate("agent_console")
         elif "Dashboard" in label:
             self.router.navigate("dashboard")

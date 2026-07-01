@@ -1,0 +1,23 @@
+schema: capability/v1
+required:
+  - agents
+fields:
+  agents: map
+agent_required:
+  - read
+  - write
+  - execute
+  - approve
+  - version
+  - api_version
+  - framework_version
+  - sdk_version
+agent_fields:
+  read: list[string]
+  write: list[string]
+  execute: boolean
+  approve: boolean
+  version: semver
+  api_version: integer
+  framework_version: integer
+  sdk_version: integer

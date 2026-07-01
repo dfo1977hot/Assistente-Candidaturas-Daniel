@@ -1,0 +1,23 @@
+schema: handoff/v1
+required:
+  - from_agent
+  - to_agent
+  - status
+  - score
+  - risk
+  - artifacts
+  - issues
+  - next_agent
+  - approval
+  - timestamp
+fields:
+  from_agent: string
+  to_agent: string
+  status: enum[approved, blocked, needs_changes]
+  score: integer[0,100]
+  risk: enum[very_low, low, medium, high]
+  artifacts: list[string]
+  issues: list[string]
+  next_agent: string
+  approval: boolean
+  timestamp: datetime

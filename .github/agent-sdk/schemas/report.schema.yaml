@@ -1,0 +1,31 @@
+schema: report/v1
+required:
+  - agent
+  - scope
+  - run_id
+  - date
+  - inputs
+  - checks
+  - findings
+  - score
+  - risk
+  - release_ready
+  - final_status
+  - rationale
+  - next_agent
+  - handoff_file
+fields:
+  agent: string
+  scope: string
+  run_id: string
+  date: date
+  inputs: list[string]
+  checks: list[object]
+  findings: list[string]
+  score: integer[0,100]
+  risk: enum[very_low, low, medium, high]
+  release_ready: enum[YES, NO]
+  final_status: enum[approved, blocked, needs_changes]
+  rationale: string
+  next_agent: string
+  handoff_file: path

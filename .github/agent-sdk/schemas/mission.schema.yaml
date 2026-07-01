@@ -1,0 +1,33 @@
+schema: mission/v1
+required:
+  - name
+  - version
+  - api_version
+  - framework_version
+  - sdk_version
+  - mission
+  - responsibilities
+  - restrictions
+  - inputs
+  - outputs
+  - approval_criteria
+  - blocking_criteria
+  - checklist
+  - handoff
+fields:
+  name: string
+  version: semver
+  api_version: integer
+  framework_version: integer
+  sdk_version: integer
+  mission: string
+  responsibilities: list[string]
+  restrictions: list[string]
+  inputs: list[string]
+  outputs: list[string]
+  approval_criteria: list[string]
+  blocking_criteria: list[string]
+  checklist: list[string]
+  handoff:
+    next_agent: string
+    artifact: path

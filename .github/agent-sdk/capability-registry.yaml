@@ -1,0 +1,87 @@
+agents:
+  architecture:
+    read:
+      - docs/**
+      - acd/**
+      - .github/**
+    write:
+      - docs/**
+    execute: true
+    approve: true
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1
+  implementation:
+    read:
+      - acd/**
+      - docs/**
+      - .github/**
+    write:
+      - acd/**
+      - tests/**
+      - docs/**
+    execute: true
+    approve: false
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1
+  refactoring:
+    read:
+      - acd/**
+      - tests/**
+      - docs/**
+    write:
+      - acd/**
+      - tests/**
+      - docs/**
+    execute: true
+    approve: false
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1
+  testing:
+    read:
+      - acd/**
+      - tests/**
+      - docs/**
+    write:
+      - tests/**
+      - docs/**
+    execute: true
+    approve: true
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1
+  documentation:
+    read:
+      - docs/**
+      - .github/**
+      - acd/**
+    write:
+      - docs/**
+      - .github/**
+    execute: false
+    approve: false
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1
+  release:
+    read:
+      - docs/**
+      - .github/**
+      - acd/**
+      - tests/**
+    write:
+      - docs/**
+      - .github/**
+    execute: true
+    approve: true
+    version: 1.0.0
+    api_version: 1
+    framework_version: 1
+    sdk_version: 1

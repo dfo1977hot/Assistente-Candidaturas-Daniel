@@ -1,0 +1,7 @@
+# Default owners
+* @daniel
+
+# Architecture and governance
+/.github/ @daniel
+/docs/architecture/ @daniel
+/docs/rfc/ @daniel

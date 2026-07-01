@@ -1,0 +1,1 @@
+"""Multi-agent domain entities."""
