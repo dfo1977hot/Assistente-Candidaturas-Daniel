@@ -1,0 +1,28 @@
+QMainWindow {
+    background-color: #f5f7fa;
+}
+
+QListWidget {
+    background: #1f2937;
+    color: white;
+    border: none;
+    font-size: 14px;
+    padding: 8px;
+}
+
+QListWidget::item {
+    padding: 12px;
+}
+
+QListWidget::item:selected {
+    background-color: #2563eb;
+    border-radius: 6px;
+}
+
+QStatusBar {
+    background: #e5e7eb;
+}
+
+QLabel {
+    color: #111827;
+}
