@@ -19,6 +19,8 @@ class Company(Base):
 
     website: Mapped[str] = mapped_column(String(300), nullable=True, default="")
 
+    notes: Mapped[str] = mapped_column(String(1000), nullable=True, default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
