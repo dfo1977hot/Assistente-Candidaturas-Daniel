@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from acd.core.router import Router
 from acd.presentation.pages.application_page import ApplicationPage
 from acd.presentation.pages.company_page import CompanyPage
+from acd.presentation.pages.curriculum_page import CurriculumPage
 from acd.presentation.pages.interview_page import InterviewPage
 from acd.presentation.pages.job_page import JobPage
 from acd.ui.sidebar import Sidebar
@@ -40,12 +41,14 @@ class MainWindow(QMainWindow):
         self.job_page = JobPage()
         self.application_page = ApplicationPage()
         self.interview_page = InterviewPage()
+        self.curriculum_page = CurriculumPage()
 
         self.stack.addWidget(self.dashboard)
         self.stack.addWidget(self.company_page)
         self.stack.addWidget(self.job_page)
         self.stack.addWidget(self.application_page)
         self.stack.addWidget(self.interview_page)
+        self.stack.addWidget(self.curriculum_page)
 
         self.router = Router()
         self.router.set_stack(self.stack)
@@ -54,6 +57,7 @@ class MainWindow(QMainWindow):
         self.router.register("jobs", self.job_page)
         self.router.register("applications", self.application_page)
         self.router.register("interviews", self.interview_page)
+        self.router.register("curricula", self.curriculum_page)
 
         self.sidebar.itemClicked.connect(self._on_sidebar_item_clicked)
 
@@ -81,5 +85,7 @@ class MainWindow(QMainWindow):
             self.router.navigate("applications")
         elif "Entrevistas" in label:
             self.router.navigate("interviews")
+        elif "Currículos" in label:
+            self.router.navigate("curricula")
         elif "Dashboard" in label:
             self.router.navigate("dashboard")

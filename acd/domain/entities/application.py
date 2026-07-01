@@ -20,6 +20,7 @@ class Application(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), nullable=False)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
     curriculum_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    curriculum_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="")
     cover_letter_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Rascunho")
     application_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
