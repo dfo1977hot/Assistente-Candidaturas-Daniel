@@ -86,7 +86,8 @@ class ApplicationPage(BasePage):
             "Encerrada",
         ])
         self.filter_status_combo.addItem("", "")
-        self.filter_status_combo.addItems([status for status in self.status_combo.itemText(index) for index in range(self.status_combo.count())])
+        for index in range(self.status_combo.count()):
+            self.filter_status_combo.addItem(self.status_combo.itemText(index))
         self.filter_company_combo.addItem("", "")
 
         form = QFormLayout()

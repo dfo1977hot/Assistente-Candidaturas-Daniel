@@ -11,6 +11,23 @@ from acd.infrastructure.repositories.application_repository import ApplicationRe
 class ApplicationService:
     """Camada de serviço para regras de negócio das candidaturas."""
 
+    VALID_STATUSES = {
+        "Rascunho",
+        "Preparando Currículo",
+        "Preparando Carta",
+        "Pronta para Aplicação",
+        "Aplicada",
+        "Em Triagem",
+        "Entrevista RH",
+        "Teste",
+        "Entrevista Técnica",
+        "Entrevista Gestor",
+        "Oferta",
+        "Contratada",
+        "Rejeitada",
+        "Encerrada",
+    }
+
     VALID_STATUS_TRANSITIONS = {
         "Rascunho": {"Preparando Currículo", "Preparando Carta", "Pronta para Aplicação"},
         "Preparando Currículo": {"Preparando Carta", "Pronta para Aplicação"},
@@ -52,6 +69,7 @@ class ApplicationService:
     ) -> Application:
         """Cria uma candidatura e registra a timeline inicial."""
         self._validate_required_fields(job_id=job_id, company_id=company_id)
+        self._validate_status(status)
         application = Application(
             job_id=job_id,
             company_id=company_id,
@@ -97,9 +115,13 @@ class ApplicationService:
     ) -> Optional[Application]:
         """Atualiza uma candidatura existente."""
         self._validate_required_fields(job_id=job_id, company_id=company_id)
+        self._validate_status(status)
         application = self.repository.get_by_id(application_id)
         if application is None:
             return None
+
+        if application.status != status:
+            self._validate_transition(application.status, status)
 
         application.job_id = job_id
         application.company_id = company_id
@@ -148,9 +170,8 @@ class ApplicationService:
             return None
 
         current_status = application.status
-        allowed = self.VALID_STATUS_TRANSITIONS.get(current_status, set())
-        if new_status not in allowed and not administrative:
-            raise ValueError(f"Transição inválida de {current_status} para {new_status}.")
+        self._validate_status(new_status)
+        self._validate_transition(current_status, new_status, administrative=administrative)
 
         updated = self.repository.change_status(application_id, new_status)
         if updated is not None:
@@ -171,6 +192,17 @@ class ApplicationService:
             raise ValueError("Vaga é obrigatória.")
         if company_id <= 0:
             raise ValueError("Empresa é obrigatória.")
+
+    def _validate_status(self, status: str) -> None:
+        if status not in self.VALID_STATUSES:
+            raise ValueError(f"Status inválido: {status}")
+
+    def _validate_transition(self, current_status: str, new_status: str, *, administrative: bool = False) -> None:
+        self._validate_status(current_status)
+        self._validate_status(new_status)
+        allowed = self.VALID_STATUS_TRANSITIONS.get(current_status, set())
+        if new_status not in allowed and not administrative:
+            raise ValueError(f"Transição inválida de {current_status} para {new_status}.")
 
     def _parse_optional_date(self, value: Optional[str]) -> Optional[date]:
         if not value:

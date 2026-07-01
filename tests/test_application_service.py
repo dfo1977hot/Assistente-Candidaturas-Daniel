@@ -61,10 +61,20 @@ def test_application_service_creates_and_changes_status(service_setup):
     assert updated.status == "Pronta para Aplicação"
 
 
+def test_application_service_rejects_invalid_status_transition(service_setup):
+    application_service, job_id, company_id = service_setup
+
+    created = application_service.create_application(job_id=job_id, company_id=company_id)
+
+    with pytest.raises(ValueError):
+        application_service.change_status(created.id, "Contratada")
+
+
 def test_application_service_updates_and_deletes_application(service_setup):
     application_service, job_id, company_id = service_setup
 
     created = application_service.create_application(job_id=job_id, company_id=company_id)
+    application_service.change_status(created.id, "Pronta para Aplicação")
     updated = application_service.update_application(
         created.id,
         job_id=job_id,
@@ -76,3 +86,13 @@ def test_application_service_updates_and_deletes_application(service_setup):
     assert updated.status == "Aplicada"
     assert application_service.delete_application(created.id) is True
     assert application_service.get_statistics()["total"] == 0
+
+
+def test_application_service_creates_followup_event(service_setup):
+    application_service, job_id, company_id = service_setup
+
+    created = application_service.create_application(job_id=job_id, company_id=company_id)
+    followups = application_service.get_followups(created.id)
+
+    assert len(followups) == 1
+    assert followups[0].description == "Candidatura criada"

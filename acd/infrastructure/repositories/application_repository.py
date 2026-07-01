@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from sqlalchemy import select
@@ -74,7 +75,7 @@ class ApplicationRepository:
             if application is None:
                 return None
             application.status = status
-            application.last_update = None
+            application.last_update = date.today()
             session.commit()
             session.refresh(application)
             return application
