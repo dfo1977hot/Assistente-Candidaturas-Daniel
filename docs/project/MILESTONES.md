@@ -10,7 +10,7 @@
 | Beta 1 | ⏳ | - |
 | Release 1.0 | ⏳ | - |
 
-## Estado do Projeto (Fase Alpha)
+## Estado do projeto - Fase Alpha
 
 | Area | Status |
 |---|---|

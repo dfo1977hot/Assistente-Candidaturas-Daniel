@@ -17,6 +17,9 @@ from acd.presentation.pages.analytics_page import AnalyticsPage
 from acd.presentation.pages.career_page import CareerPage
 from acd.presentation.pages.assistant_page import AssistantPage
 from acd.presentation.pages.agent_console_page import AgentConsolePage
+from acd.presentation.pages.ai_resume_page import AIResumePage
+from acd.presentation.pages.ats_page import ATSPage
+from acd.presentation.pages.base_page import BasePage
 from acd.ui.sidebar import Sidebar
 from acd.ui.dashboard import Dashboard
 
@@ -52,6 +55,9 @@ class MainWindow(QMainWindow):
         self.career_page = CareerPage()
         self.assistant_page = AssistantPage()
         self.agent_console_page = AgentConsolePage()
+        self.cover_letters_page = AIResumePage()
+        self.crm_page = ATSPage()
+        self.settings_page = BasePage("Configuracoes")
 
         self.stack.addWidget(self.dashboard)
         self.stack.addWidget(self.company_page)
@@ -64,6 +70,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.career_page)
         self.stack.addWidget(self.assistant_page)
         self.stack.addWidget(self.agent_console_page)
+        self.stack.addWidget(self.cover_letters_page)
+        self.stack.addWidget(self.crm_page)
+        self.stack.addWidget(self.settings_page)
 
         self.router = Router()
         self.router.set_stack(self.stack)
@@ -78,6 +87,9 @@ class MainWindow(QMainWindow):
         self.router.register("career", self.career_page)
         self.router.register("assistant", self.assistant_page)
         self.router.register("agent_console", self.agent_console_page)
+        self.router.register("cover_letters", self.cover_letters_page)
+        self.router.register("crm", self.crm_page)
+        self.router.register("settings", self.settings_page)
 
         self.sidebar.itemClicked.connect(self._on_sidebar_item_clicked)
 
@@ -117,5 +129,11 @@ class MainWindow(QMainWindow):
             self.router.navigate("assistant")
         elif "Agentes" in label:
             self.router.navigate("agent_console")
+        elif "Cartas" in label:
+            self.router.navigate("cover_letters")
+        elif "CRM" in label:
+            self.router.navigate("crm")
+        elif "Config" in label:
+            self.router.navigate("settings")
         elif "Dashboard" in label:
             self.router.navigate("dashboard")

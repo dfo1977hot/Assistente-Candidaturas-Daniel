@@ -1,55 +1,109 @@
-# Sprint 0.2 - Functional Validation
+# ACD - Sprint 0.2
 
-Objetivo: validar todas as telas existentes sem desenvolver novas funcionalidades.
+## Projeto
+Assistente de Candidaturas do Daniel (ACD)
 
-## Escopo congelado
-- Validar comportamento das telas ja existentes.
-- Corrigir apenas defeitos localizados identificados durante a validacao.
-- Nao introduzir novas features durante esta sprint.
+## Versao
+v0.1.1-alpha
 
-## Matriz de validacao
+## Titulo
+Functional Validation & UI Stabilization
 
-| Modulo | Abre | Renderiza | Navegacao | Sem erros | Status |
-|---|---|---|---|---|---|
-| Dashboard | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Vagas | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Empresas | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Candidaturas | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Entrevistas | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Curriculos | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Cartas | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Workflows | ☐ | ☐ | ☐ | ☐ | Pendente |
-| CRM | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Analise | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Planejamento de Carreira | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Assistente IA | ☐ | ☐ | ☐ | ☐ | Pendente |
-| Agentes | ☐ | ☐ | ☐ | ☐ | Pendente |
+## Epic
+Platform Stabilization
 
-## Criterios de aceite por modulo
-- Abre corretamente sem bloqueios.
-- Renderiza completamente sem layout quebrado.
-- Navegacao entre componentes e menus funciona.
-- Nao gera traceback nem excecao visivel no terminal.
-- Botoes e acoes principais estao clicaveis e responsivos.
+## Prioridade
+Critica
 
-## Fluxo de registro de bugs
-- Quando um item da matriz falhar, registrar bug em `docs/project/SPRINT0.2_BUG_LOG.md` usando o template de `docs/project/SPRINT0.2_BUG_TEMPLATE.md`.
-- Classificar severidade: Critico, Alto, Medio, Baixo.
-- Vincular modulo e evidencia (stacktrace, print, passo a passo).
+## Estimativa
+3 dias
 
-## Regra de geracao do backlog 0.3
-- Todo bug aberto na Sprint 0.2 entra no backlog da Sprint 0.3.
-- Bugs Criticos e Altos entram com prioridade P1.
-- Bugs Medios entram com prioridade P2.
-- Bugs Baixos entram com prioridade P3.
+## Dependencias
+- Sprint -1 (Governanca)
+- Sprint -0.5 (Agent SDK)
+- Sprint 0.1A (SQLAlchemy)
+- Sprint 0.1B (Database)
+- Sprint 0.1C (Bootstrap)
 
-## Entregaveis da sprint
-- Matriz completa e atualizada por modulo.
-- Relatorio consolidado em `docs/project/SPRINT0.2_VALIDATION_REPORT.md`.
-- Bug log consolidado em `docs/project/SPRINT0.2_BUG_LOG.md`.
-- Backlog priorizado para Sprint 0.3.
+## Objetivo
+Validar funcionalmente todas as telas existentes do ACD, eliminando erros de navegacao, renderizacao e inicializacao da interface.
 
-## Criterio de encerramento
-- Todos os modulos avaliados na matriz.
-- Nenhum bug Critico aberto.
-- Relatorio final publicado com resumo executivo e pendencias.
+Nao serao implementadas novas funcionalidades nesta sprint.
+
+## Fora do Escopo
+- Novos modulos
+- IA
+- ATS
+- Playwright
+- Novas tabelas
+- Refatoracoes arquiteturais amplas
+- Mudancas na governanca
+
+## Escopo de Validacao
+1. Sidebar: cada item deve abrir, renderizar, trocar de pagina e nao gerar traceback.
+2. Dashboard: KPIs, layout, responsividade basica e widgets sem quebra.
+3. Empresas, Vagas, Candidaturas e Entrevistas: abertura, tabela, toolbar, filtros e botoes.
+4. Curriculos e Cartas: abertura da pagina sem excecao.
+5. Analytics: graficos vazios, renderizacao e layout.
+6. Planejamento de Carreira, Agentes e Configuracoes: validacao de abertura e navegacao.
+
+## Criterio de Validacao
+Cada tela recebe status PASS ou FAIL.
+
+## Relatorio Obrigatorio
+Arquivo: `docs/project/SPRINT0.2_REPORT.md`
+
+Formato:
+| Tela | Status | Bugs | Severidade |
+|---|---|---|---|
+| Dashboard | PASS | 0 | - |
+| Empresas | FAIL | 2 | Medio |
+| Analytics | PASS | 0 | - |
+
+## Severidade
+- Critico: impede iniciar a aplicacao.
+- Alto: impede utilizar a tela.
+- Medio: funcionalidade parcial.
+- Baixo: problema visual.
+
+## Logging
+Toda excecao deve ser registrada em `logs/functional_validation.log`.
+
+## Testes
+Adicionar testes para:
+- abertura da MainWindow;
+- troca de paginas;
+- criacao das paginas;
+- renderizacao dos widgets principais.
+
+Cobertura minima: 85% para a camada `presentation`.
+
+Estrutura esperada:
+- `tests/presentation/test_main_window.py`
+- `tests/presentation/test_sidebar.py`
+- `tests/presentation/test_dashboard.py`
+- `tests/presentation/test_pages.py`
+
+## Melhorias Permitidas
+Apenas correcoes de `__init__`, sinais e slots, layouts, imports, widgets quebrados e erros de renderizacao.
+
+Qualquer outra alteracao exige ADR.
+
+## Criterios de Aceite
+- Todas as telas abrem sem excecao.
+- Sidebar navega corretamente.
+- Dashboard renderiza.
+- Nao existem tracebacks durante a navegacao.
+- Relatorio `SPRINT0.2_REPORT.md` gerado.
+- Bugs classificados por severidade.
+
+## Commit da Sprint
+`test(ui): validate application screens and navigation`
+
+## Definition of Done
+- Todas as paginas existentes podem ser abertas.
+- Nenhum erro critico na UI.
+- Navegacao funcional.
+- Relatorio gerado.
+- Testes executados.
+- Quality Gate aprovado.
