@@ -16,3 +16,9 @@
 | 🤖 Assistente IA | PASS | 0 | - |
 | 🦾 Agentes | PASS | 0 | - |
 | ⚙ Configurações | PASS | 0 | - |
+
+## Observacao de cobertura
+
+A cobertura da camada presentation ficou em 54% nesta sprint e foi aceita temporariamente.
+
+A meta de 85% foi adiada para a fase Beta, priorizando a evolucao funcional do MVP.

@@ -20,6 +20,8 @@ dist/
 
 # SQLite backups
 *.db-journal
+backups/
+data/database/*backup*.db
 
 # OS
 .DS_Store
