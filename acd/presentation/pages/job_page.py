@@ -3,13 +3,15 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtWidgets import (
+    QLineEdit,
     QComboBox,
     QDateEdit,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
+    QDoubleSpinBox,
+    QSpinBox,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -17,6 +19,10 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
 )
+
+from PySide6.QtCore import (
+    QDate,
+) 
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.company_service import CompanyService
@@ -32,62 +38,122 @@ class JobPage(BasePage):
         self.job_service = JobService()
         self.company_service = CompanyService()
         self.current_job_id: Optional[int] = None
-
         self.company_combo = QComboBox()
         self.title_input = QLineEdit()
         self.location_input = QLineEdit()
         self.work_model_combo = QComboBox()
         self.employment_type_combo = QComboBox()
-        self.salary_min_input = QLineEdit()
-        self.salary_max_input = QLineEdit()
-        self.currency_input = QLineEdit()
+        self.salary_min_input = QDoubleSpinBox()
+        self.salary_min_input.setDecimals(2)
+        self.salary_min_input.setMaximum(99999999.99)
+        self.salary_min_input.setMinimum(0)
+        self.salary_min_input.setSingleStep(100)
+        self.salary_min_input.setGroupSeparatorShown(True)
+        self.salary_min_input.setPrefix("R$ ")
+        self.salary_max_input = QDoubleSpinBox()
+        self.salary_max_input.setDecimals(2)
+        self.salary_max_input.setMaximum(99999999.99)
+        self.salary_max_input.setMinimum(0)
+        self.salary_max_input.setSingleStep(100)
+        self.salary_max_input.setGroupSeparatorShown(True)
+        self.salary_max_input.setPrefix("R$ ")
+        self.currency_input = QComboBox()
+      
+        # self.currency_input.addItems(
+        #     [
+        #         "R$",
+        #         "US$",
+        #         "€",
+        #         "£",
+        #     ]
+        # ) 
+
         self.status_combo = QComboBox()
         self.source_input = QLineEdit()
         self.url_input = QLineEdit()
         self.recruiter_input = QLineEdit()
         self.deadline_input = QDateEdit()
+        self.deadline_input.setCalendarPopup(True)
+        self.deadline_input.setDisplayFormat("dd/MM/yyyy")
+        self.deadline_input.setDate(QDate.currentDate())
         self.application_date_input = QDateEdit()
-        self.priority_input = QLineEdit()
+        self.application_date_input.setCalendarPopup(True)
+        self.application_date_input.setDate(QDate.currentDate())
+        self.priority_input = QSpinBox()
+        self.priority_input.setMinimum(1)
+        self.priority_input.setMaximum(5)
+        self.priority_input.setValue(3)
         self.notes_input = QTextEdit()
-
         self.search_input = QLineEdit()
         self.filter_status_combo = QComboBox()
         self.filter_company_combo = QComboBox()
         self.filter_button = QPushButton("Filtrar")
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
-
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
             ["ID", "Empresa", "Cargo", "Status", "Cidade", "Cadastro"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
-
         self._setup_controls()
         self._load_companies()
         self._load_jobs()
 
     def _setup_controls(self) -> None:
         self.company_combo.addItem("", "")
-        self.work_model_combo.addItems(["", "Presencial", "Híbrido", "Remoto"])
-        self.employment_type_combo.addItems(["", "CLT", "PJ", "Temporário", "Estágio", "Freelancer", "Terceirizado"])
-        self.status_combo.addItems([
-            "Nova",
-            "Analisada",
-            "Currículo Enviado",
-            "Carta Enviada",
-            "Inscrição Concluída",
-            "Triagem RH",
-            "Entrevista RH",
-            "Entrevista Técnica",
-            "Teste",
-            "Oferta",
-            "Rejeitada",
-            "Encerrada",
-        ])
+        self.currency_input.addItems(
+            [
+                "BRL",
+                "USD",
+                "EUR",
+                "GBP",
+            ]
+        )
+        self.currency_input.currentIndexChanged.connect(
+            self._update_currency_symbol
+        )
+
+        self._update_currency_symbol()
+
+        self.work_model_combo.addItems(
+            [
+                "",
+                "Presencial",
+                "Híbrido",
+                "Remoto"
+            ]
+        )
+        self.employment_type_combo.addItems(
+            [
+                "",
+                "CLT",
+                "PJ",
+                "Temporário",
+                "Estágio",
+                "Freelancer",
+                "Terceirizado"
+            ]
+        )
+        self.status_combo.addItems(
+            [
+                "Nova",
+                "Analisada",
+                "Currículo Enviado",
+                "Carta Enviada",
+                "Inscrição Concluída",
+                "Triagem RH",
+                "Entrevista RH",
+                "Entrevista Técnica",
+                "Teste",
+                "Oferta",
+                "Rejeitada",
+                "Encerrada",
+            ]
+        )
         self.filter_status_combo.addItem("", "")
         self.filter_status_combo.addItems(self.status_combo.itemText(index) for index in range(1, self.status_combo.count()))
         self.filter_company_combo.addItem("", "")
@@ -152,16 +218,16 @@ class JobPage(BasePage):
             location = self.location_input.text().strip()
             work_model = self.work_model_combo.currentText()
             employment_type = self.employment_type_combo.currentText()
-            salary_min = self._parse_optional_number(self.salary_min_input.text())
-            salary_max = self._parse_optional_number(self.salary_max_input.text())
-            currency = self.currency_input.text().strip()
+            salary_min=self.salary_min_input.value()
+            salary_max=self.salary_max_input.value()
+            currency = self.currency_input.currentText()
             status = self.status_combo.currentText()
             source = self.source_input.text().strip()
             job_url = self.url_input.text().strip()
             recruiter = self.recruiter_input.text().strip()
             deadline = self.deadline_input.date().toString("yyyy-MM-dd") if self.deadline_input.date().isValid() else ""
             application_date = self.application_date_input.date().toString("yyyy-MM-dd") if self.application_date_input.date().isValid() else ""
-            priority = int(self.priority_input.text().strip() or 0)
+            priority=self.priority_input.value()
             notes = self.notes_input.toPlainText().strip()
 
             if self.current_job_id is None:
@@ -228,14 +294,87 @@ class JobPage(BasePage):
         self._load_jobs()
 
     def _on_row_selected(self) -> None:
+        """Carrega todos os dados da vaga selecionada."""
+
         selected_rows = self.table.selectionModel().selectedRows()
+
         if not selected_rows:
             return
 
         row = selected_rows[0].row()
-        self.current_job_id = int(self.table.item(row, 0).text())
-        self.title_input.setText(self.table.item(row, 2).text())
-        self.location_input.setText(self.table.item(row, 4).text())
+
+        self.current_job_id = int(
+            self.table.item(row, 0).text()
+        )
+
+        job = self.job_service.get_job(self.current_job_id)
+
+        if job is None:
+            return
+
+        self._populate_form(job)
+
+    def _populate_form(self, job) -> None:
+        """Preenche o formulário com os dados da vaga."""
+
+        index = self.company_combo.findData(job.company_id)
+
+        if index >= 0:
+            self.company_combo.setCurrentIndex(index)
+
+        self.title_input.setText(job.title or "")
+        self.location_input.setText(job.location or "")
+
+        self.work_model_combo.setCurrentText(
+            job.work_model or ""
+        )
+
+        self.employment_type_combo.setCurrentText(
+            job.employment_type or ""
+        )
+
+        self.salary_min_input.setValue(
+            float(job.salary_min or 0)
+        )
+
+        self.salary_max_input.setValue(
+            float(job.salary_max or 0)
+        )
+
+        index = self.currency_input.findText(
+            job.currency or "R$"
+        )
+
+        if index >= 0:
+            self.currency_input.setCurrentIndex(index)
+
+        self._update_currency_symbol()
+
+        self.status_combo.setCurrentText(
+            job.status or "Nova"
+        )
+
+        self.source_input.setText(job.source or "")
+
+        self.url_input.setText(job.job_url or "")
+
+        self.recruiter_input.setText(
+            job.recruiter or ""
+        )
+
+        if job.application_deadline:
+            self.deadline_input.setDate(job.application_deadline)
+
+        if job.application_date:
+            self.application_date_input.setDate(job.application_date)
+
+        self.priority_input.setValue(
+            job.priority or 3
+        )
+
+        self.notes_input.setPlainText(
+            job.notes or ""
+        )
 
     def _load_jobs(self) -> None:
         jobs = self.job_service.list_jobs()
@@ -273,23 +412,47 @@ class JobPage(BasePage):
         self.table.resizeColumnsToContents()
 
     def _clear_form(self) -> None:
+        """Limpa o formulário e prepara para um novo cadastro."""
         self.current_job_id = None
         self.company_combo.setCurrentIndex(0)
         self.title_input.clear()
         self.location_input.clear()
         self.work_model_combo.setCurrentIndex(0)
         self.employment_type_combo.setCurrentIndex(0)
-        self.salary_min_input.clear()
-        self.salary_max_input.clear()
-        self.currency_input.clear()
+        self.salary_min_input.setValue(0.00)
+        self.salary_max_input.setValue(0.00)
+        self.currency_input.setCurrentIndex(0)
         self.status_combo.setCurrentIndex(0)
         self.source_input.clear()
         self.url_input.clear()
         self.recruiter_input.clear()
-        self.deadline_input.setDate(self.deadline_input.minimumDate())
-        self.application_date_input.setDate(self.application_date_input.minimumDate())
-        self.priority_input.clear()
+        # Reinicia as datas para a data atual
+        self.deadline_input.setDate(QDate.currentDate())
+        self.application_date_input.setDate(QDate.currentDate())
+        self.priority_input.setValue(3)
         self.notes_input.clear()
+        # Remove seleção da tabela
+        self.table.clearSelection()
+        # Coloca o foco no primeiro campo útil
+        self.title_input.setFocus()
+
+    def _update_currency_symbol(self) -> None:
+        """Atualiza o prefixo dos campos de salário conforme a moeda."""
+
+        symbols = {
+            "BRL": "R$",
+            "USD": "US$",
+            "EUR": "€",
+            "GBP": "£",
+        }
+
+        symbol = symbols.get(
+            self.currency_input.currentText(),
+            "R$",
+    )
+
+        self.salary_min_input.setPrefix(f"{symbol} ")
+        self.salary_max_input.setPrefix(f"{symbol} ")   
 
     def _parse_optional_number(self, value: str) -> Optional[float]:
         if not value.strip():

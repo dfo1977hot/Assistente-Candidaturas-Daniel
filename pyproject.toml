@@ -1,0 +1,13 @@
+[project]
+name = "acd"
+version = "0.1.0"
+description = "Assistente de Candidaturas do Daniel"
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

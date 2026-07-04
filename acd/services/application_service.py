@@ -151,6 +151,11 @@ class ApplicationService:
             logger.info("Candidatura encerrada: %s", application_id)
         return deleted
 
+    def get_application(self, application_id: int):
+        """Retorna uma candidatura pelo ID."""
+
+        return self.repository.get_by_id(application_id)
+
     def list_applications(self) -> list[Application]:
         """Retorna todas as candidaturas."""
         return self.repository.get_all()

@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from sqlalchemy.orm import joinedload
 from datetime import date
 from typing import Optional
 
@@ -38,12 +38,34 @@ class ApplicationRepository:
 
     def get_by_id(self, application_id: int) -> Optional[Application]:
         with database_module.SessionLocal() as session:
-            return session.get(Application, application_id)
+            stmt = (
+                select(Application)
+                .options(
+                    joinedload(Application.company),
+                    joinedload(Application.job),
+                )
+                .where(Application.id == application_id)
+            )
 
+            return session.scalar(stmt)
+        
     def get_all(self) -> list[Application]:
         with database_module.SessionLocal() as session:
-            stmt = select(Application).order_by(Application.application_date.desc(), Application.created_at.desc())
+            stmt = (
+                select(Application)
+                .options(
+                    joinedload(Application.company),
+                    joinedload(Application.job),
+                )
+                .order_by(
+                    Application.application_date.desc(),
+                    Application.created_at.desc(),
+                )
+            )
+
             return list(session.scalars(stmt).all())
+            
+
 
     def search(self, query: str) -> list[Application]:
         with database_module.SessionLocal() as session:
@@ -90,6 +112,14 @@ class ApplicationRepository:
             total = session.query(Application).count()
             active = session.query(Application).filter(Application.status != "Encerrada").count()
             return {"total": total, "active": active}
+        
+    def count(self) -> int:
+        """
+        Retorna o número total de candidaturas cadastradas.
+        """
+
+        with database_module.SessionLocal() as session:
+            return session.query(Application).count()
 
     def add_event(self, application_id: int, event_type: str, description: str) -> TimelineEvent:
         with database_module.SessionLocal() as session:
