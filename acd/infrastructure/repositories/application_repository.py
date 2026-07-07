@@ -1,9 +1,9 @@
 from __future__ import annotations
-from sqlalchemy.orm import joinedload
+
 from datetime import date
-from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from acd.database import database as database_module
 from acd.domain.entities.application import Application
@@ -36,7 +36,7 @@ class ApplicationRepository:
             session.commit()
             return True
 
-    def get_by_id(self, application_id: int) -> Optional[Application]:
+    def get_by_id(self, application_id: int) -> Application | None:
         with database_module.SessionLocal() as session:
             stmt = (
                 select(Application)
@@ -48,7 +48,7 @@ class ApplicationRepository:
             )
 
             return session.scalar(stmt)
-        
+
     def get_all(self) -> list[Application]:
         with database_module.SessionLocal() as session:
             stmt = (
@@ -64,22 +64,25 @@ class ApplicationRepository:
             )
 
             return list(session.scalars(stmt).all())
-            
-
 
     def search(self, query: str) -> list[Application]:
         with database_module.SessionLocal() as session:
             stmt = (
                 select(Application)
                 .where(
-                    Application.notes.ilike(f"%{query}%")
-                    | Application.feedback.ilike(f"%{query}%")
+                    Application.notes.ilike(f"%{query}%") | Application.feedback.ilike(f"%{query}%")
                 )
                 .order_by(Application.created_at.desc())
             )
             return list(session.scalars(stmt).all())
 
-    def filter(self, *, status: Optional[str] = None, company_id: Optional[int] = None, channel: Optional[str] = None) -> list[Application]:
+    def filter(
+        self,
+        *,
+        status: str | None = None,
+        company_id: int | None = None,
+        channel: str | None = None,
+    ) -> list[Application]:
         with database_module.SessionLocal() as session:
             stmt = select(Application)
             if status:
@@ -91,7 +94,7 @@ class ApplicationRepository:
             stmt = stmt.order_by(Application.created_at.desc())
             return list(session.scalars(stmt).all())
 
-    def change_status(self, application_id: int, status: str) -> Optional[Application]:
+    def change_status(self, application_id: int, status: str) -> Application | None:
         with database_module.SessionLocal() as session:
             application = session.get(Application, application_id)
             if application is None:
@@ -104,7 +107,11 @@ class ApplicationRepository:
 
     def get_followups(self, application_id: int) -> list[TimelineEvent]:
         with database_module.SessionLocal() as session:
-            stmt = select(TimelineEvent).where(TimelineEvent.application_id == application_id).order_by(TimelineEvent.created_at.desc())
+            stmt = (
+                select(TimelineEvent)
+                .where(TimelineEvent.application_id == application_id)
+                .order_by(TimelineEvent.created_at.desc())
+            )
             return list(session.scalars(stmt).all())
 
     def get_statistics(self) -> dict[str, int]:
@@ -112,7 +119,7 @@ class ApplicationRepository:
             total = session.query(Application).count()
             active = session.query(Application).filter(Application.status != "Encerrada").count()
             return {"total": total, "active": active}
-        
+
     def count(self) -> int:
         """
         Retorna o número total de candidaturas cadastradas.
@@ -123,7 +130,9 @@ class ApplicationRepository:
 
     def add_event(self, application_id: int, event_type: str, description: str) -> TimelineEvent:
         with database_module.SessionLocal() as session:
-            event = TimelineEvent(application_id=application_id, event_type=event_type, description=description)
+            event = TimelineEvent(
+                application_id=application_id, event_type=event_type, description=description
+            )
             session.add(event)
             session.commit()
             session.refresh(event)

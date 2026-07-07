@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from acd.services.profile_service import ProfileService, ProfileAggregate, ProfileCompletionService
-from acd.services.import_service import ImportService
 from acd.services.export_service import ExportService
+from acd.services.import_service import ImportService
+from acd.services.profile_service import ProfileAggregate, ProfileCompletionService, ProfileService
 
 
 class ProfileApplicationService:

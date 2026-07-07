@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import func, or_, select
 
 from acd.database import database as database_module
@@ -49,7 +47,7 @@ class JobRepository:
                 session.rollback()
                 raise
 
-    def get_by_id(self, job_id: int) -> Optional[Job]:
+    def get_by_id(self, job_id: int) -> Job | None:
         with database_module.SessionLocal() as session:
             return session.get(Job, job_id)
 
@@ -80,10 +78,10 @@ class JobRepository:
     def filter(
         self,
         *,
-        company_id: Optional[int] = None,
-        status: Optional[str] = None,
-        work_model: Optional[str] = None,
-        employment_type: Optional[str] = None,
+        company_id: int | None = None,
+        status: str | None = None,
+        work_model: str | None = None,
+        employment_type: str | None = None,
     ) -> list[Job]:
         with database_module.SessionLocal() as session:
             stmt = select(Job)
@@ -106,31 +104,19 @@ class JobRepository:
 
     def list_by_company(self, company_id: int) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = (
-                select(Job)
-                .where(Job.company_id == company_id)
-                .order_by(Job.created_at.desc())
-            )
+            stmt = select(Job).where(Job.company_id == company_id).order_by(Job.created_at.desc())
 
             return list(session.scalars(stmt).all())
 
     def list_by_status(self, status: str) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = (
-                select(Job)
-                .where(Job.status == status)
-                .order_by(Job.created_at.desc())
-            )
+            stmt = select(Job).where(Job.status == status).order_by(Job.created_at.desc())
 
             return list(session.scalars(stmt).all())
 
     def list_recent(self, limit: int = 20) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = (
-                select(Job)
-                .order_by(Job.created_at.desc())
-                .limit(limit)
-            )
+            stmt = select(Job).order_by(Job.created_at.desc()).limit(limit)
 
             return list(session.scalars(stmt).all())
 

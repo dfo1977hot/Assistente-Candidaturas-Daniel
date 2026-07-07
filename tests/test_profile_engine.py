@@ -3,10 +3,10 @@ import tempfile
 
 import pytest
 
-from acd.services.profile_service import ProfileService, ProfileAggregate, ProfileCompletionService
 from acd.infrastructure.repositories.profile_repository import ProfileRepository
-from acd.services.import_service import ImportService
 from acd.services.export_service import ExportService
+from acd.services.import_service import ImportService
+from acd.services.profile_service import ProfileAggregate, ProfileCompletionService, ProfileService
 
 
 @pytest.fixture
@@ -34,17 +34,6 @@ def profile_setup(monkeypatch):
 
     from acd.models.base import Base
 
-    import acd.domain.entities.profile
-    import acd.domain.entities.experience
-    import acd.domain.entities.education
-    import acd.domain.entities.language
-    import acd.domain.entities.certification
-    import acd.domain.entities.project
-    import acd.domain.entities.publication
-    import acd.domain.entities.social_link
-    import acd.domain.entities.answer_template
-    import acd.domain.entities.profile_version
-
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)
 
@@ -64,7 +53,17 @@ def test_profile_service_creates_and_updates_profile(profile_setup):
 
 def test_profile_completion_service_calculates_completion(profile_setup):
     service = ProfileCompletionService()
-    aggregate = ProfileAggregate(profile={"full_name": "Daniel", "email": "d@example.com"}, experiences=[], educations=[], languages=[], certifications=[], projects=[], publications=[], social_links=[], answer_templates=[])
+    aggregate = ProfileAggregate(
+        profile={"full_name": "Daniel", "email": "d@example.com"},
+        experiences=[],
+        educations=[],
+        languages=[],
+        certifications=[],
+        projects=[],
+        publications=[],
+        social_links=[],
+        answer_templates=[],
+    )
     result = service.calculate(aggregate)
 
     assert result["percentage"] >= 0
@@ -73,7 +72,11 @@ def test_profile_completion_service_calculates_completion(profile_setup):
 
 def test_import_service_imports_linkedin_payload(profile_setup):
     service = ImportService()
-    payload = {"full_name": "Daniel Silva", "email": "daniel@example.com", "experiences": [{"company": "ACME", "role": "Analista"}]}
+    payload = {
+        "full_name": "Daniel Silva",
+        "email": "daniel@example.com",
+        "experiences": [{"company": "ACME", "role": "Analista"}],
+    }
     imported = service.import_data(payload, source="linkedin")
     assert imported["profile_id"] is not None
 

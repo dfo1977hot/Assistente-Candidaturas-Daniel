@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -17,7 +18,7 @@ class AutomationResult(Base):
     application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id"), nullable=True)
     connector: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     execution_time: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
     screenshot: Mapped[str] = mapped_column(Text, nullable=False, default="")

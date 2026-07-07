@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from acd.core.logger import logger
 from acd.domain.entities.application import Application
@@ -13,20 +12,38 @@ from acd.infrastructure.repositories.curriculum_repository import CurriculumRepo
 class CurriculumService:
     """Serviço para gerenciamento de currículos e versões."""
 
-    def __init__(self, repository: Optional[CurriculumRepository] = None) -> None:
+    def __init__(self, repository: CurriculumRepository | None = None) -> None:
         self.repository = repository or CurriculumRepository()
         self.storage_root = Path("data/curriculos")
         self.storage_root.mkdir(parents=True, exist_ok=True)
 
-    def create_curriculum(self, *, name: str, version: str = "v1.0", language: str = "pt-BR", description: str = "") -> Curriculum:
+    def create_curriculum(
+        self, *, name: str, version: str = "v1.0", language: str = "pt-BR", description: str = ""
+    ) -> Curriculum:
         """Cria um currículo e sua primeira versão."""
-        curriculum = Curriculum(name=name.strip(), version=version.strip(), language=language.strip(), description=description.strip())
+        curriculum = Curriculum(
+            name=name.strip(),
+            version=version.strip(),
+            language=language.strip(),
+            description=description.strip(),
+        )
         created = self.repository.create(curriculum)
-        self.repository.create_version(created.id, CurriculumVersion(curriculum_id=created.id, version=version.strip(), file_name="", file_path="", file_type=""))
+        self.repository.create_version(
+            created.id,
+            CurriculumVersion(
+                curriculum_id=created.id,
+                version=version.strip(),
+                file_name="",
+                file_path="",
+                file_type="",
+            ),
+        )
         logger.info("Currículo criado: %s", created.id)
         return created
 
-    def update_curriculum(self, curriculum_id: int, *, name: str, version: str, language: str, description: str = "") -> Optional[Curriculum]:
+    def update_curriculum(
+        self, curriculum_id: int, *, name: str, version: str, language: str, description: str = ""
+    ) -> Curriculum | None:
         """Atualiza um currículo."""
         curriculum = self.repository.get_by_id(curriculum_id)
         if curriculum is None:
@@ -46,19 +63,34 @@ class CurriculumService:
             logger.info("Currículo removido: %s", curriculum_id)
         return deleted
 
-    def duplicate_curriculum(self, curriculum_id: int) -> Optional[Curriculum]:
+    def duplicate_curriculum(self, curriculum_id: int) -> Curriculum | None:
         """Cria uma nova versão a partir de um currículo existente."""
         base = self.repository.get_by_id(curriculum_id)
         if base is None:
             return None
         next_version = self._next_version(base.version)
-        duplicated = Curriculum(name=base.name, description=base.description, version=next_version, language=base.language, is_default=False)
+        duplicated = Curriculum(
+            name=base.name,
+            description=base.description,
+            version=next_version,
+            language=base.language,
+            is_default=False,
+        )
         created = self.repository.create(duplicated)
-        self.repository.create_version(created.id, CurriculumVersion(curriculum_id=created.id, version=next_version, file_name=base.name, file_path="", file_type=""))
+        self.repository.create_version(
+            created.id,
+            CurriculumVersion(
+                curriculum_id=created.id,
+                version=next_version,
+                file_name=base.name,
+                file_path="",
+                file_type="",
+            ),
+        )
         logger.info("Versão criada: %s", created.id)
         return created
 
-    def activate_curriculum(self, curriculum_id: int) -> Optional[Curriculum]:
+    def activate_curriculum(self, curriculum_id: int) -> Curriculum | None:
         """Marca um currículo como padrão."""
         curriculum = self.repository.get_by_id(curriculum_id)
         if curriculum is None:
@@ -72,7 +104,9 @@ class CurriculumService:
         logger.info("Currículo ativado: %s", updated.id)
         return updated
 
-    def import_curriculum(self, *, curriculum_id: int, file_name: str, file_bytes: bytes, file_type: str) -> Optional[CurriculumVersion]:
+    def import_curriculum(
+        self, *, curriculum_id: int, file_name: str, file_bytes: bytes, file_type: str
+    ) -> CurriculumVersion | None:
         """Importa um arquivo de currículo para o sistema de arquivos local."""
         curriculum = self.repository.get_by_id(curriculum_id)
         if curriculum is None:
@@ -91,7 +125,9 @@ class CurriculumService:
         logger.info("Currículo importado: %s", created_version.id)
         return created_version
 
-    def associate_to_application(self, *, application_id: int, curriculum_id: int) -> Optional[Application]:
+    def associate_to_application(
+        self, *, application_id: int, curriculum_id: int
+    ) -> Application | None:
         """Associa um currículo a uma candidatura."""
         application = self._get_application(application_id)
         if application is None:
@@ -120,7 +156,11 @@ class CurriculumService:
         repo = ApplicationRepository()
         applications = repo.get_all()
         used = sum(1 for application in applications if getattr(application, "curriculum_id", None))
-        return {"total": len(self.repository.get_all()), "versions": len(self.repository.get_all()) * 2, "used": used}
+        return {
+            "total": len(self.repository.get_all()),
+            "versions": len(self.repository.get_all()) * 2,
+            "used": used,
+        }
 
     def _next_version(self, version: str) -> str:
         base = version.replace("v", "")
@@ -134,7 +174,7 @@ class CurriculumService:
 
         return hashlib.sha256(data).hexdigest()
 
-    def _get_application(self, application_id: int) -> Optional[Application]:
+    def _get_application(self, application_id: int) -> Application | None:
         from acd.infrastructure.repositories.application_repository import ApplicationRepository
 
         return ApplicationRepository().get_by_id(application_id)

@@ -1,15 +1,14 @@
 import os
-import json
 import tempfile
 
 import pytest
 
+from acd.domain.workflow.execution_context import ExecutionContext
+from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
+from acd.infrastructure.workflow.command_dispatcher import CommandDispatcher
+from acd.infrastructure.workflow.event_bus import EventBus
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_template_service import WorkflowTemplateService
-from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
-from acd.infrastructure.workflow.event_bus import EventBus
-from acd.infrastructure.workflow.command_dispatcher import CommandDispatcher
-from acd.domain.workflow.execution_context import ExecutionContext
 
 
 @pytest.fixture
@@ -36,13 +35,6 @@ def workflow_setup(monkeypatch):
     )
 
     from acd.models.base import Base
-
-    import acd.domain.entities.workflow
-    import acd.domain.entities.workflow_step
-    import acd.domain.entities.workflow_execution
-    import acd.domain.entities.workflow_event
-    import acd.domain.entities.workflow_log
-    import acd.domain.entities.workflow_template
 
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)
@@ -108,7 +100,9 @@ def test_workflow_template_service_provides_templates(workflow_setup):
 
 
 def test_workflow_template_service_creates_from_template(workflow_setup):
-    template_service = WorkflowTemplateService(workflow_service=WorkflowService(repository=WorkflowRepository()))
+    template_service = WorkflowTemplateService(
+        workflow_service=WorkflowService(repository=WorkflowRepository())
+    )
     result = template_service.create_workflow_from_template("Apenas ATS")
     assert result is not None
     assert "id" in result or "error" not in result

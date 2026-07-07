@@ -41,7 +41,9 @@ def service_setup(monkeypatch):
 
 
 def test_service_creates_and_searches_company(service_setup):
-    created = service_setup.create_company(name="Acme", city="São Paulo", website="https://acme.com")
+    created = service_setup.create_company(
+        name="Acme", city="São Paulo", website="https://acme.com"
+    )
 
     assert created.id is not None
     assert service_setup.count_companies() == 1

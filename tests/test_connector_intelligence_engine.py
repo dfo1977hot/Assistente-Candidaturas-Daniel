@@ -3,14 +3,14 @@ import tempfile
 
 import pytest
 
-from acd.services.connector_mapping_service import MappingService
-from acd.services.connector_validation_service import ValidationService
-from acd.services.connector_transformation_service import TransformationService
-from acd.services.connector_discovery_service import ConnectorDiscoveryService
-from acd.services.schema_service import SchemaService
-from acd.services.field_resolver_service import FieldResolverService
-from acd.infrastructure.repositories.connector_repository import ConnectorRepository
 from acd.infrastructure.connectors.plugin_registry import PluginRegistry
+from acd.infrastructure.repositories.connector_repository import ConnectorRepository
+from acd.services.connector_discovery_service import ConnectorDiscoveryService
+from acd.services.connector_mapping_service import MappingService
+from acd.services.connector_transformation_service import TransformationService
+from acd.services.connector_validation_service import ValidationService
+from acd.services.field_resolver_service import FieldResolverService
+from acd.services.schema_service import SchemaService
 
 
 @pytest.fixture
@@ -37,23 +37,6 @@ def connector_setup(monkeypatch):
     )
 
     from acd.models.base import Base
-
-    import acd.domain.entities.profile
-    import acd.domain.entities.experience
-    import acd.domain.entities.education
-    import acd.domain.entities.language
-    import acd.domain.entities.certification
-    import acd.domain.entities.project
-    import acd.domain.entities.publication
-    import acd.domain.entities.social_link
-    import acd.domain.entities.answer_template
-    import acd.domain.entities.profile_version
-    import acd.domain.connector.platform
-    import acd.domain.connector.schema
-    import acd.domain.connector.field_mapping
-    import acd.domain.connector.connector_profile
-    import acd.domain.connector.connector_rule
-    import acd.domain.connector.field_history
 
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)

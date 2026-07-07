@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 def update_company(
-    repository: "CompanyRepository",
+    repository: CompanyRepository,
     company_id: int,
     *,
     name: str,

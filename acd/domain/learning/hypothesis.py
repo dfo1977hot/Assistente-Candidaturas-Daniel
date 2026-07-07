@@ -1,16 +1,17 @@
 """Hypothesis entity for testable assumptions about patterns."""
 
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import String, Text, Integer, DateTime, JSON, Enum as SQLEnum, Numeric, ForeignKey
+from sqlalchemy import JSON, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class HypothesisStatus(str, Enum):
+class HypothesisStatus(StrEnum):
     """Hypothesis status."""
 
     PROPOSED = "proposed"
@@ -29,25 +30,36 @@ class Hypothesis(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     statement: Mapped[str] = mapped_column(String(500), nullable=False, unique=False, index=True)
-    confidence: Mapped[float] = mapped_column(Numeric(precision=5, scale=4), nullable=False, default=0.5)
-    status: Mapped[str] = mapped_column(
-        SQLEnum(HypothesisStatus), 
-        nullable=False, 
-        default=HypothesisStatus.PROPOSED,
-        index=True
+    confidence: Mapped[float] = mapped_column(
+        Numeric(precision=5, scale=4), nullable=False, default=0.5
     )
-    evidence_base: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False, comment="Evidence supporting hypothesis")
-    evidence_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="Number of data points")
-    counterevidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False, comment="Counter evidence")
+    status: Mapped[str] = mapped_column(
+        SQLEnum(HypothesisStatus), nullable=False, default=HypothesisStatus.PROPOSED, index=True
+    )
+    evidence_base: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False, comment="Evidence supporting hypothesis"
+    )
+    evidence_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="Number of data points"
+    )
+    counterevidence: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False, comment="Counter evidence"
+    )
     counterevidence_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     test_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     test_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    expected_impact: Mapped[str] = mapped_column(Text, nullable=False, default="", comment="Expected impact if true")
-    related_patterns: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False, comment="Related pattern IDs")
+    expected_impact: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", comment="Expected impact if true"
+    )
+    related_patterns: Mapped[list[int]] = mapped_column(
+        JSON, default=list, nullable=False, comment="Related pattern IDs"
+    )
     related_learning_records: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False)
     user_notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:
@@ -61,7 +73,7 @@ class Hypothesis(Base):
             notes: Optional notes
         """
         self.status = HypothesisStatus.CONFIRMED
-        self.reviewed_at = datetime.utcnow()
+        self.reviewed_at = datetime.now(UTC)
         if notes:
             self.user_notes = notes
 
@@ -72,7 +84,7 @@ class Hypothesis(Base):
             notes: Optional notes
         """
         self.status = HypothesisStatus.REFUTED
-        self.reviewed_at = datetime.utcnow()
+        self.reviewed_at = datetime.now(UTC)
         if notes:
             self.user_notes = notes
 
@@ -83,7 +95,7 @@ class Hypothesis(Base):
             notes: Optional notes
         """
         self.status = HypothesisStatus.REJECTED_BY_USER
-        self.reviewed_at = datetime.utcnow()
+        self.reviewed_at = datetime.now(UTC)
         if notes:
             self.user_notes = notes
 
@@ -97,7 +109,7 @@ class Hypothesis(Base):
             self.evidence_base = {}
         self.evidence_base[str(len(self.evidence_base))] = evidence_item
         self.evidence_count += 1
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def get_confidence_percentage(self) -> float:
         """Get confidence as percentage."""

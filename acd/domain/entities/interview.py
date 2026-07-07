@@ -1,13 +1,13 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from acd.models.base import Base
 from acd.domain.entities.application import Application
+from acd.models.base import Base
 
 
 class Interview(Base):
@@ -27,11 +27,11 @@ class Interview(Base):
     notes: Mapped[str] = mapped_column(String(1000), nullable=True, default="")
     feedback: Mapped[str] = mapped_column(String(1000), nullable=True, default="")
     result: Mapped[str] = mapped_column(String(50), nullable=True, default="Agendada")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
     )
 

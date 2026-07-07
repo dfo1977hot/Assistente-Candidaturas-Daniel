@@ -14,14 +14,14 @@ def create_goal(
     **kwargs,
 ) -> dict[str, Any]:
     """Create a new career goal.
-    
+
     Args:
         target_role: Target position title
         target_industry: Target industry
         deadline_months: Months to achieve goal
         service: CareerPlanningService instance
         **kwargs: Additional goal parameters
-        
+
     Returns:
         Created goal data
     """

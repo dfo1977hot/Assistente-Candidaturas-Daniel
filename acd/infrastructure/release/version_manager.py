@@ -1,8 +1,6 @@
 """Version manager with semantic versioning support."""
 
 import re
-from typing import Tuple
-from datetime import datetime
 
 
 class SemanticVersion:
@@ -12,7 +10,7 @@ class SemanticVersion:
 
     def __init__(self, version_string: str):
         """Initialize semantic version.
-        
+
         Args:
             version_string: Version string (e.g., "0.4.0", "1.0.0-beta.1", "2.0.0+build.123")
         """
@@ -35,7 +33,7 @@ class SemanticVersion:
         """Return detailed representation."""
         return f"SemanticVersion({self.original})"
 
-    def __eq__(self, other: "SemanticVersion") -> bool:
+    def __eq__(self, other: SemanticVersion) -> bool:
         """Check equality (ignoring build metadata)."""
         if not isinstance(other, SemanticVersion):
             return False
@@ -46,7 +44,7 @@ class SemanticVersion:
             and self.prerelease == other.prerelease
         )
 
-    def __lt__(self, other: "SemanticVersion") -> bool:
+    def __lt__(self, other: SemanticVersion) -> bool:
         """Check if less than (comparison)."""
         if not isinstance(other, SemanticVersion):
             raise TypeError(f"Cannot compare SemanticVersion with {type(other)}")
@@ -71,15 +69,15 @@ class SemanticVersion:
 
         return False
 
-    def __le__(self, other: "SemanticVersion") -> bool:
+    def __le__(self, other: SemanticVersion) -> bool:
         """Check if less than or equal."""
         return self == other or self < other
 
-    def __gt__(self, other: "SemanticVersion") -> bool:
+    def __gt__(self, other: SemanticVersion) -> bool:
         """Check if greater than."""
         return not (self <= other)
 
-    def __ge__(self, other: "SemanticVersion") -> bool:
+    def __ge__(self, other: SemanticVersion) -> bool:
         """Check if greater than or equal."""
         return not (self < other)
 
@@ -115,15 +113,15 @@ class SemanticVersion:
         """Check if this is a release candidate."""
         return self.prerelease is not None and "rc" in self.prerelease.lower()
 
-    def get_next_major(self) -> "SemanticVersion":
+    def get_next_major(self) -> SemanticVersion:
         """Get next major version."""
         return SemanticVersion(f"{self.major + 1}.0.0")
 
-    def get_next_minor(self) -> "SemanticVersion":
+    def get_next_minor(self) -> SemanticVersion:
         """Get next minor version."""
         return SemanticVersion(f"{self.major}.{self.minor + 1}.0")
 
-    def get_next_patch(self) -> "SemanticVersion":
+    def get_next_patch(self) -> SemanticVersion:
         """Get next patch version."""
         return SemanticVersion(f"{self.major}.{self.minor}.{self.patch + 1}")
 
@@ -152,7 +150,7 @@ class VersionManager:
     @staticmethod
     def compare_versions(version1: str, version2: str) -> int:
         """Compare two versions.
-        
+
         Returns:
             -1 if version1 < version2
             0 if version1 == version2
@@ -169,9 +167,11 @@ class VersionManager:
             return 0
 
     @staticmethod
-    def is_compatible(current_version: str, min_required: str, max_allowed: str | None = None) -> bool:
+    def is_compatible(
+        current_version: str, min_required: str, max_allowed: str | None = None
+    ) -> bool:
         """Check if current version is within compatibility range.
-        
+
         Args:
             current_version: Current version
             min_required: Minimum required version
@@ -191,9 +191,11 @@ class VersionManager:
         return True
 
     @staticmethod
-    def get_upgrade_path(from_version: str, to_version: str, available_versions: list[str]) -> list[str]:
+    def get_upgrade_path(
+        from_version: str, to_version: str, available_versions: list[str]
+    ) -> list[str]:
         """Get upgrade path from one version to another.
-        
+
         Returns:
             List of versions to upgrade through (in order)
         """

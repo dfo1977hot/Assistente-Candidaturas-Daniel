@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 """Insight generator for creating actionable insights from patterns."""
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
-from acd.domain.learning.insight import Insight, InsightType
-from acd.domain.learning.pattern import Pattern, PatternType
-from acd.domain.learning.hypothesis import Hypothesis
+from acd.domain.learning.insight import InsightType
+from acd.domain.learning.pattern import PatternType
 
 
 class InsightGenerator:
@@ -21,29 +22,18 @@ class InsightGenerator:
         related_patterns: list[int] | None = None,
         related_hypotheses: list[int] | None = None,
     ) -> dict[str, Any]:
-        """Generate insight from pattern data.
+        """Generate insight from pattern data."""
 
-        Args:
-            pattern_data: Pattern dictionary
-            related_patterns: IDs of related patterns
-            related_hypotheses: IDs of related hypotheses
-
-        Returns:
-            Insight data
-        """
         pattern_type = pattern_data.get("type", "")
 
-        # Generate recommendations based on pattern type
         recommendations = self._generate_recommendations(pattern_data)
 
-        # Generate title and description
         title, description = self._generate_title_and_description(pattern_data)
 
-        # Calculate impact
         impact_score = pattern_data.get("impact", 0.0)
         expected_impact = self._describe_impact(impact_score, pattern_type)
 
-        insight = {
+        return {
             "title": title,
             "description": description,
             "insight_type": self._map_pattern_to_insight_type(pattern_type),
@@ -61,96 +51,149 @@ class InsightGenerator:
             "data_points_analyzed": pattern_data.get("evidence_count", 0),
             "is_actionable": True,
             "analysis_period_start": None,
-            "analysis_period_end": datetime.utcnow(),
+            "analysis_period_end": datetime.now(UTC),
         }
 
-        return insight
+    def _generate_title_and_description(
+        self,
+        pattern_data: dict[str, Any],
+    ) -> tuple[str, str]:
+        """Generate title and description from pattern."""
 
-    def _generate_title_and_description(self, pattern_data: dict[str, Any]) -> tuple[str, str]:
-        """Generate title and description from pattern.
-
-        Args:
-            pattern_data: Pattern dictionary
-
-        Returns:
-            Tuple of (title, description)
-        """
         name = pattern_data.get("name", "")
         criteria = pattern_data.get("criteria", {})
         evidence = pattern_data.get("evidence_count", 0)
         confidence = pattern_data.get("confidence", 0.5)
 
-        title = f"{name}"
-        description = f"{pattern_data.get('description', '')} Based on {evidence} applications with {confidence*100:.0f}% confidence."
+        title = name
+
+        description = (
+            f"{pattern_data.get('description', '')} "
+            f"Based on {evidence} applications "
+            f"with {confidence * 100:.0f}% confidence."
+        )
+
+        # evita variável não utilizada (útil para futuras melhorias)
+        _ = criteria
 
         return title, description
 
-    def _generate_recommendations(self, pattern_data: dict[str, Any]) -> list[dict[str, Any]]:
-        """Generate recommendations based on pattern.
+    def _generate_recommendations(
+        self,
+        pattern_data: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Generate recommendations based on pattern."""
 
-        Args:
-            pattern_data: Pattern dictionary
-
-        Returns:
-            List of recommendations
-        """
         pattern_type = pattern_data.get("type", "")
         criteria = pattern_data.get("criteria", {})
         impact = pattern_data.get("impact", 0.0)
 
-        recommendations = []
+        recommendations: list[dict[str, Any]] = []
 
         if pattern_type == PatternType.SKILL_SUCCESS.value:
-            recommendations.append({
-                "action": f"Emphasize {criteria.get('skill')} skill in applications",
-                "rationale": f"This skill appears in {criteria.get('applications')} successful applications",
-                "expected_benefit": f"Could improve success rate by ~{impact*100:.0f}%",
-            })
+
+            recommendations.append(
+                {
+                    "action": (
+                        f"Emphasize {criteria.get('skill', 'this')} skill "
+                        "in applications"
+                    ),
+                    "rationale": (
+                        "This skill appears in "
+                        f"{criteria.get('applications', 0)} "
+                        "successful applications"
+                    ),
+                    "expected_benefit": (
+                        f"Could improve success rate by ~{impact * 100:.0f}%"
+                    ),
+                }
+            )
 
         elif pattern_type == PatternType.PLATFORM_SUCCESS.value:
-            recommendations.append({
-                "action": f"Prioritize applications on {criteria.get('platform')}",
-                "rationale": f"{criteria.get('platform')} has shown high conversion ({criteria.get('min_conversion')*100:.0f}%)",
-                "expected_benefit": f"Could improve success rate by ~{impact*100:.0f}%",
-            })
+
+            platform = criteria.get("platform", "this platform")
+
+            recommendations.append(
+                {
+                    "action": f"Prioritize applications on {platform}",
+                    "rationale": (
+                        f"{platform} has shown high conversion "
+                        f"({criteria.get('min_conversion', 0) * 100:.0f}%)"
+                    ),
+                    "expected_benefit": (
+                        f"Could improve success rate by ~{impact * 100:.0f}%"
+                    ),
+                }
+            )
 
         elif pattern_type == PatternType.SECTOR_PATTERN.value:
-            recommendations.append({
-                "action": f"Target {criteria.get('sector')} sector positions",
-                "rationale": f"Your profile aligns well with {criteria.get('sector')} sector",
-                "expected_benefit": f"Could improve success rate by ~{impact*100:.0f}%",
-            })
+
+            sector = criteria.get("sector", "this sector")
+
+            recommendations.append(
+                {
+                    "action": f"Target {sector} sector positions",
+                    "rationale": f"Your profile aligns well with {sector} sector",
+                    "expected_benefit": (
+                        f"Could improve success rate by ~{impact * 100:.0f}%"
+                    ),
+                }
+            )
 
         elif pattern_type == PatternType.TIMING_PATTERN.value:
+
             day_name = criteria.get("day_name", "Monday")
-            recommendations.append({
-                "action": f"Submit applications on {day_name}",
-                "rationale": f"Applications submitted on {day_name} have {criteria.get('success_rate')*100:.0f}% success rate",
-                "expected_benefit": f"Could improve response time and success rate",
-            })
+
+            recommendations.append(
+                {
+                    "action": f"Submit applications on {day_name}",
+                    "rationale": (
+                        f"Applications submitted on {day_name} "
+                        f"have {criteria.get('success_rate', 0) * 100:.0f}% "
+                        "success rate"
+                    ),
+                    "expected_benefit": (
+                        "Could improve response time and success rate"
+                    ),
+                }
+            )
 
         elif pattern_type == PatternType.RESUME_TYPE_SUCCESS.value:
-            recommendations.append({
-                "action": f"Use resume version {criteria.get('resume_id')} for similar positions",
-                "rationale": f"This resume version achieved {criteria.get('success_rate')*100:.0f}% success rate",
-                "expected_benefit": f"Could improve interview rate by ~{impact*100:.0f}%",
-            })
 
-        return recommendations if recommendations else [{
-            "action": "Review the pattern details above",
-            "rationale": pattern_data.get("description", ""),
-            "expected_benefit": f"~{impact*100:.0f}% improvement potential",
-        }]
+            recommendations.append(
+                {
+                    "action": (
+                        f"Use resume version "
+                        f"{criteria.get('resume_id', 'recommended')} "
+                        "for similar positions"
+                    ),
+                    "rationale": (
+                        "This resume version achieved "
+                        f"{criteria.get('success_rate', 0) * 100:.0f}% "
+                        "success rate"
+                    ),
+                    "expected_benefit": (
+                        f"Could improve interview rate by ~{impact * 100:.0f}%"
+                    ),
+                }
+            )
+
+        if recommendations:
+            return recommendations
+
+        return [
+            {
+                "action": "Review the pattern details above",
+                "rationale": pattern_data.get("description", ""),
+                "expected_benefit": (
+                    f"~{impact * 100:.0f}% improvement potential"
+                ),
+            }
+        ]
 
     def _map_pattern_to_insight_type(self, pattern_type: str) -> str:
-        """Map pattern type to insight type.
+        """Map pattern type to insight type."""
 
-        Args:
-            pattern_type: Pattern type string
-
-        Returns:
-            Insight type string
-        """
         mapping = {
             PatternType.SKILL_SUCCESS.value: InsightType.SKILL_RECOMMENDATION.value,
             PatternType.PLATFORM_SUCCESS.value: InsightType.PLATFORM_ADVICE.value,
@@ -161,18 +204,21 @@ class InsightGenerator:
             PatternType.RESPONSE_TIME.value: InsightType.TIMING_INSIGHT.value,
             PatternType.LETTER_EFFECTIVENESS.value: InsightType.LETTER_IMPROVEMENT.value,
         }
-        return mapping.get(pattern_type, InsightType.GENERAL_RECOMMENDATION.value)
 
-    def _describe_impact(self, impact: float, pattern_type: str) -> str:
-        """Describe expected impact in human language.
+        return mapping.get(
+            pattern_type,
+            InsightType.GENERAL_RECOMMENDATION.value,
+        )
 
-        Args:
-            impact: Impact score (0-1)
-            pattern_type: Pattern type
+    def _describe_impact(
+        self,
+        impact: float,
+        pattern_type: str,
+    ) -> str:
+        """Describe expected impact."""
 
-        Returns:
-            Impact description
-        """
+        del pattern_type
+
         impact_pct = impact * 100
 
         if impact_pct >= 30:
@@ -184,26 +230,19 @@ class InsightGenerator:
         else:
             magnitude = "minimal"
 
-        return f"Applying this insight could have a {magnitude} impact (estimated +{impact_pct:.0f}%) on your success rate."
+        return (
+            f"Applying this insight could have a {magnitude} impact "
+            f"(estimated +{impact_pct:.0f}%) on your success rate."
+        )
 
     def generate_multiple(
         self,
         patterns: list[dict[str, Any]],
         max_insights: int = 10,
     ) -> list[dict[str, Any]]:
-        """Generate multiple insights from patterns.
+        """Generate multiple insights."""
 
-        Args:
-            patterns: List of pattern dictionaries
-            max_insights: Maximum insights to generate
-
-        Returns:
-            List of insights
-        """
-        insights = []
-
-        for pattern in patterns[:max_insights]:
-            insight = self.generate_from_pattern(pattern)
-            insights.append(insight)
-
-        return insights
+        return [
+            self.generate_from_pattern(pattern)
+            for pattern in patterns[:max_insights]
+        ]

@@ -1,34 +1,29 @@
 """Tests for multi-agent platform."""
 
-import pytest
-import tempfile
 import os
+import tempfile
 
+import pytest
+
+from acd.application.multi_agent.session import (
+    get_session_status,
+    initialize_multi_agent_platform,
+    process_user_request,
+    start_session,
+)
 from acd.domain.agents.agent import Agent, AgentStatus
-from acd.domain.agents.task import AgentTask, TaskStatus, TaskPriority
-from acd.domain.agents.message import AgentMessage, MessageType
-from acd.infrastructure.agents.registry import AgentRegistry
-from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.context import ContextManager, AgentContext
-from acd.infrastructure.agents.task_scheduler import TaskScheduler
+from acd.domain.agents.message import MessageType
 from acd.infrastructure.agents.capability_service import CapabilityService
-from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
-from acd.services.agents.supervisor_service import SupervisorService
+from acd.infrastructure.agents.context import ContextManager
+from acd.infrastructure.agents.message_bus import MessageBus
+from acd.infrastructure.agents.registry import AgentRegistry
+from acd.infrastructure.agents.task_scheduler import TaskScheduler
 from acd.services.agents.specialized import (
-    ResumeAgent,
     ATSAgent,
     AutomationAgent,
-    CareerAgent,
-    InterviewAgent,
-    AnalyticsAgent,
-    WorkflowAgent,
+    ResumeAgent,
 )
-from acd.application.multi_agent.session import (
-    initialize_multi_agent_platform,
-    start_session,
-    process_user_request,
-    get_session_status,
-)
+from acd.services.agents.supervisor_service import SupervisorService
 
 
 @pytest.fixture
@@ -41,16 +36,11 @@ def temp_database(monkeypatch):
     import acd.database.database as database_module
 
     # Import all agent entities to register ORM metadata
-    import acd.domain.agents.agent
-    import acd.domain.agents.task
-    import acd.domain.agents.message
-    import acd.domain.agents.capability
-    import acd.domain.agents.tool
-    import acd.domain.agents.session
-    import acd.domain.agents.memory
 
     database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(f"sqlite:///{db_path}", echo=False, future=True)
+    database_module.engine = database_module.create_engine(
+        f"sqlite:///{db_path}", echo=False, future=True
+    )
     database_module.SessionLocal = database_module.sessionmaker(
         bind=database_module.engine, autoflush=False, autocommit=False
     )
@@ -273,9 +263,9 @@ class TestTaskScheduler:
         scheduler = TaskScheduler()
 
         # Schedule tasks in different order
-        id1 = scheduler.schedule_task(1, "task1", priority=5)
+        scheduler.schedule_task(1, "task1", priority=5)
         id2 = scheduler.schedule_task(1, "task2", priority=1)  # Higher priority
-        id3 = scheduler.schedule_task(1, "task3", priority=3)
+        scheduler.schedule_task(1, "task3", priority=3)
 
         # Get tasks - should be in priority order
         task1 = scheduler.get_next_task()
@@ -296,8 +286,8 @@ class TestTaskScheduler:
         """Test getting running tasks."""
         scheduler = TaskScheduler()
 
-        task_id = scheduler.schedule_task(1, "process")
-        task = scheduler.get_next_task()
+        scheduler.schedule_task(1, "process")
+        scheduler.get_next_task()
 
         running = scheduler.get_running_tasks()
         assert len(running) > 0
@@ -504,11 +494,15 @@ class TestMultiAgentIntegration:
         supervisor = SupervisorService(registry=registry)
 
         # Initialize
-        init_result = initialize_multi_agent_platform(supervisor_service=supervisor, registry=registry)
+        init_result = initialize_multi_agent_platform(
+            supervisor_service=supervisor, registry=registry
+        )
         assert init_result["success"]
 
         # Start session
-        session = start_session("Integration Test", "Find job at company", supervisor_service=supervisor)
+        session = start_session(
+            "Integration Test", "Find job at company", supervisor_service=supervisor
+        )
         assert session["success"]
 
         # Process request

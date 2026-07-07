@@ -10,8 +10,4 @@ class ThemeManager:
 
         if theme.exists():
 
-            app.setStyleSheet(
-                theme.read_text(
-                    encoding="utf-8"
-                )
-            )
+            app.setStyleSheet(theme.read_text(encoding="utf-8"))

@@ -4,12 +4,12 @@ from typing import Any
 
 from acd.database import database as database_module
 from acd.domain.agents.agent import Agent, AgentStatus
-from acd.domain.agents.task import AgentTask, TaskStatus, TaskPriority
-from acd.domain.agents.message import AgentMessage, MessageType
 from acd.domain.agents.capability import AgentCapability
-from acd.domain.agents.tool import AgentTool
-from acd.domain.agents.session import AgentSession
 from acd.domain.agents.memory import AgentMemory, MemoryType
+from acd.domain.agents.message import AgentMessage, MessageType
+from acd.domain.agents.session import AgentSession
+from acd.domain.agents.task import AgentTask, TaskPriority, TaskStatus
+from acd.domain.agents.tool import AgentTool
 
 
 class AgentRepository:
@@ -164,7 +164,9 @@ class AgentRepository:
         with database_module.SessionLocal() as session:
             return session.query(AgentTask).filter(AgentTask.id == task_id).first()
 
-    def list_tasks_by_agent(self, agent_id: int, status: TaskStatus | None = None) -> list[AgentTask]:
+    def list_tasks_by_agent(
+        self, agent_id: int, status: TaskStatus | None = None
+    ) -> list[AgentTask]:
         """List tasks for agent.
 
         Args:
@@ -180,7 +182,9 @@ class AgentRepository:
                 query = query.filter(AgentTask.status == status)
             return query.all()
 
-    def update_task_status(self, task_id: int, status: TaskStatus, result: dict[str, Any] | None = None) -> AgentTask | None:
+    def update_task_status(
+        self, task_id: int, status: TaskStatus, result: dict[str, Any] | None = None
+    ) -> AgentTask | None:
         """Update task status.
 
         Args:
@@ -309,7 +313,9 @@ class AgentRepository:
             Updated session or None
         """
         with database_module.SessionLocal() as session:
-            agent_session = session.query(AgentSession).filter(AgentSession.id == session_id).first()
+            agent_session = (
+                session.query(AgentSession).filter(AgentSession.id == session_id).first()
+            )
             if agent_session:
                 agent_session.is_active = False
                 session.commit()
@@ -361,10 +367,14 @@ class AgentRepository:
             Memory or None
         """
         with database_module.SessionLocal() as session:
-            return session.query(AgentMemory).filter(
-                AgentMemory.agent_id == agent_id,
-                AgentMemory.key == key,
-            ).first()
+            return (
+                session.query(AgentMemory)
+                .filter(
+                    AgentMemory.agent_id == agent_id,
+                    AgentMemory.key == key,
+                )
+                .first()
+            )
 
     # Capability methods
     def add_capability(

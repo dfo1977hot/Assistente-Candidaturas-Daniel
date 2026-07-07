@@ -1,24 +1,16 @@
-import json
 import os
 import tempfile
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from acd.database import database as database_module
-from acd.domain.career.career_goal import CareerGoal
-from acd.domain.career.development_plan import DevelopmentPlan
-from acd.domain.career.skill_gap import CareerSkillGap
-from acd.domain.career.career_recommendation import CareerRecommendation
-from acd.domain.career.milestone import Milestone
-from acd.infrastructure.repositories.career_repository import CareerRepository
-from acd.infrastructure.career.rule_engine import CareerRuleEngine
 from acd.infrastructure.career.recommendation_engine import RecommendationRankingEngine
+from acd.infrastructure.career.rule_engine import CareerRuleEngine
+from acd.infrastructure.repositories.career_repository import CareerRepository
 from acd.services.career_planning_service import CareerPlanningService
-from acd.services.gap_analysis_service import GapAnalysisService
 from acd.services.career_simulation_service import CareerSimulationService
-
+from acd.services.gap_analysis_service import GapAnalysisService
 
 @pytest.fixture
 def temp_database(monkeypatch):
@@ -27,17 +19,12 @@ def temp_database(monkeypatch):
     db_path = os.path.join(temp_dir, "test_acd_career.db")
     monkeypatch.setattr("acd.database.database.DATABASE_URL", f"sqlite:///{db_path}")
 
-    import acd.database.database as database_module
-
     # Import all entities FIRST to register ORM metadata
-    import acd.domain.career.career_goal
-    import acd.domain.career.development_plan
-    import acd.domain.career.career_recommendation
-    import acd.domain.career.skill_gap
-    import acd.domain.career.milestone
 
     database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(f"sqlite:///{db_path}", echo=False, future=True)
+    database_module.engine = database_module.create_engine(
+        f"sqlite:///{db_path}", echo=False, future=True
+    )
     database_module.SessionLocal = database_module.sessionmaker(
         bind=database_module.engine, autoflush=False, autocommit=False
     )
@@ -57,7 +44,7 @@ class TestCareerRepository:
     def test_create_goal(self, temp_database):
         """Test creating a career goal."""
         repo = CareerRepository()
-        deadline = datetime.utcnow() + timedelta(days=365)
+        deadline = datetime.now(UTC) + timedelta(days=365)
 
         goal = repo.create_goal(
             target_role="Coordenador de Supply Chain",
@@ -71,7 +58,7 @@ class TestCareerRepository:
     def test_list_goals(self, temp_database):
         """Test listing career goals."""
         repo = CareerRepository()
-        deadline = datetime.utcnow() + timedelta(days=365)
+        deadline = datetime.now(UTC) + timedelta(days=365)
 
         repo.create_goal("Role 1", "Industry 1", deadline)
         repo.create_goal("Role 2", "Industry 2", deadline)
@@ -82,13 +69,13 @@ class TestCareerRepository:
     def test_create_plan(self, temp_database):
         """Test creating a development plan."""
         repo = CareerRepository()
-        deadline = datetime.utcnow() + timedelta(days=365)
+        deadline = datetime.now(UTC) + timedelta(days=365)
 
         goal = repo.create_goal("Role", "Industry", deadline)
         plan = repo.create_plan(
             goal_id=goal.id,
             title="Test Plan",
-            start_date=datetime.utcnow(),
+            start_date=datetime.now(UTC),
             target_date=deadline,
         )
 
@@ -98,19 +85,19 @@ class TestCareerRepository:
     def test_create_milestone(self, temp_database):
         """Test creating a milestone."""
         repo = CareerRepository()
-        deadline = datetime.utcnow() + timedelta(days=365)
+        deadline = datetime.now(UTC) + timedelta(days=365)
 
         goal = repo.create_goal("Role", "Industry", deadline)
         plan = repo.create_plan(
             goal_id=goal.id,
             title="Test Plan",
-            start_date=datetime.utcnow(),
+            start_date=datetime.now(UTC),
             target_date=deadline,
         )
         milestone = repo.create_milestone(
             plan_id=plan.id,
             title="First Milestone",
-            target_date=datetime.utcnow() + timedelta(days=30),
+            target_date=datetime.now(UTC) + timedelta(days=30),
             order_index=1,
         )
 
@@ -120,7 +107,7 @@ class TestCareerRepository:
     def test_create_skill_gap(self, temp_database):
         """Test creating a skill gap."""
         repo = CareerRepository()
-        deadline = datetime.utcnow() + timedelta(days=365)
+        deadline = datetime.now(UTC) + timedelta(days=365)
 
         goal = repo.create_goal("Role", "Industry", deadline)
         gap = repo.create_gap(

@@ -1,16 +1,17 @@
 """Application layer use cases for learning functionality."""
 
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from acd.services.learning import LearningService, ApprovalService, KnowledgeReuseService
+from acd.services.learning import ApprovalService, KnowledgeReuseService, LearningService
 
 
 @dataclass
 class RegisterOutcomeRequest:
     """Request for registering an outcome."""
+
     outcome_type: str
     result: str
     company: str
@@ -25,6 +26,7 @@ class RegisterOutcomeRequest:
 @dataclass
 class ApproveRecordRequest:
     """Request for approving a record."""
+
     record_id: int
     notes: str = ""
 
@@ -32,6 +34,7 @@ class ApproveRecordRequest:
 @dataclass
 class RejectRecordRequest:
     """Request for rejecting a record."""
+
     record_id: int
     notes: str = ""
 

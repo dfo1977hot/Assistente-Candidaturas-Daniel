@@ -1,13 +1,12 @@
 """Update service for application updates."""
 
+import shutil
 from datetime import datetime
 from pathlib import Path
-import shutil
-import hashlib
 
 from acd.infrastructure.platform import StructuredLogger
-from acd.infrastructure.repositories.release import ReleaseRepository
 from acd.infrastructure.release import VersionManager
+from acd.infrastructure.repositories.release import ReleaseRepository
 
 
 class UpdateService:
@@ -15,7 +14,7 @@ class UpdateService:
 
     def __init__(self, session, database_path: str | None = None):
         """Initialize update service.
-        
+
         Args:
             session: SQLAlchemy database session
             database_path: Path to database for backup during update
@@ -31,7 +30,7 @@ class UpdateService:
         include_beta: bool = False,
     ) -> dict:
         """Check if updates are available.
-        
+
         Returns:
             {
                 "update_available": bool,
@@ -49,7 +48,15 @@ class UpdateService:
 
             if include_beta:
                 latest_beta = self.repository.get_latest_beta_release()
-                latest = latest_beta if (latest_beta and latest_beta.version > (latest_stable.version if latest_stable else "0.0.0")) else latest_stable
+                latest = (
+                    latest_beta
+                    if (
+                        latest_beta
+                        and latest_beta.version
+                        > (latest_stable.version if latest_stable else "0.0.0")
+                    )
+                    else latest_stable
+                )
             else:
                 latest = latest_stable
 
@@ -102,7 +109,7 @@ class UpdateService:
         update_package_path: str | None = None,
     ) -> dict:
         """Prepare for update by creating backup and logs.
-        
+
         Returns:
             {
                 "success": bool,
@@ -209,7 +216,7 @@ class UpdateService:
 
     def rollback_update(self, update_id: int, from_version: str) -> dict:
         """Rollback to previous version.
-        
+
         Returns:
             {
                 "success": bool,

@@ -7,10 +7,9 @@ from acd.domain.entities.application import Application
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job import Job
 from acd.domain.entities.job_profile import JobProfile
-from acd.services.automation_service import AutomationService, AutomationContext
-from acd.infrastructure.automation.connectors import MockConnector
 from acd.infrastructure.automation.browser_manager import BrowserManager
 from acd.infrastructure.automation.connector_factory import ConnectorFactory
+from acd.services.automation_service import AutomationContext, AutomationService
 
 
 @pytest.fixture
@@ -38,17 +37,6 @@ def automation_setup(monkeypatch):
 
     from acd.models.base import Base
 
-    import acd.domain.entities.application
-    import acd.domain.entities.curriculum
-    import acd.domain.entities.curriculum_version
-    import acd.domain.entities.job
-    import acd.domain.entities.job_profile
-    import acd.domain.entities.automation_session
-    import acd.domain.entities.automation_log
-    import acd.domain.entities.automation_result
-    import acd.domain.entities.connector_setting
-    import acd.domain.entities.browser_profile
-
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)
 
@@ -74,8 +62,24 @@ def test_automation_service_executes_mock_flow(automation_setup):
     application = Application(job_id=1, company_id=1, status="Pronta para Aplicação")
     curriculum = Curriculum(name="Analista", description="Power BI, Excel")
     job = Job(title="Analista", company_id=1)
-    job_profile = JobProfile(job_id=1, raw_description="Vaga de analista", skills="Power BI", technologies="Power BI", methodologies="", languages="", certifications="", keywords="Power BI")
-    context = AutomationContext(application=application, curriculum=curriculum, job=job, job_profile=job_profile, platform="smartrecruiters", headless=True)
+    job_profile = JobProfile(
+        job_id=1,
+        raw_description="Vaga de analista",
+        skills="Power BI",
+        technologies="Power BI",
+        methodologies="",
+        languages="",
+        certifications="",
+        keywords="Power BI",
+    )
+    context = AutomationContext(
+        application=application,
+        curriculum=curriculum,
+        job=job,
+        job_profile=job_profile,
+        platform="smartrecruiters",
+        headless=True,
+    )
 
     result = service.run(context)
 

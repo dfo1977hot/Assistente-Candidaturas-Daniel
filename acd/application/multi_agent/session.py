@@ -2,22 +2,8 @@
 
 from typing import Any
 
-from acd.services.agents.supervisor_service import SupervisorService
 from acd.infrastructure.agents.registry import AgentRegistry
-from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.context import ContextManager
-from acd.infrastructure.agents.task_scheduler import TaskScheduler
-from acd.infrastructure.agents.capability_service import CapabilityService
-from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
-from acd.services.agents.specialized import (
-    ResumeAgent,
-    ATSAgent,
-    AutomationAgent,
-    CareerAgent,
-    InterviewAgent,
-    AnalyticsAgent,
-    WorkflowAgent,
-)
+from acd.services.agents.supervisor_service import SupervisorService
 
 
 def initialize_multi_agent_platform(

@@ -1,15 +1,16 @@
 """Service for backup management."""
 
+import hashlib
 import os
 import shutil
-import hashlib
-from typing import Any
 from datetime import datetime
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from acd.domain.platform.backup import BackupStatus
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.domain.platform.backup import BackupStatus
 
 
 class BackupService:
@@ -60,13 +61,13 @@ class BackupService:
             total_size = 0
             checksum = hashlib.sha256()
 
-            for root, dirs, files in os.walk(backup_path):
+            for root, _dirs, files in os.walk(backup_path):
                 for file in files:
                     file_path = os.path.join(root, file)
                     file_size = os.path.getsize(file_path)
                     total_size += file_size
 
-                    with open(file_path, 'rb') as f:
+                    with open(file_path, "rb") as f:
                         checksum.update(f.read())
 
             # Create backup record
@@ -135,10 +136,10 @@ class BackupService:
 
             # Calculate checksum
             checksum = hashlib.sha256()
-            for root, dirs, files in os.walk(backup.file_path):
+            for root, _dirs, files in os.walk(backup.file_path):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    with open(file_path, 'rb') as f:
+                    with open(file_path, "rb") as f:
                         checksum.update(f.read())
 
             return checksum.hexdigest() == backup.checksum

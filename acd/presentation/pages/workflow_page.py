@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
+    QLabel,
     QListWidget,
     QListWidgetItem,
-    QLabel,
-    QComboBox,
+    QPushButton,
 )
 
 from acd.presentation.pages.base_page import BasePage
-from acd.services.workflow_template_service import WorkflowTemplateService
 from acd.services.workflow_service import WorkflowService
+from acd.services.workflow_template_service import WorkflowTemplateService
 
 
 class WorkflowPage(BasePage):
@@ -55,4 +52,6 @@ class WorkflowPage(BasePage):
         if current_item is None:
             return
         template = current_item.data(32)
-        result = self.template_service.create_workflow_from_template(template["name"])
+        self.template_service.create_workflow_from_template(
+    template["name"]
+)

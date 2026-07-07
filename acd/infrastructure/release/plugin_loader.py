@@ -1,12 +1,11 @@
 """Plugin loader for dynamic extension loading."""
 
 import importlib
-import inspect
-import sys
-from pathlib import Path
-from typing import Type, Any, Optional
-from dataclasses import dataclass
 import json
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -19,7 +18,7 @@ class PluginMetadata:
     description: str
     entry_point: str
     min_app_version: str
-    max_app_version: Optional[str] = None
+    max_app_version: str | None = None
     dependencies: list[str] = None
     tags: list[str] = None
 
@@ -62,7 +61,7 @@ class PluginLoader:
 
     def __init__(self, plugin_dirs: list[str] | None = None):
         """Initialize plugin loader.
-        
+
         Args:
             plugin_dirs: List of directories to search for plugins
         """
@@ -85,7 +84,7 @@ class PluginLoader:
 
     def discover_plugins(self) -> list[str]:
         """Discover available plugins.
-        
+
         Returns:
             List of plugin names found
         """
@@ -109,11 +108,11 @@ class PluginLoader:
 
     def load_plugin(self, plugin_name: str, version: str | None = None) -> bool:
         """Load a plugin by name.
-        
+
         Args:
             plugin_name: Name of plugin to load
             version: Specific version (optional)
-        
+
         Returns:
             True if successful, False otherwise
         """
@@ -172,7 +171,7 @@ class PluginLoader:
             if not hasattr(module, class_name):
                 return False
 
-            plugin_class: Type[PluginInterface] = getattr(module, class_name)
+            plugin_class: type[PluginInterface] = getattr(module, class_name)
 
             # Verify it implements PluginInterface
             if not issubclass(plugin_class, PluginInterface):
@@ -199,10 +198,10 @@ class PluginLoader:
 
     def unload_plugin(self, plugin_name: str) -> bool:
         """Unload a plugin.
-        
+
         Args:
             plugin_name: Name of plugin to unload
-        
+
         Returns:
             True if successful
         """
@@ -233,7 +232,7 @@ class PluginLoader:
 
     def get_capabilities(self) -> dict[str, list[str]]:
         """Get all capabilities from loaded plugins.
-        
+
         Returns:
             Dict mapping plugin name to list of capabilities
         """
@@ -269,7 +268,7 @@ class PluginLoader:
 
 
 # Global plugin loader instance
-_plugin_loader: Optional[PluginLoader] = None
+_plugin_loader: PluginLoader | None = None
 
 
 def get_plugin_loader() -> PluginLoader:

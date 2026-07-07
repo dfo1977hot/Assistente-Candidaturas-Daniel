@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
 import json
+from typing import Any
 
 
 class ContextBuilder:
@@ -40,7 +40,9 @@ class ContextBuilder:
         """Add available curriculum versions."""
         self._context["available_curricula"] = {
             "total": len(curricula),
-            "versions": [{"id": c.get("id"), "specialization": c.get("specialization")} for c in curricula],
+            "versions": [
+                {"id": c.get("id"), "specialization": c.get("specialization")} for c in curricula
+            ],
         }
         return self
 
@@ -97,7 +99,9 @@ class ContextBuilder:
 
         if "career_goals" in self._context:
             goals = self._context["career_goals"]
-            summary_parts.append(f"Active Goals: {len(goals)} | Primary: {goals[0].get('title') if goals else 'None'}")
+            summary_parts.append(
+                f"Active Goals: {len(goals)} | Primary: {goals[0].get('title') if goals else 'None'}"
+            )
 
         if "active_applications" in self._context:
             apps = self._context["active_applications"]

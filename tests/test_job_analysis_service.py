@@ -57,7 +57,9 @@ def test_job_analysis_service_extracts_skills_and_metadata(analysis_setup):
 
 def test_job_analysis_service_gets_statistics(analysis_setup):
     service = analysis_setup
-    service.analyze_job(job_id=1, raw_description="Vaga para analista de dados com Python, SQL e Power BI.")
+    service.analyze_job(
+        job_id=1, raw_description="Vaga para analista de dados com Python, SQL e Power BI."
+    )
     stats = service.get_statistics()
     assert stats["total_profiles"] >= 1
     assert "Python" in stats["top_skills"]

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from acd.application.prompt.prompt_builder import PromptBuilder, PromptContext
@@ -32,9 +31,13 @@ class BaseGenerationService:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.ats_service = ats_service or ATSService()
 
-    def _build_context(self, *, curriculum: Curriculum, job_profile: JobProfile, language: str) -> PromptContext:
+    def _build_context(
+        self, *, curriculum: Curriculum, job_profile: JobProfile, language: str
+    ) -> PromptContext:
         persisted_curriculum = self._ensure_curriculum(curriculum)
-        ats_result = self.ats_service.compare_curriculum(curriculum=persisted_curriculum, job_profile=job_profile)
+        ats_result = self.ats_service.compare_curriculum(
+            curriculum=persisted_curriculum, job_profile=job_profile
+        )
         return PromptContext(
             vacancy_title=job_profile.raw_description[:80],
             vacancy_description=job_profile.raw_description,
@@ -46,12 +49,19 @@ class BaseGenerationService:
             language=language,
         )
 
-    def _persist_generation(self, *, generation_type: str, prompt: str, response: str, model: str) -> AIGeneration:
+    def _persist_generation(
+        self, *, generation_type: str, prompt: str, response: str, model: str
+    ) -> AIGeneration:
         prompt_record = self.repository.save_prompt(
             AIPrompt(template_name=generation_type, version="v1.0", content=prompt)
         )
         generation = self.repository.save_generation(
-            AIGeneration(prompt_id=prompt_record.id, generation_type=generation_type, model=model, response_text=response)
+            AIGeneration(
+                prompt_id=prompt_record.id,
+                generation_type=generation_type,
+                model=model,
+                response_text=response,
+            )
         )
         self.repository.save_log(
             GenerationLog(
@@ -74,11 +84,19 @@ class BaseGenerationService:
 class ResumeGenerationService(BaseGenerationService):
     """Gera uma nova versão de currículo com ajuda de IA."""
 
-    def generate_resume(self, *, curriculum: Curriculum, job_profile: JobProfile, language: str) -> dict[str, Any]:
-        context = self._build_context(curriculum=curriculum, job_profile=job_profile, language=language)
+    def generate_resume(
+        self, *, curriculum: Curriculum, job_profile: JobProfile, language: str
+    ) -> dict[str, Any]:
+        context = self._build_context(
+            curriculum=curriculum, job_profile=job_profile, language=language
+        )
         prompt = self.prompt_builder.build_resume_prompt(context)
-        response = self.provider.generate_text(prompt=prompt, model="mock", temperature=0.2, max_tokens=400, language=language)
-        self._persist_generation(generation_type="resume", prompt=prompt, response=response, model="mock")
+        response = self.provider.generate_text(
+            prompt=prompt, model="mock", temperature=0.2, max_tokens=400, language=language
+        )
+        self._persist_generation(
+            generation_type="resume", prompt=prompt, response=response, model="mock"
+        )
         version = self.repository.save_resume_version(
             ResumeVersion(
                 curriculum_id=curriculum.id,
@@ -99,11 +117,19 @@ class ResumeGenerationService(BaseGenerationService):
 class CoverLetterGenerationService(BaseGenerationService):
     """Gera uma carta de apresentação personalizada."""
 
-    def generate_cover_letter(self, *, curriculum: Curriculum, job_profile: JobProfile, language: str) -> dict[str, Any]:
-        context = self._build_context(curriculum=curriculum, job_profile=job_profile, language=language)
+    def generate_cover_letter(
+        self, *, curriculum: Curriculum, job_profile: JobProfile, language: str
+    ) -> dict[str, Any]:
+        context = self._build_context(
+            curriculum=curriculum, job_profile=job_profile, language=language
+        )
         prompt = self.prompt_builder.build_cover_letter_prompt(context)
-        response = self.provider.generate_text(prompt=prompt, model="mock", temperature=0.2, max_tokens=400, language=language)
-        self._persist_generation(generation_type="cover_letter", prompt=prompt, response=response, model="mock")
+        response = self.provider.generate_text(
+            prompt=prompt, model="mock", temperature=0.2, max_tokens=400, language=language
+        )
+        self._persist_generation(
+            generation_type="cover_letter", prompt=prompt, response=response, model="mock"
+        )
         version = self.repository.save_cover_letter_version(
             CoverLetterVersion(
                 curriculum_id=curriculum.id,

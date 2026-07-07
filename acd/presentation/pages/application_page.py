@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -32,7 +30,7 @@ class ApplicationPage(BasePage):
         self.application_service = ApplicationService()
         self.company_service = CompanyService()
         self.job_service = JobService()
-        self.current_application_id: Optional[int] = None
+        self.current_application_id: int | None = None
 
         self.company_combo = QComboBox()
         self.job_combo = QComboBox()
@@ -69,22 +67,24 @@ class ApplicationPage(BasePage):
         self._load_applications()
 
     def _setup_controls(self) -> None:
-        self.status_combo.addItems([
-            "Rascunho",
-            "Preparando Currículo",
-            "Preparando Carta",
-            "Pronta para Aplicação",
-            "Aplicada",
-            "Em Triagem",
-            "Entrevista RH",
-            "Teste",
-            "Entrevista Técnica",
-            "Entrevista Gestor",
-            "Oferta",
-            "Contratada",
-            "Rejeitada",
-            "Encerrada",
-        ])
+        self.status_combo.addItems(
+            [
+                "Rascunho",
+                "Preparando Currículo",
+                "Preparando Carta",
+                "Pronta para Aplicação",
+                "Aplicada",
+                "Em Triagem",
+                "Entrevista RH",
+                "Teste",
+                "Entrevista Técnica",
+                "Entrevista Gestor",
+                "Oferta",
+                "Contratada",
+                "Rejeitada",
+                "Encerrada",
+            ]
+        )
         self.filter_status_combo.addItem("", "")
         for index in range(self.status_combo.count()):
             self.filter_status_combo.addItem(self.status_combo.itemText(index))
@@ -156,10 +156,26 @@ class ApplicationPage(BasePage):
             company_id = self.company_combo.currentData()
             job_id = self.job_combo.currentData()
             status = self.status_combo.currentText()
-            application_date = self.application_date_input.date().toString("yyyy-MM-dd") if self.application_date_input.date().isValid() else ""
-            next_follow_up = self.next_follow_up_input.date().toString("yyyy-MM-dd") if self.next_follow_up_input.date().isValid() else ""
-            response_date = self.response_date_input.date().toString("yyyy-MM-dd") if self.response_date_input.date().isValid() else ""
-            interview_date = self.interview_date_input.date().toString("yyyy-MM-dd") if self.interview_date_input.date().isValid() else ""
+            application_date = (
+                self.application_date_input.date().toString("yyyy-MM-dd")
+                if self.application_date_input.date().isValid()
+                else ""
+            )
+            next_follow_up = (
+                self.next_follow_up_input.date().toString("yyyy-MM-dd")
+                if self.next_follow_up_input.date().isValid()
+                else ""
+            )
+            response_date = (
+                self.response_date_input.date().toString("yyyy-MM-dd")
+                if self.response_date_input.date().isValid()
+                else ""
+            )
+            interview_date = (
+                self.interview_date_input.date().toString("yyyy-MM-dd")
+                if self.interview_date_input.date().isValid()
+                else ""
+            )
             salary_expected = self._parse_optional_number(self.salary_expected_input.text())
             salary_offered = self._parse_optional_number(self.salary_offered_input.text())
             channel = self.channel_input.text().strip()
@@ -258,11 +274,31 @@ class ApplicationPage(BasePage):
         self.table.setRowCount(len(applications))
         for row, application in enumerate(applications):
             self.table.setItem(row, 0, QTableWidgetItem(str(application.id)))
-            self.table.setItem(row, 1, QTableWidgetItem(application.company.name if application.company else ""))
-            self.table.setItem(row, 2, QTableWidgetItem(application.job.title if application.job else ""))
+            self.table.setItem(
+                row, 1, QTableWidgetItem(application.company.name if application.company else "")
+            )
+            self.table.setItem(
+                row, 2, QTableWidgetItem(application.job.title if application.job else "")
+            )
             self.table.setItem(row, 3, QTableWidgetItem(application.status))
-            self.table.setItem(row, 4, QTableWidgetItem(application.application_date.strftime("%d/%m/%Y") if application.application_date else ""))
-            self.table.setItem(row, 5, QTableWidgetItem(application.next_follow_up.strftime("%d/%m/%Y") if application.next_follow_up else ""))
+            self.table.setItem(
+                row,
+                4,
+                QTableWidgetItem(
+                    application.application_date.strftime("%d/%m/%Y")
+                    if application.application_date
+                    else ""
+                ),
+            )
+            self.table.setItem(
+                row,
+                5,
+                QTableWidgetItem(
+                    application.next_follow_up.strftime("%d/%m/%Y")
+                    if application.next_follow_up
+                    else ""
+                ),
+            )
         self.table.resizeColumnsToContents()
 
     def _clear_form(self) -> None:
@@ -283,7 +319,7 @@ class ApplicationPage(BasePage):
         self.feedback_input.clear()
         self.notes_input.clear()
 
-    def _parse_optional_number(self, value: str) -> Optional[float]:
+    def _parse_optional_number(self, value: str) -> float | None:
         if not value.strip():
             return None
         return float(value)

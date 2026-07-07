@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 def create_company(
-    repository: "CompanyRepository",
+    repository: CompanyRepository,
     *,
     name: str,
     city: str,

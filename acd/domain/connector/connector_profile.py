@@ -1,8 +1,9 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
@@ -17,4 +18,4 @@ class ConnectorProfile(Base):
     platform_id: Mapped[int] = mapped_column(ForeignKey("platforms.id"), nullable=False)
     profile_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     config: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

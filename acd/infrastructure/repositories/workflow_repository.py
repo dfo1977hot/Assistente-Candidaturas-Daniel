@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 
 from acd.database import database as database_module
 from acd.domain.entities.workflow import Workflow
-from acd.domain.entities.workflow_execution import WorkflowExecution
 from acd.domain.entities.workflow_event import WorkflowEvent
+from acd.domain.entities.workflow_execution import WorkflowExecution
 from acd.domain.entities.workflow_log import WorkflowLog
 from acd.domain.entities.workflow_template import WorkflowTemplate
 
@@ -15,15 +13,19 @@ from acd.domain.entities.workflow_template import WorkflowTemplate
 class WorkflowRepository:
     """Repository for workflow persistence."""
 
-    def create_workflow(self, name: str, description: str, definition: str, *, version: str = "1") -> Workflow:
+    def create_workflow(
+        self, name: str, description: str, definition: str, *, version: str = "1"
+    ) -> Workflow:
         with database_module.SessionLocal() as session:
-            workflow = Workflow(name=name, description=description, definition=definition, version=version)
+            workflow = Workflow(
+                name=name, description=description, definition=definition, version=version
+            )
             session.add(workflow)
             session.commit()
             session.refresh(workflow)
             return workflow
 
-    def get_workflow(self, workflow_id: int) -> Optional[Workflow]:
+    def get_workflow(self, workflow_id: int) -> Workflow | None:
         with database_module.SessionLocal() as session:
             return session.get(Workflow, workflow_id)
 
@@ -31,15 +33,19 @@ class WorkflowRepository:
         with database_module.SessionLocal() as session:
             return list(session.scalars(select(Workflow)).all())
 
-    def create_execution(self, workflow_id: int, application_id: int | None = None) -> WorkflowExecution:
+    def create_execution(
+        self, workflow_id: int, application_id: int | None = None
+    ) -> WorkflowExecution:
         with database_module.SessionLocal() as session:
-            execution = WorkflowExecution(workflow_id=workflow_id, application_id=application_id, status="created")
+            execution = WorkflowExecution(
+                workflow_id=workflow_id, application_id=application_id, status="created"
+            )
             session.add(execution)
             session.commit()
             session.refresh(execution)
             return execution
 
-    def get_execution(self, execution_id: int) -> Optional[WorkflowExecution]:
+    def get_execution(self, execution_id: int) -> WorkflowExecution | None:
         with database_module.SessionLocal() as session:
             return session.get(WorkflowExecution, execution_id)
 
@@ -52,7 +58,9 @@ class WorkflowRepository:
 
     def create_event(self, execution_id: int, event_type: str, event_data: str) -> WorkflowEvent:
         with database_module.SessionLocal() as session:
-            event = WorkflowEvent(workflow_execution_id=execution_id, event_type=event_type, event_data=event_data)
+            event = WorkflowEvent(
+                workflow_execution_id=execution_id, event_type=event_type, event_data=event_data
+            )
             session.add(event)
             session.commit()
             session.refresh(event)
@@ -66,7 +74,7 @@ class WorkflowRepository:
             session.refresh(log)
             return log
 
-    def get_template(self, template_id: int) -> Optional[WorkflowTemplate]:
+    def get_template(self, template_id: int) -> WorkflowTemplate | None:
         with database_module.SessionLocal() as session:
             return session.get(WorkflowTemplate, template_id)
 

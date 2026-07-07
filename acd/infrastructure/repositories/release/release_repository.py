@@ -1,17 +1,18 @@
 """Release repository for data access."""
 
 from datetime import datetime, timedelta
+
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
 
 from acd.domain.release import (
-    Release,
-    InstalledVersion,
-    UpdateHistory,
-    InstallationLog,
-    MigrationHistory,
-    FeatureFlag,
     DocumentationTopic,
+    FeatureFlag,
+    InstallationLog,
+    InstalledVersion,
+    MigrationHistory,
+    Release,
+    UpdateHistory,
 )
 
 
@@ -20,7 +21,7 @@ class ReleaseRepository:
 
     def __init__(self, session: Session):
         """Initialize repository.
-        
+
         Args:
             session: SQLAlchemy database session
         """
@@ -377,7 +378,6 @@ class ReleaseRepository:
         limit: int = 20,
     ) -> list[DocumentationTopic]:
         """Search documentation topics."""
-        query_lower = search_query.lower()
         topics = self.session.query(DocumentationTopic).filter_by(is_visible=True).all()
 
         results = [t for t in topics if t.matches_search(search_query)]

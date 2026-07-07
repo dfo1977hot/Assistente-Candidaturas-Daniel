@@ -10,7 +10,15 @@ class MappingService:
     def __init__(self, repository: ConnectorRepository | None = None) -> None:
         self.repository = repository or ConnectorRepository()
 
-    def create_mapping(self, *, platform_name: str, source_field: str, target_field: str, transformation: str = "", priority: int = 0) -> FieldMapping:
+    def create_mapping(
+        self,
+        *,
+        platform_name: str,
+        source_field: str,
+        target_field: str,
+        transformation: str = "",
+        priority: int = 0,
+    ) -> FieldMapping:
         platform = self._get_or_create_platform(platform_name)
         return self.repository.create_mapping(
             platform_id=platform.id,

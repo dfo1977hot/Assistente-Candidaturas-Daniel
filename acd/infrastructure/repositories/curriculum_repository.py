@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 
 from acd.database import database as database_module
@@ -35,7 +33,7 @@ class CurriculumRepository:
             session.commit()
             return True
 
-    def get_by_id(self, curriculum_id: int) -> Optional[Curriculum]:
+    def get_by_id(self, curriculum_id: int) -> Curriculum | None:
         with database_module.SessionLocal() as session:
             return session.get(Curriculum, curriculum_id)
 
@@ -44,14 +42,18 @@ class CurriculumRepository:
             stmt = select(Curriculum).order_by(Curriculum.name.asc())
             return list(session.scalars(stmt).all())
 
-    def get_default(self) -> Optional[Curriculum]:
+    def get_default(self) -> Curriculum | None:
         with database_module.SessionLocal() as session:
             stmt = select(Curriculum).where(Curriculum.is_default.is_(True))
             return session.scalar(stmt)
 
     def get_versions(self, curriculum_id: int) -> list[CurriculumVersion]:
         with database_module.SessionLocal() as session:
-            stmt = select(CurriculumVersion).where(CurriculumVersion.curriculum_id == curriculum_id).order_by(CurriculumVersion.created_at.asc())
+            stmt = (
+                select(CurriculumVersion)
+                .where(CurriculumVersion.curriculum_id == curriculum_id)
+                .order_by(CurriculumVersion.created_at.asc())
+            )
             return list(session.scalars(stmt).all())
 
     def search(self, query: str) -> list[Curriculum]:

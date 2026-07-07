@@ -14,8 +14,7 @@ class AIProvider(Protocol):
         temperature: float,
         max_tokens: int,
         language: str,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 class MockAIProvider:

@@ -1,6 +1,7 @@
 """Agent registry for dynamic agent management."""
 
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable
+from typing import Any
 
 from acd.domain.agents.agent import Agent, AgentStatus
 
@@ -14,7 +15,9 @@ class AgentRegistry:
         self._agent_by_name: dict[str, int] = {}
         self._agent_by_type: dict[str, list[int]] = {}
 
-    def register(self, agent: Agent, handler: Callable[[dict[str, Any]], dict[str, Any]] | None = None) -> None:
+    def register(
+        self, agent: Agent, handler: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    ) -> None:
         """Register an agent.
 
         Args:

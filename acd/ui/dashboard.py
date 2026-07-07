@@ -45,7 +45,9 @@ class Dashboard(BasePage):
     def refresh_kpis(self) -> None:
         self.total_companies_card.set_value(str(self.company_service.count_companies()))
         self.total_jobs_card.set_value(str(self.job_service.count_jobs()))
-        self.total_applications_card.set_value(str(self.application_service.get_statistics().get("total", 0)))
+        self.total_applications_card.set_value(
+            str(self.application_service.get_statistics().get("total", 0))
+        )
         statistics = self.interview_service.get_statistics()
         self.total_interviews_card.set_value(str(statistics.get("total", 0)))
         self.today_interviews_card.set_value(str(statistics.get("today", 0)))

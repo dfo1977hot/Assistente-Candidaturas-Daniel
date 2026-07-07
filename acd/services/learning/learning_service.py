@@ -1,11 +1,10 @@
 """Learning service for orchestrating learning operations."""
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from acd.domain.learning.outcome import Outcome
 from acd.infrastructure.learning import LearningEngine
 from acd.infrastructure.repositories.learning import LearningRepository
 
@@ -33,7 +32,7 @@ class LearningService:
         platform: str | None = None,
         sector: str | None = None,
         curriculum_id: int | None = None,
-        **kwargs
+        **kwargs,
     ) -> dict[str, Any]:
         """Register application outcome and trigger learning.
 
@@ -61,7 +60,7 @@ class LearningService:
             platform=platform,
             sector=sector,
             curriculum_id=curriculum_id,
-            **kwargs
+            **kwargs,
         )
 
         # Process outcome through learning engine
@@ -109,17 +108,19 @@ class LearningService:
                 evidence_count=pattern_data.get("evidence_count", 0),
                 confidence=pattern_data.get("confidence", 0.5),
             )
-            saved_patterns.append({
-                "id": saved_pattern.id,
-                "pattern": pattern_data,
-                "requires_approval": pattern_result["requires_approval"],
-            })
+            saved_patterns.append(
+                {
+                    "id": saved_pattern.id,
+                    "pattern": pattern_data,
+                    "requires_approval": pattern_result["requires_approval"],
+                }
+            )
 
         return {
             "success": True,
             "patterns_detected": len(saved_patterns),
             "patterns": saved_patterns,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def generate_insights(
@@ -139,15 +140,17 @@ class LearningService:
         patterns = self.repository.list_patterns(is_active=True, limit=limit)
 
         for pattern in patterns:
-            patterns_data.append({
-                "name": pattern.name,
-                "description": pattern.description,
-                "type": pattern.pattern_type,
-                "criteria": pattern.criteria,
-                "evidence_count": pattern.evidence_count,
-                "confidence": pattern.confidence,
-                "impact": 0.3,  # Can be calculated from criteria
-            })
+            patterns_data.append(
+                {
+                    "name": pattern.name,
+                    "description": pattern.description,
+                    "type": pattern.pattern_type,
+                    "criteria": pattern.criteria,
+                    "evidence_count": pattern.evidence_count,
+                    "confidence": pattern.confidence,
+                    "impact": 0.3,  # Can be calculated from criteria
+                }
+            )
 
         # Generate insights
         insights_results = self.engine.generate_insights(patterns_data, max_insights=limit)
@@ -164,17 +167,19 @@ class LearningService:
                 confidence=insight_data.get("confidence", 0.5),
                 recommendations=insight_data.get("recommendations", []),
             )
-            saved_insights.append({
-                "id": saved_insight.id,
-                "insight": insight_data,
-                "requires_approval": insight_result["requires_approval"],
-            })
+            saved_insights.append(
+                {
+                    "id": saved_insight.id,
+                    "insight": insight_data,
+                    "requires_approval": insight_result["requires_approval"],
+                }
+            )
 
         return {
             "success": True,
             "insights_generated": len(saved_insights),
             "insights": saved_insights,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def get_pending_approvals(self) -> dict[str, list]:
@@ -245,7 +250,7 @@ class LearningService:
         return {
             **stats,
             **engine_stats,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def get_learning_health(self) -> dict[str, Any]:

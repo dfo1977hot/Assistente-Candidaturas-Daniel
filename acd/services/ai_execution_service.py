@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
 import json
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
-from acd.infrastructure.agent.tool_registry import ToolRegistry
+from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 
 
 class AIExecutionService:
@@ -21,11 +20,11 @@ class AIExecutionService:
         orchestrator: AIOrchestrator,
     ) -> dict[str, Any]:
         """Execute a plan.
-        
+
         Args:
             plan_id: ID of plan to execute
             orchestrator: AI Orchestrator instance
-            
+
         Returns:
             Execution result
         """
@@ -37,7 +36,7 @@ class AIExecutionService:
             return {"success": False, "error": "Plan not approved"}
 
         # Update plan status
-        self.repository.update_plan(plan_id, status="executing", started_at=datetime.utcnow())
+        self.repository.update_plan(plan_id, status="executing", started_at=datetime.now(UTC))
 
         # Execute tasks
         tasks = self.repository.list_tasks_by_plan(plan_id)
@@ -73,8 +72,10 @@ class AIExecutionService:
             plan_id,
             status="completed",
             progress_percentage=int(progress),
-            completed_at=datetime.utcnow(),
-            result_summary=json.dumps({"total": len(tasks), "completed": completed, "failed": len(tasks) - completed}),
+            completed_at=datetime.now(UTC),
+            result_summary=json.dumps(
+                {"total": len(tasks), "completed": completed, "failed": len(tasks) - completed}
+            ),
         )
 
         return {
@@ -141,7 +142,7 @@ class AIExecutionService:
         self.repository.update_plan(
             plan_id,
             status="cancelled",
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(UTC),
         )
 
         return {"success": True, "plan_id": plan_id}
@@ -157,7 +158,7 @@ class AgentMemoryService:
         """Save a decision to memory."""
         memory = self.repository.save_memory(
             memory_type="decision",
-            key=f"decision_{goal_id}_{datetime.utcnow().timestamp()}",
+            key=f"decision_{goal_id}_{datetime.now(UTC).timestamp()}",
             value=json.dumps({"decision": decision, "reasoning": reasoning}),
             importance=7,
         )
@@ -215,7 +216,7 @@ class AgentMemoryService:
         """Save conversation turn."""
         memory = self.repository.save_memory(
             memory_type="conversation",
-            key=f"conv_{datetime.utcnow().timestamp()}",
+            key=f"conv_{datetime.now(UTC).timestamp()}",
             value=json.dumps({"user": user_message, "agent": agent_response}),
             importance=5,
         )

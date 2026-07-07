@@ -21,8 +21,12 @@ class AnalyticsService:
     ) -> None:
         self.repository = repository or AnalyticsRepository()
         self.metrics_engine = metrics_engine or MetricsEngine()
-        self.recommendation_engine = recommendation_engine or RecommendationEngine(self.repository, self.metrics_engine)
-        self.trend_service = trend_service or TrendAnalysisService(self.repository, self.metrics_engine)
+        self.recommendation_engine = recommendation_engine or RecommendationEngine(
+            self.repository, self.metrics_engine
+        )
+        self.trend_service = trend_service or TrendAnalysisService(
+            self.repository, self.metrics_engine
+        )
 
     def calculate_kpis(self) -> dict[str, Any]:
         """Calculate all KPIs for dashboard."""
@@ -66,4 +70,8 @@ class AnalyticsService:
         summary = json.dumps(dashboard["kpis"])
         kpis = json.dumps(dashboard["kpis"])
         snapshot = self.repository.create_snapshot(period, summary, kpis)
-        return {"id": snapshot.id, "period": snapshot.period, "created_at": str(snapshot.created_at)}
+        return {
+            "id": snapshot.id,
+            "period": snapshot.period,
+            "created_at": str(snapshot.created_at),
+        }

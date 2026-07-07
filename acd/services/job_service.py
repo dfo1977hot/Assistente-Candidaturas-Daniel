@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 from urllib.parse import urlparse
 
 from acd.core.logger import logger
@@ -24,7 +23,7 @@ class JobService:
         "Encerrada",
     }
 
-    def __init__(self, repository: Optional[JobRepository] = None) -> None:
+    def __init__(self, repository: JobRepository | None = None) -> None:
         self.repository = repository or JobRepository()
 
     def create_job(
@@ -35,15 +34,15 @@ class JobService:
         location: str = "",
         work_model: str = "",
         employment_type: str = "",
-        salary_min: Optional[float] = None,
-        salary_max: Optional[float] = None,
+        salary_min: float | None = None,
+        salary_max: float | None = None,
         currency: str = "",
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
         recruiter: str = "",
-        application_deadline: Optional[str] = None,
-        application_date: Optional[str] = None,
+        application_deadline: str | None = None,
+        application_date: str | None = None,
         priority: int = 0,
         notes: str = "",
     ) -> Job:
@@ -93,18 +92,18 @@ class JobService:
         location: str = "",
         work_model: str = "",
         employment_type: str = "",
-        salary_min: Optional[float] = None,
-        salary_max: Optional[float] = None,
+        salary_min: float | None = None,
+        salary_max: float | None = None,
         currency: str = "",
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
         recruiter: str = "",
-        application_deadline: Optional[str] = None,
-        application_date: Optional[str] = None,
+        application_deadline: str | None = None,
+        application_date: str | None = None,
         priority: int = 0,
         notes: str = "",
-    ) -> Optional[Job]:
+    ) -> Job | None:
         """Atualiza uma vaga existente."""
 
         self._validate_required_fields(company_id=company_id, title=title)
@@ -155,7 +154,7 @@ class JobService:
 
         return deleted
 
-    def get_job(self, job_id: int) -> Optional[Job]:
+    def get_job(self, job_id: int) -> Job | None:
         """Retorna uma vaga pelo ID."""
         return self.repository.get_by_id(job_id)
 
@@ -170,10 +169,10 @@ class JobService:
     def filter_jobs(
         self,
         *,
-        company_id: Optional[int] = None,
-        status: Optional[str] = None,
-        work_model: Optional[str] = None,
-        employment_type: Optional[str] = None,
+        company_id: int | None = None,
+        status: str | None = None,
+        work_model: str | None = None,
+        employment_type: str | None = None,
     ) -> list[Job]:
         """Filtra vagas."""
 
@@ -200,19 +199,13 @@ class JobService:
 
     @staticmethod
     def _validate_salary_range(
-        salary_min: Optional[float],
-        salary_max: Optional[float],
+        salary_min: float | None,
+        salary_max: float | None,
     ) -> None:
         """Valida a faixa salarial."""
 
-        if (
-            salary_min is not None
-            and salary_max is not None
-            and salary_min > salary_max
-        ):
-            raise ValueError(
-                "O salário mínimo não pode ser maior que o salário máximo."
-            )
+        if salary_min is not None and salary_max is not None and salary_min > salary_max:
+            raise ValueError("O salário mínimo não pode ser maior que o salário máximo.")
 
     def _validate_status(self, status: str) -> None:
         """Valida o status informado."""
@@ -232,12 +225,10 @@ class JobService:
         parsed = urlparse(url)
 
         if parsed.scheme not in ("http", "https"):
-            raise ValueError(
-                "A URL da vaga deve iniciar com http:// ou https://."
-            )
+            raise ValueError("A URL da vaga deve iniciar com http:// ou https://.")
 
     @staticmethod
-    def _parse_optional_date(value: Optional[str]) -> Optional[date]:
+    def _parse_optional_date(value: str | None) -> date | None:
         """Converte uma data ISO para datetime.date."""
 
         if not value:

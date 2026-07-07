@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtWidgets import (
-    QComboBox,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
@@ -27,7 +24,7 @@ class CurriculumPage(BasePage):
         super().__init__("Currículos")
 
         self.curriculum_service = CurriculumService()
-        self.current_curriculum_id: Optional[int] = None
+        self.current_curriculum_id: int | None = None
 
         self.name_input = QLineEdit()
         self.version_input = QLineEdit()
@@ -113,7 +110,11 @@ class CurriculumPage(BasePage):
 
     def _search_curricula(self) -> None:
         query = self.search_input.text().strip()
-        curricula = self.curriculum_service.search_curricula(query) if query else self.curriculum_service.repository.get_all()
+        curricula = (
+            self.curriculum_service.search_curricula(query)
+            if query
+            else self.curriculum_service.repository.get_all()
+        )
         self._render_curricula(curricula)
 
     def _render_curricula(self, curricula: list) -> None:

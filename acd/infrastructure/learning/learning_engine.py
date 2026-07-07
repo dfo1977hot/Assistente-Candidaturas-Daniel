@@ -1,22 +1,22 @@
 """Central learning engine for coordinating learning activities."""
 
-from typing import Any
 from datetime import datetime
+from typing import Any
 
-from acd.domain.learning.learning_record import LearningRecord, LearningRecordStatus, LearningSourceType
-from acd.domain.learning.outcome import Outcome
-from acd.domain.learning.pattern import Pattern
-from acd.domain.learning.hypothesis import Hypothesis
-from acd.domain.learning.insight import Insight
-from acd.infrastructure.learning.pattern_detector import PatternDetector
-from acd.infrastructure.learning.insight_generator import InsightGenerator
-from acd.infrastructure.learning.evidence_aggregator import EvidenceAggregator
-from acd.infrastructure.learning.confidence_calculator import ConfidenceCalculator
-from acd.infrastructure.learning.learning_policy_engine import (
-    LearningPolicyEngine,
-    LearningEventType,
-    ApprovalRequirement,
+from acd.domain.learning.learning_record import (
+    LearningRecord,
+    LearningRecordStatus,
+    LearningSourceType,
 )
+from acd.domain.learning.outcome import Outcome
+from acd.infrastructure.learning.confidence_calculator import ConfidenceCalculator
+from acd.infrastructure.learning.evidence_aggregator import EvidenceAggregator
+from acd.infrastructure.learning.insight_generator import InsightGenerator
+from acd.infrastructure.learning.learning_policy_engine import (
+    LearningEventType,
+    LearningPolicyEngine,
+)
+from acd.infrastructure.learning.pattern_detector import PatternDetector
 
 
 class LearningEngine:
@@ -65,28 +65,19 @@ class LearningEngine:
         if not self.policy_engine.should_process_event(LearningEventType.OUTCOME_RECORDED.value):
             return result
 
-        # Create learning record for outcome
-        learning_record = LearningRecord(
-            source=f"outcome_{outcome.id}",
-            source_type=LearningSourceType.USER_FEEDBACK,
-            description=f"Application outcome: {outcome.outcome_type.value}",
-            evidence={
-                "outcome_type": outcome.outcome_type.value,
-                "result": outcome.result.value,
-                "company": outcome.company,
-                "position": outcome.position_title,
-            },
-            confidence=0.95,  # Direct user recording has high confidence
-            status=LearningRecordStatus.DETECTED,
-        )
+        # Create learning record for outcome.
+        # TODO: Persist or enqueue the LearningRecord when the
+        # learning repository is integrated.
 
         # Auto-detect patterns if enabled
         if auto_detect_patterns:
             # This would be called with outcomes batch
-            result["patterns_detected"].append({
-                "type": "outcome_recorded",
-                "outcome_id": outcome.id,
-            })
+            result["patterns_detected"].append(
+                {
+                    "type": "outcome_recorded",
+                    "outcome_id": outcome.id,
+                }
+            )
 
         return result
 
@@ -122,11 +113,13 @@ class LearningEngine:
                 pattern.get("confidence", 0.5),
             )
 
-            results.append({
-                "pattern": pattern,
-                "requires_approval": requires_approval,
-                "can_auto_apply": not requires_approval,
-            })
+            results.append(
+                {
+                    "pattern": pattern,
+                    "requires_approval": requires_approval,
+                    "can_auto_apply": not requires_approval,
+                }
+            )
 
         self.stats["patterns_detected"] += len(results)
         return results
@@ -158,11 +151,13 @@ class LearningEngine:
                 insight.get("confidence", 0.5),
             )
 
-            results.append({
-                "insight": insight,
-                "requires_approval": requires_approval,
-                "can_auto_apply": not requires_approval,
-            })
+            results.append(
+                {
+                    "insight": insight,
+                    "requires_approval": requires_approval,
+                    "can_auto_apply": not requires_approval,
+                }
+            )
 
         self.stats["insights_generated"] += len(results)
         return results
@@ -285,11 +280,11 @@ class LearningEngine:
         Returns:
             Health information
         """
-        total_records = self.stats["learning_records_approved"] + self.stats["learning_records_rejected"]
+        total_records = (
+            self.stats["learning_records_approved"] + self.stats["learning_records_rejected"]
+        )
         approval_rate = (
-            self.stats["learning_records_approved"] / total_records
-            if total_records > 0
-            else 0
+            self.stats["learning_records_approved"] / total_records if total_records > 0 else 0
         )
 
         return {
@@ -300,5 +295,5 @@ class LearningEngine:
             "insights_generated": self.stats["insights_generated"],
             "hypotheses_proposed": self.stats["hypotheses_proposed"],
             "policy_mode": "standard",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).timestamp(),
         }

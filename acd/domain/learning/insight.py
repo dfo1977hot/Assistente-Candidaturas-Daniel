@@ -1,16 +1,17 @@
 """Insight entity for actionable knowledge derived from patterns."""
 
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import String, Text, Integer, DateTime, JSON, Enum as SQLEnum, Numeric, Boolean
+from sqlalchemy import JSON, Boolean, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class InsightType(str, Enum):
+class InsightType(StrEnum):
     """Type of insight."""
 
     CONVERSION_TIP = "conversion_tip"
@@ -32,12 +33,20 @@ class Insight(Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     insight_type: Mapped[str] = mapped_column(SQLEnum(InsightType), nullable=False, index=True)
-    expected_impact: Mapped[str] = mapped_column(Text, nullable=False, comment="Expected impact if applied")
-    confidence: Mapped[float] = mapped_column(Numeric(precision=5, scale=4), nullable=False, default=0.5)
-    origin: Mapped[str] = mapped_column(String(200), nullable=False, comment="Where insight came from")
+    expected_impact: Mapped[str] = mapped_column(
+        Text, nullable=False, comment="Expected impact if applied"
+    )
+    confidence: Mapped[float] = mapped_column(
+        Numeric(precision=5, scale=4), nullable=False, default=0.5
+    )
+    origin: Mapped[str] = mapped_column(
+        String(200), nullable=False, comment="Where insight came from"
+    )
     related_patterns: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False)
     related_hypotheses: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False)
-    recommendations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    recommendations: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
     evidence_summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     analysis_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     analysis_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -46,8 +55,10 @@ class Insight(Base):
     is_applied: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     user_feedback: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
 
     def __repr__(self) -> str:
         """String representation."""
@@ -56,8 +67,8 @@ class Insight(Base):
     def mark_applied(self) -> None:
         """Mark insight as applied."""
         self.is_applied = True
-        self.applied_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.applied_at = datetime.now(UTC)()
+        self.updated_at = datetime.now(UTC)()
 
     def add_recommendation(self, recommendation: dict[str, Any]) -> None:
         """Add recommendation to insight.
@@ -68,7 +79,7 @@ class Insight(Base):
         if not isinstance(self.recommendations, list):
             self.recommendations = []
         self.recommendations.append(recommendation)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def get_confidence_percentage(self) -> float:
         """Get confidence as percentage."""

@@ -1,7 +1,7 @@
 """Capability-Based Access Control (CBAC) service."""
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
 
 class CapabilityService:
@@ -9,17 +9,12 @@ class CapabilityService:
 
     def __init__(self) -> None:
         """Initialize capability service."""
-        self._capabilities: dict[int, list[str]] = {}  # agent_id -> list of capability names
-        self._tools: dict[int, dict[str, Any]] = {}  # agent_id -> tool_name -> tool config
-        self._tool_usage: dict[int, dict[str, int]] = {}  # agent_id -> tool_name -> usage count
+        self._capabilities: dict[int, list[str]] = {}  # agent_id -> capability names
+        self._tools: dict[int, dict[str, Any]] = {}  # agent_id -> tool configuration
+        self._tool_usage: dict[int, dict[str, int]] = {}  # agent_id -> tool usage count
 
     def grant_capability(self, agent_id: int, capability: str) -> None:
-        """Grant a capability to an agent.
-
-        Args:
-            agent_id: Agent ID
-            capability: Capability name
-        """
+        """Grant a capability to an agent."""
         if agent_id not in self._capabilities:
             self._capabilities[agent_id] = []
 
@@ -27,42 +22,22 @@ class CapabilityService:
             self._capabilities[agent_id].append(capability)
 
     def revoke_capability(self, agent_id: int, capability: str) -> bool:
-        """Revoke a capability from an agent.
+        """Revoke a capability from an agent."""
+        if (
+            agent_id in self._capabilities
+            and capability in self._capabilities[agent_id]
+        ):
+            self._capabilities[agent_id].remove(capability)
+            return True
 
-        Args:
-            agent_id: Agent ID
-            capability: Capability name
-
-        Returns:
-            True if revoked, False otherwise
-        """
-        if agent_id in self._capabilities:
-            if capability in self._capabilities[agent_id]:
-                self._capabilities[agent_id].remove(capability)
-                return True
         return False
 
     def has_capability(self, agent_id: int, capability: str) -> bool:
-        """Check if agent has capability.
-
-        Args:
-            agent_id: Agent ID
-            capability: Capability name
-
-        Returns:
-            True if agent has capability
-        """
+        """Check whether the agent has a capability."""
         return capability in self._capabilities.get(agent_id, [])
 
     def get_capabilities(self, agent_id: int) -> list[str]:
-        """Get all capabilities for agent.
-
-        Args:
-            agent_id: Agent ID
-
-        Returns:
-            List of capabilities
-        """
+        """Return all capabilities for an agent."""
         return self._capabilities.get(agent_id, [])
 
     def authorize_tool(
@@ -73,15 +48,7 @@ class CapabilityService:
         max_calls_per_day: int | None = None,
         requires_approval: bool = False,
     ) -> None:
-        """Authorize a tool for an agent.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-            max_calls_per_session: Max calls per session
-            max_calls_per_day: Max calls per day
-            requires_approval: Whether tool requires approval
-        """
+        """Authorize a tool for an agent."""
         if agent_id not in self._tools:
             self._tools[agent_id] = {}
 
@@ -90,114 +57,69 @@ class CapabilityService:
             "max_calls_per_session": max_calls_per_session,
             "max_calls_per_day": max_calls_per_day,
             "requires_approval": requires_approval,
-            "authorized_at": datetime.utcnow(),
+            "authorized_at": datetime.now(UTC),
         }
 
-        # Grant corresponding capability
         self.grant_capability(agent_id, f"use_tool_{tool_name}")
 
     def revoke_tool(self, agent_id: int, tool_name: str) -> bool:
-        """Revoke tool access from agent.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-
-        Returns:
-            True if revoked, False otherwise
-        """
-        if agent_id in self._tools and tool_name in self._tools[agent_id]:
+        """Revoke authorization for a tool."""
+        if (
+            agent_id in self._tools
+            and tool_name in self._tools[agent_id]
+        ):
             del self._tools[agent_id][tool_name]
             self.revoke_capability(agent_id, f"use_tool_{tool_name}")
             return True
+
         return False
 
     def can_use_tool(self, agent_id: int, tool_name: str) -> bool:
-        """Check if agent can use tool.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-
-        Returns:
-            True if agent is authorized
-        """
+        """Return whether the agent can use the tool."""
         return f"use_tool_{tool_name}" in self._capabilities.get(agent_id, [])
 
     def get_authorized_tools(self, agent_id: int) -> dict[str, Any]:
-        """Get all authorized tools for agent.
-
-        Args:
-            agent_id: Agent ID
-
-        Returns:
-            Dictionary of tool configurations
-        """
+        """Return all authorized tools for an agent."""
         return self._tools.get(agent_id, {})
 
     def record_tool_usage(self, agent_id: int, tool_name: str) -> bool:
-        """Record tool usage by agent.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-
-        Returns:
-            True if within limits, False if exceeds limit
-        """
+        """Record tool usage."""
         if agent_id not in self._tool_usage:
             self._tool_usage[agent_id] = {}
 
         if tool_name not in self._tool_usage[agent_id]:
             self._tool_usage[agent_id][tool_name] = 0
 
-        # Get tool config
         tool_config = self._tools.get(agent_id, {}).get(tool_name)
-        if not tool_config:
+        if tool_config is None:
             return False
 
-        # Check limits
         usage_count = self._tool_usage[agent_id][tool_name]
-        if tool_config.get("max_calls_per_session") and usage_count >= tool_config["max_calls_per_session"]:
+
+        max_calls = tool_config.get("max_calls_per_session")
+        if max_calls is not None and usage_count >= max_calls:
             return False
 
-        # Record usage
         self._tool_usage[agent_id][tool_name] += 1
         return True
 
     def get_tool_usage(self, agent_id: int, tool_name: str) -> int:
-        """Get usage count for tool.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-
-        Returns:
-            Usage count
-        """
+        """Return the number of times a tool has been used."""
         return self._tool_usage.get(agent_id, {}).get(tool_name, 0)
 
     def reset_tool_usage(self, agent_id: int | None = None) -> None:
-        """Reset tool usage counters.
+        """Reset tool usage counters."""
+        if agent_id is None:
+            self._tool_usage.clear()
+            return
 
-        Args:
-            agent_id: Optional agent ID (if None, reset all)
-        """
-        if agent_id:
-            if agent_id in self._tool_usage:
-                self._tool_usage[agent_id] = {}
-        else:
-            self._tool_usage = {}
+        self._tool_usage[agent_id] = {}
 
     def requires_approval(self, agent_id: int, tool_name: str) -> bool:
-        """Check if tool requires approval.
-
-        Args:
-            agent_id: Agent ID
-            tool_name: Tool name
-
-        Returns:
-            True if requires approval
-        """
+        """Return whether the tool requires approval."""
         tool_config = self._tools.get(agent_id, {}).get(tool_name)
-        return tool_config.get("requires_approval", False) if tool_config else False
+        return (
+            tool_config.get("requires_approval", False)
+            if tool_config is not None
+            else False
+        )

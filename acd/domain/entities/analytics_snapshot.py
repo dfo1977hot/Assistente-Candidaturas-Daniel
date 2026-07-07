@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -17,4 +18,4 @@ class AnalyticsSnapshot(Base):
     period: Mapped[str] = mapped_column(String(50), nullable=False, default="daily")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     kpis: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

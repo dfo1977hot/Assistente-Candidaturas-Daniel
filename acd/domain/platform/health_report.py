@@ -1,14 +1,15 @@
 """Health report entity for system health checks."""
 
-from enum import Enum
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+from enum import StrEnum
+
 from sqlalchemy import JSON, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Health status levels."""
 
     HEALTHY = "healthy"
@@ -17,7 +18,7 @@ class HealthStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
-class HealthCheckType(str, Enum):
+class HealthCheckType(StrEnum):
     """Types of health checks."""
 
     DATABASE = "database"

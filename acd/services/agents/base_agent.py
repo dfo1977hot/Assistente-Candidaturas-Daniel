@@ -1,13 +1,13 @@
 """Base agent implementation."""
 
-from typing import Any
 from abc import ABC, abstractmethod
+from typing import Any
 
+from acd.domain.agents.message import MessageType
+from acd.infrastructure.agents.capability_service import CapabilityService
 from acd.infrastructure.agents.context import AgentContext
 from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.capability_service import CapabilityService
 from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
-from acd.domain.agents.message import MessageType
 
 
 class BaseAgent(ABC):

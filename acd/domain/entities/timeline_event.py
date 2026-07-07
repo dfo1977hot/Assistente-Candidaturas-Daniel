@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -17,7 +18,7 @@ class TimelineEvent(Base):
     application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     def __repr__(self) -> str:
         return f"<TimelineEvent {self.event_type}>"

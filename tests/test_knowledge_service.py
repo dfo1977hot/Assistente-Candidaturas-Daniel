@@ -66,7 +66,7 @@ def test_knowledge_service_creates_relations_and_similarity(knowledge_setup):
 
     lean = service.create_skill(name="Lean", category="Produção", weight=0.7)
     kaizen = service.create_skill(name="Kaizen", category="Produção", weight=0.8)
-    sigma = service.create_skill(name="Six Sigma", category="Qualidade", weight=0.9)
+    service.create_skill(name="Six Sigma", category="Qualidade", weight=0.9)
 
     relation = service.create_relation(
         parent_skill_id=lean.id,

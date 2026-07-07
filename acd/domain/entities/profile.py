@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -23,5 +24,5 @@ class Profile(Base):
     portfolio_url: Mapped[str] = mapped_column(String(300), nullable=False, default="")
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     location: Mapped[str] = mapped_column(String(200), nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

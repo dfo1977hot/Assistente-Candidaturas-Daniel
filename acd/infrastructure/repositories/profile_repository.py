@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 
 from acd.database import database as database_module
@@ -25,7 +23,7 @@ class ProfileRepository:
             session.refresh(profile)
             return profile
 
-    def get_by_id(self, profile_id: int) -> Optional[Profile]:
+    def get_by_id(self, profile_id: int) -> Profile | None:
         with database_module.SessionLocal() as session:
             return session.get(Profile, profile_id)
 

@@ -10,15 +10,13 @@ from acd.infrastructure.repositories.skill_repository import SkillRepository
 class SkillClassifier(Protocol):
     """Interface para mecanismos de classificação."""
 
-    def classify(self, skill_name: str) -> str:
-        ...
+    def classify(self, skill_name: str) -> str: ...
 
 
 class SimilarityEngine(Protocol):
     """Interface para mecanismos de comparação."""
 
-    def calculate(self, left: str, right: str) -> float:
-        ...
+    def calculate(self, left: str, right: str) -> float: ...
 
 
 class RuleBasedSimilarityEngine:
@@ -48,9 +46,15 @@ class RuleBasedSimilarityEngine:
             return 1.0
         if normalized_left in normalized_right or normalized_right in normalized_left:
             return 0.85
-        if normalized_left in self.KNOWN_RELATIONS and normalized_right in self.KNOWN_RELATIONS[normalized_left]:
+        if (
+            normalized_left in self.KNOWN_RELATIONS
+            and normalized_right in self.KNOWN_RELATIONS[normalized_left]
+        ):
             return 0.6
-        if normalized_right in self.KNOWN_RELATIONS and normalized_left in self.KNOWN_RELATIONS[normalized_right]:
+        if (
+            normalized_right in self.KNOWN_RELATIONS
+            and normalized_left in self.KNOWN_RELATIONS[normalized_right]
+        ):
             return 0.6
         shared_words = set(normalized_left.split()) & set(normalized_right.split())
         if shared_words:
@@ -58,7 +62,9 @@ class RuleBasedSimilarityEngine:
             if len(shared_words) >= 2:
                 score += self.alias_bonus
             return min(0.95, score)
-        if any(word in normalized_right for word in normalized_left.split()) or any(word in normalized_left for word in normalized_right.split()):
+        if any(word in normalized_right for word in normalized_left.split()) or any(
+            word in normalized_left for word in normalized_right.split()
+        ):
             return 0.45
         return 0.2
 
@@ -125,7 +131,9 @@ class KnowledgeService:
         logger.info("Competência criada: %s", created.name)
         return created
 
-    def merge_skill(self, *, source_skill_id: int, target_skill_id: int, alias_name: str) -> Skill | None:
+    def merge_skill(
+        self, *, source_skill_id: int, target_skill_id: int, alias_name: str
+    ) -> Skill | None:
         """Faz a fusão de uma competência com outra e registra um alias."""
         source = self.repository.get_by_id(source_skill_id)
         target = self.repository.get_by_id(target_skill_id)
@@ -135,7 +143,15 @@ class KnowledgeService:
         logger.info("Competência fundida: %s -> %s", source.name, target.name)
         return target
 
-    def update_skill(self, skill_id: int, *, name: str, category: str = "", description: str = "", weight: float = 0.0) -> Skill | None:
+    def update_skill(
+        self,
+        skill_id: int,
+        *,
+        name: str,
+        category: str = "",
+        description: str = "",
+        weight: float = 0.0,
+    ) -> Skill | None:
         """Atualiza uma competência existente."""
         skill = self.repository.get_by_id(skill_id)
         if skill is None:
@@ -154,7 +170,9 @@ class KnowledgeService:
         """Busca competências pelo nome."""
         return self.repository.search(query)
 
-    def create_relation(self, *, parent_skill_id: int, child_skill_id: int, relation_type: str, strength: float) -> SkillRelation | None:
+    def create_relation(
+        self, *, parent_skill_id: int, child_skill_id: int, relation_type: str, strength: float
+    ) -> SkillRelation | None:
         """Cria um relacionamento entre duas competências."""
         if parent_skill_id == child_skill_id:
             return None

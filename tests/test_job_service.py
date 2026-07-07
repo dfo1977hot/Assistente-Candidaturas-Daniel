@@ -5,7 +5,6 @@ import pytest
 
 from acd.infrastructure.repositories.company_repository import CompanyRepository
 from acd.infrastructure.repositories.job_repository import JobRepository
-from acd.models.company import Company
 from acd.services.company_service import CompanyService
 from acd.services.job_service import JobService
 
@@ -59,7 +58,9 @@ def test_job_service_updates_and_deletes_job(service_setup):
     job_service, company_id = service_setup
 
     created = job_service.create_job(company_id=company_id, title="Python Developer")
-    updated = job_service.update_job(created.id, company_id=company_id, title="Senior Python Developer")
+    updated = job_service.update_job(
+        created.id, company_id=company_id, title="Senior Python Developer"
+    )
 
     assert updated is not None
     assert updated.title == "Senior Python Developer"

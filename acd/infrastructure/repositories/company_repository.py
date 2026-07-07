@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import or_, select
 
 from acd.database import database as database_module
@@ -34,7 +32,7 @@ class CompanyRepository:
             session.commit()
             return True
 
-    def get_by_id(self, company_id: int) -> Optional[Company]:
+    def get_by_id(self, company_id: int) -> Company | None:
         with database_module.SessionLocal() as session:
             return session.get(Company, company_id)
 
@@ -71,7 +69,9 @@ class CompanyRepository:
             stmt = select(Company).order_by(column.desc() if descending else column.asc())
             return list(session.scalars(stmt).all())
 
-    def exists_by_name_and_website(self, *, name: str, website: str, exclude_id: Optional[int] = None) -> bool:
+    def exists_by_name_and_website(
+        self, *, name: str, website: str, exclude_id: int | None = None
+    ) -> bool:
         normalized_name = name.strip().lower()
         normalized_website = website.strip().lower()
 

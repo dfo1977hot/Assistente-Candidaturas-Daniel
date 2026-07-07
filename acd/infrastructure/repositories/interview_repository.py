@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 from sqlalchemy import select
 
@@ -35,7 +34,7 @@ class InterviewRepository:
             session.commit()
             return True
 
-    def get_by_id(self, interview_id: int) -> Optional[Interview]:
+    def get_by_id(self, interview_id: int) -> Interview | None:
         with database_module.SessionLocal() as session:
             return session.get(Interview, interview_id)
 
@@ -49,14 +48,20 @@ class InterviewRepository:
             stmt = (
                 select(Interview)
                 .where(
-                    Interview.interviewer.ilike(f"%{query}%")
-                    | Interview.notes.ilike(f"%{query}%")
+                    Interview.interviewer.ilike(f"%{query}%") | Interview.notes.ilike(f"%{query}%")
                 )
                 .order_by(Interview.interview_date.asc())
             )
             return list(session.scalars(stmt).all())
 
-    def filter(self, *, interview_type: Optional[str] = None, result: Optional[str] = None, period_start: Optional[datetime] = None, period_end: Optional[datetime] = None) -> list[Interview]:
+    def filter(
+        self,
+        *,
+        interview_type: str | None = None,
+        result: str | None = None,
+        period_start: datetime | None = None,
+        period_end: datetime | None = None,
+    ) -> list[Interview]:
         with database_module.SessionLocal() as session:
             stmt = select(Interview)
             if interview_type:
@@ -75,26 +80,41 @@ class InterviewRepository:
         with database_module.SessionLocal() as session:
             stmt = select(Interview).where(
                 Interview.interview_date >= datetime.combine(today, datetime.min.time()),
-                Interview.interview_date < datetime.combine(today + timedelta(days=1), datetime.min.time()),
+                Interview.interview_date
+                < datetime.combine(today + timedelta(days=1), datetime.min.time()),
             )
             return list(session.scalars(stmt).all())
 
     def get_next(self, limit: int = 5) -> list[Interview]:
         with database_module.SessionLocal() as session:
-            stmt = select(Interview).where(Interview.interview_date >= datetime.now()).order_by(Interview.interview_date.asc()).limit(limit)
+            stmt = (
+                select(Interview)
+                .where(Interview.interview_date >= datetime.now())
+                .order_by(Interview.interview_date.asc())
+                .limit(limit)
+            )
             return list(session.scalars(stmt).all())
 
     def get_statistics(self) -> dict[str, int]:
         with database_module.SessionLocal() as session:
             total = session.query(Interview).count()
             today = datetime.now().date()
-            today_count = session.query(Interview).filter(
-                Interview.interview_date >= datetime.combine(today, datetime.min.time()),
-                Interview.interview_date < datetime.combine(today + timedelta(days=1), datetime.min.time()),
-            ).count()
+            today_count = (
+                session.query(Interview)
+                .filter(
+                    Interview.interview_date >= datetime.combine(today, datetime.min.time()),
+                    Interview.interview_date
+                    < datetime.combine(today + timedelta(days=1), datetime.min.time()),
+                )
+                .count()
+            )
             week_end = today + timedelta(days=7)
-            week_count = session.query(Interview).filter(
-                Interview.interview_date >= datetime.combine(today, datetime.min.time()),
-                Interview.interview_date < datetime.combine(week_end, datetime.min.time()),
-            ).count()
+            week_count = (
+                session.query(Interview)
+                .filter(
+                    Interview.interview_date >= datetime.combine(today, datetime.min.time()),
+                    Interview.interview_date < datetime.combine(week_end, datetime.min.time()),
+                )
+                .count()
+            )
             return {"total": total, "today": today_count, "week": week_count}

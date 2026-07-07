@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import date, datetime
 
@@ -23,4 +24,4 @@ class Experience(Base):
     skills_used: Mapped[str] = mapped_column(Text, nullable=False, default="")
     key_results: Mapped[str] = mapped_column(Text, nullable=False, default="")
     technologies_used: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

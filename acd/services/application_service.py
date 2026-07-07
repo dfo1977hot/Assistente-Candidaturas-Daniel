@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 from acd.core.logger import logger
 from acd.domain.entities.application import Application
@@ -45,7 +44,7 @@ class ApplicationService:
         "Encerrada": set(),
     }
 
-    def __init__(self, repository: Optional[ApplicationRepository] = None) -> None:
+    def __init__(self, repository: ApplicationRepository | None = None) -> None:
         self.repository = repository or ApplicationRepository()
 
     def create_application(
@@ -54,12 +53,12 @@ class ApplicationService:
         job_id: int,
         company_id: int,
         status: str = "Rascunho",
-        application_date: Optional[str] = None,
-        next_follow_up: Optional[str] = None,
-        response_date: Optional[str] = None,
-        interview_date: Optional[str] = None,
-        salary_expected: Optional[float] = None,
-        salary_offered: Optional[float] = None,
+        application_date: str | None = None,
+        next_follow_up: str | None = None,
+        response_date: str | None = None,
+        interview_date: str | None = None,
+        salary_expected: float | None = None,
+        salary_offered: float | None = None,
         application_channel: str = "",
         recruiter_name: str = "",
         recruiter_email: str = "",
@@ -100,19 +99,19 @@ class ApplicationService:
         job_id: int,
         company_id: int,
         status: str = "Rascunho",
-        application_date: Optional[str] = None,
-        next_follow_up: Optional[str] = None,
-        response_date: Optional[str] = None,
-        interview_date: Optional[str] = None,
-        salary_expected: Optional[float] = None,
-        salary_offered: Optional[float] = None,
+        application_date: str | None = None,
+        next_follow_up: str | None = None,
+        response_date: str | None = None,
+        interview_date: str | None = None,
+        salary_expected: float | None = None,
+        salary_offered: float | None = None,
         application_channel: str = "",
         recruiter_name: str = "",
         recruiter_email: str = "",
         recruiter_phone: str = "",
         feedback: str = "",
         notes: str = "",
-    ) -> Optional[Application]:
+    ) -> Application | None:
         """Atualiza uma candidatura existente."""
         self._validate_required_fields(job_id=job_id, company_id=company_id)
         self._validate_status(status)
@@ -164,11 +163,19 @@ class ApplicationService:
         """Busca candidaturas por texto."""
         return self.repository.search(query)
 
-    def filter_applications(self, *, status: Optional[str] = None, company_id: Optional[int] = None, channel: Optional[str] = None) -> list[Application]:
+    def filter_applications(
+        self,
+        *,
+        status: str | None = None,
+        company_id: int | None = None,
+        channel: str | None = None,
+    ) -> list[Application]:
         """Filtra candidaturas por status, empresa e canal."""
         return self.repository.filter(status=status, company_id=company_id, channel=channel)
 
-    def change_status(self, application_id: int, new_status: str, *, administrative: bool = False) -> Optional[Application]:
+    def change_status(
+        self, application_id: int, new_status: str, *, administrative: bool = False
+    ) -> Application | None:
         """Altera o status seguindo uma máquina de estados simples."""
         application = self.repository.get_by_id(application_id)
         if application is None:
@@ -180,7 +187,9 @@ class ApplicationService:
 
         updated = self.repository.change_status(application_id, new_status)
         if updated is not None:
-            self.repository.add_event(application_id, "status_changed", f"Status alterado para {new_status}")
+            self.repository.add_event(
+                application_id, "status_changed", f"Status alterado para {new_status}"
+            )
             logger.info("Status alterado: %s", new_status)
         return updated
 
@@ -202,14 +211,16 @@ class ApplicationService:
         if status not in self.VALID_STATUSES:
             raise ValueError(f"Status inválido: {status}")
 
-    def _validate_transition(self, current_status: str, new_status: str, *, administrative: bool = False) -> None:
+    def _validate_transition(
+        self, current_status: str, new_status: str, *, administrative: bool = False
+    ) -> None:
         self._validate_status(current_status)
         self._validate_status(new_status)
         allowed = self.VALID_STATUS_TRANSITIONS.get(current_status, set())
         if new_status not in allowed and not administrative:
             raise ValueError(f"Transição inválida de {current_status} para {new_status}.")
 
-    def _parse_optional_date(self, value: Optional[str]) -> Optional[date]:
+    def _parse_optional_date(self, value: str | None) -> date | None:
         if not value:
             return None
         return date.fromisoformat(value)

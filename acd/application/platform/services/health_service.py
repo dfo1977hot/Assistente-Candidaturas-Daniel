@@ -1,15 +1,16 @@
 """Service for system health monitoring."""
 
-from typing import Any
 from datetime import datetime
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from acd.domain.platform.health_report import HealthStatus
 from acd.infrastructure.platform import (
     StructuredLogger,
     get_registry,
 )
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.domain.platform.health_report import HealthStatus
 
 
 class HealthService:
@@ -31,10 +32,7 @@ class HealthService:
         Returns:
             Results from all checks
         """
-        self.logger.debug(
-            "run_all_checks",
-            "Starting health checks"
-        )
+        self.logger.debug("run_all_checks", "Starting health checks")
 
         registry = get_registry()
         results = registry.run_all()
@@ -61,10 +59,7 @@ class HealthService:
         Returns:
             Check result
         """
-        self.logger.debug(
-            "run_specific_check",
-            f"Running check: {check_name}"
-        )
+        self.logger.debug("run_specific_check", f"Running check: {check_name}")
 
         registry = get_registry()
         result = registry.run_check(check_name)
@@ -91,7 +86,7 @@ class HealthService:
         overall_status = registry.get_overall_status()
 
         with self.logger.operation("get_overall_health"):
-            status = self.repository.get_or_create_status()
+            self.repository.get_or_create_status()
             status_data = {
                 "overall_status": overall_status,
                 "timestamp": datetime.now().isoformat(),

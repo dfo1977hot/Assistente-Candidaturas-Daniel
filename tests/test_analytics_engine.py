@@ -1,21 +1,14 @@
-import json
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 
 from acd.database import database as database_module
-from acd.domain.entities.metric import Metric
-from acd.domain.entities.analytics_snapshot import AnalyticsSnapshot
-from acd.domain.entities.report import Report
-from acd.domain.entities.analytics_recommendation import AnalyticsRecommendation
-from acd.domain.entities.trend import Trend
 from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
+from acd.services.analytics_service import AnalyticsService
 from acd.services.metrics_engine import MetricsEngine
 from acd.services.recommendation_engine import RecommendationEngine
 from acd.services.trend_analysis_service import TrendAnalysisService
-from acd.services.analytics_service import AnalyticsService
 
 
 @pytest.fixture
@@ -27,8 +20,6 @@ def temp_database(monkeypatch):
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",
     )
-
-    import acd.database.database as database_module
 
     database_module.engine.dispose()
     database_module.engine = database_module.create_engine(
@@ -43,12 +34,6 @@ def temp_database(monkeypatch):
     )
 
     from acd.models.base import Base
-
-    import acd.domain.entities.metric
-    import acd.domain.entities.analytics_snapshot
-    import acd.domain.entities.report
-    import acd.domain.entities.analytics_recommendation
-    import acd.domain.entities.trend
 
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)

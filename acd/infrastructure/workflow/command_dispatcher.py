@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from acd.infrastructure.workflow.command import WorkflowCommand
 from acd.infrastructure.workflow.commands import (
     AnalyzeJobCommand,
-    GenerateResumeCommand,
-    GenerateCoverLetterCommand,
-    RunATSCommand,
     ApplyToJobCommand,
+    GenerateCoverLetterCommand,
+    GenerateResumeCommand,
     RegisterApplicationCommand,
+    RunATSCommand,
 )
 
 

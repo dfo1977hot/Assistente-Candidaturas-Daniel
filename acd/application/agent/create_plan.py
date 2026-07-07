@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
 import json
+from typing import Any
 
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
 from acd.infrastructure.agent.tool_registry import DefaultToolRegistry
+from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.services.ai_execution_service import AgentMemoryService
 
 
@@ -17,13 +17,13 @@ def create_plan(
     memory_service: AgentMemoryService | None = None,
 ) -> dict[str, Any]:
     """Create an execution plan for a goal.
-    
+
     Args:
         goal_data: Goal details (title, description, objective_type, priority)
         repository: Agent repository
         orchestrator: AI orchestrator
         memory_service: Memory service
-        
+
     Returns:
         Execution plan with tasks and approval status
     """
@@ -43,12 +43,14 @@ def create_plan(
     )
 
     # Process goal through orchestrator
-    plan_result = orchestrator.process_goal({
-        "id": goal.id,
-        "title": goal.title,
-        "description": goal.description,
-        "objective_type": goal.objective_type,
-    })
+    plan_result = orchestrator.process_goal(
+        {
+            "id": goal.id,
+            "title": goal.title,
+            "description": goal.description,
+            "objective_type": goal.objective_type,
+        }
+    )
 
     if not plan_result.get("success"):
         return {

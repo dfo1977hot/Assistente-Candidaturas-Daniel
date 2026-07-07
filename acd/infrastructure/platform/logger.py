@@ -1,13 +1,13 @@
 """Structured logging framework for the platform."""
 
 import logging
-import uuid
-from typing import Any
-from datetime import datetime
-from contextlib import contextmanager
 import time
+import uuid
+from contextlib import contextmanager
+from datetime import datetime
+from typing import Any
 
-from acd.domain.platform.system_log import SystemLog, LogLevel
+from acd.domain.platform.system_log import LogLevel, SystemLog
 
 
 class StructuredLogger:
@@ -278,7 +278,9 @@ class StructuredLogger:
             if level == LogLevel.DEBUG.value:
                 self.debug(operation_name, f"Completed in {duration_ms:.2f}ms")
             else:
-                self.info(operation_name, f"Completed in {duration_ms:.2f}ms", duration_ms=duration_ms)
+                self.info(
+                    operation_name, f"Completed in {duration_ms:.2f}ms", duration_ms=duration_ms
+                )
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
             self.error(

@@ -1,8 +1,14 @@
 """Log viewer widget."""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QComboBox, QTableWidget, QTableWidgetItem, QHeaderView
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from acd.application.platform import PlatformUseCases
@@ -43,12 +49,10 @@ class LogViewer(QWidget):
         # Logs table
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels([
-            "Timestamp", "Level", "Module", "Operation", "Message", "Duration (ms)"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.table.setHorizontalHeaderLabels(
+            ["Timestamp", "Level", "Module", "Operation", "Message", "Duration (ms)"]
         )
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -56,14 +60,11 @@ class LogViewer(QWidget):
     def refresh(self) -> None:
         """Refresh logs."""
         try:
-            from acd.infrastructure.repositories.platform import PlatformRepository
-            from sqlalchemy import create_engine
-            from sqlalchemy.orm import Session
 
             # Get logs (will be populated by service)
             failed_ops = self.use_cases.get_failed_operations(hours=24)
             self.update_table(failed_ops)
-        except Exception as e:
+        except Exception:
             pass  # Handle gracefully
 
     def update_table(self, logs: list) -> None:

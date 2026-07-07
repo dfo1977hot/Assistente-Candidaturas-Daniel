@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 
 class EventHandler(Protocol):
@@ -34,5 +35,5 @@ class EventBus:
             for handler in self._handlers[event_type]:
                 try:
                     handler(event_type, data)
-                except Exception as e:
+                except Exception:
                     pass

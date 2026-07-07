@@ -1,7 +1,7 @@
 """Approval service for managing learning approvals."""
 
+from datetime import UTC, datetime, datetime
 from typing import Any
-from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -42,16 +42,18 @@ class ApprovalService:
 
         result = []
         for record in records:
-            result.append({
-                "id": record.id,
-                "type": "learning_record",
-                "source": record.source,
-                "source_type": record.source_type,
-                "description": record.description,
-                "confidence": record.confidence,
-                "evidence": record.evidence,
-                "created_at": record.created_at.isoformat(),
-            })
+            result.append(
+                {
+                    "id": record.id,
+                    "type": "learning_record",
+                    "source": record.source,
+                    "source_type": record.source_type,
+                    "description": record.description,
+                    "confidence": record.confidence,
+                    "evidence": record.evidence,
+                    "created_at": record.created_at.isoformat(),
+                }
+            )
 
         return result
 
@@ -80,7 +82,7 @@ class ApprovalService:
             "success": True,
             "record_id": record_id,
             "status": record.status,
-            "approved_at": datetime.utcnow().isoformat(),
+            "approved_at": datetime.now(UTC).isoformat(),
         }
 
     def reject_learning_record(
@@ -108,7 +110,7 @@ class ApprovalService:
             "success": True,
             "record_id": record_id,
             "status": record.status,
-            "rejected_at": datetime.utcnow().isoformat(),
+            "rejected_at": datetime.now(UTC).isoformat(),
         }
 
     def approve_hypothesis(
@@ -136,7 +138,7 @@ class ApprovalService:
             "success": True,
             "hypothesis_id": hypothesis_id,
             "status": hypothesis.status,
-            "confirmed_at": datetime.utcnow().isoformat(),
+            "confirmed_at": datetime.now(UTC).isoformat(),
         }
 
     def reject_hypothesis(
@@ -164,7 +166,7 @@ class ApprovalService:
             "success": True,
             "hypothesis_id": hypothesis_id,
             "status": hypothesis.status,
-            "rejected_at": datetime.utcnow().isoformat(),
+            "rejected_at": datetime.now(UTC).isoformat(),
         }
 
     def bulk_approve(
@@ -215,14 +217,16 @@ class ApprovalService:
         stats = {
             "total_records": len(all_records),
             "approved": sum(1 for r in all_records if r.is_approved()),
-            "rejected": sum(1 for r in all_records if r.status == LearningRecordStatus.REJECTED.value),
-            "pending": sum(1 for r in all_records if r.status == LearningRecordStatus.DETECTED.value),
+            "rejected": sum(
+                1 for r in all_records if r.status == LearningRecordStatus.REJECTED.value
+            ),
+            "pending": sum(
+                1 for r in all_records if r.status == LearningRecordStatus.DETECTED.value
+            ),
         }
 
         stats["approval_rate"] = (
-            stats["approved"] / stats["total_records"]
-            if stats["total_records"] > 0
-            else 0
+            stats["approved"] / stats["total_records"] if stats["total_records"] > 0 else 0
         )
 
         return stats
@@ -238,13 +242,16 @@ class ApprovalService:
         """
         from datetime import timedelta
 
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+
         records = self.repository.list_records(limit=10000)
         archived_count = 0
 
         for record in records:
-            if record.created_at < cutoff_date and record.status == LearningRecordStatus.APPROVED.value:
+            if (
+                record.created_at < cutoff_date
+                and record.status == LearningRecordStatus.APPROVED.value
+            ):
                 record.status = LearningRecordStatus.ARCHIVED.value
                 archived_count += 1
 

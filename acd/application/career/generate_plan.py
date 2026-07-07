@@ -12,12 +12,12 @@ def generate_plan(
     service: CareerPlanningService | None = None,
 ) -> dict[str, Any]:
     """Generate development plan for a goal.
-    
+
     Args:
         goal_id: Career goal ID
         current_profile: Current profile data
         service: CareerPlanningService instance
-        
+
     Returns:
         Generated development plan with recommendations
     """

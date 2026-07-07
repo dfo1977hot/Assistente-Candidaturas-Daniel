@@ -1,15 +1,15 @@
 """Supervisor service for multi-agent coordination."""
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
-from acd.infrastructure.agents.registry import AgentRegistry
-from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.context import ContextManager, AgentContext
-from acd.infrastructure.agents.task_scheduler import TaskScheduler
-from acd.infrastructure.agents.capability_service import CapabilityService
-from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
 from acd.domain.agents.message import MessageType
+from acd.infrastructure.agents.capability_service import CapabilityService
+from acd.infrastructure.agents.context import ContextManager
+from acd.infrastructure.agents.message_bus import MessageBus
+from acd.infrastructure.agents.registry import AgentRegistry
+from acd.infrastructure.agents.task_scheduler import TaskScheduler
+from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
 
 
 class SupervisorService:
@@ -76,7 +76,9 @@ class SupervisorService:
 
         return session.id
 
-    def process_user_request(self, user_request: str, session_id: int | None = None) -> dict[str, Any]:
+    def process_user_request(
+        self, user_request: str, session_id: int | None = None
+    ) -> dict[str, Any]:
         """Process user request by distributing to agents.
 
         Args:
@@ -97,21 +99,12 @@ class SupervisorService:
 
         if not agents_to_involve:
             return {"success": False, "error": "No suitable agents found"}
-
-        # Create context for this request
-        request_context = {
-            "user_request": user_request,
-            "involved_agents": agents_to_involve,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-
-        # Create task for each agent
         task_ids = []
         for agent_dict in agents_to_involve:
             agent_id = agent_dict["id"]
-            
+
             # Create context for agent
-            agent_context = self.context_manager.create_context(
+            self.context_manager.create_context(
                 agent_id=agent_id,
                 agent_name=agent_dict["name"],
                 objective=user_request,
@@ -220,12 +213,14 @@ class SupervisorService:
             )
 
             # Record execution
-            self._execution_history.append({
-                "task_id": task_id,
-                "status": "completed",
-                "timestamp": datetime.utcnow(),
-                "result": result,
-            })
+            self._execution_history.append(
+                {
+                    "task_id": task_id,
+                    "status": "completed",
+                    "timestamp": datetime.now(UTC),
+                    "result": result,
+                }
+            )
 
             return {"success": True, "task_id": task_id}
 
@@ -259,12 +254,14 @@ class SupervisorService:
             )
 
             # Record execution
-            self._execution_history.append({
-                "task_id": task_id,
-                "status": "failed",
-                "error": error,
-                "timestamp": datetime.utcnow(),
-            })
+            self._execution_history.append(
+                {
+                    "task_id": task_id,
+                    "status": "failed",
+                    "error": error,
+                    "timestamp": datetime.now(UTC),
+                }
+            )
 
             return {"success": True, "task_id": task_id}
 
@@ -357,7 +354,7 @@ class SupervisorService:
             return {"success": False, "error": "No active session"}
 
         session = self.repository.close_session(session_id)
-        
+
         if session:
             self._current_session_id = None
             return {

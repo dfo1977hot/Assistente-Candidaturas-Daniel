@@ -1,31 +1,32 @@
 """Agent Console page for multi-agent platform."""
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QVBoxLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
-    QWidget,
-    QTextEdit,
-    QPushButton,
-    QScrollArea,
-    QFrame,
-    QProgressBar,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QColor
 
+from acd.application.multi_agent.session import (
+    initialize_multi_agent_platform,
+    process_user_request,
+    start_session,
+)
+from acd.infrastructure.agents.capability_service import CapabilityService
+from acd.infrastructure.agents.context import ContextManager
+from acd.infrastructure.agents.message_bus import MessageBus
+from acd.infrastructure.agents.registry import AgentRegistry
+from acd.infrastructure.agents.task_scheduler import TaskScheduler
+from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
 from acd.presentation.pages.base_page import BasePage
 from acd.services.agents.supervisor_service import SupervisorService
-from acd.infrastructure.agents.registry import AgentRegistry
-from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.context import ContextManager
-from acd.infrastructure.agents.task_scheduler import TaskScheduler
-from acd.infrastructure.agents.capability_service import CapabilityService
-from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
-from acd.application.multi_agent.session import initialize_multi_agent_platform, start_session, process_user_request
 
 
 class AgentConsolePage(BasePage):
@@ -33,7 +34,7 @@ class AgentConsolePage(BasePage):
 
     def __init__(self) -> None:
         super().__init__("Console de Agentes")
-        
+
         # Initialize multi-agent infrastructure
         self.registry = AgentRegistry()
         self.message_bus = MessageBus()
@@ -41,7 +42,7 @@ class AgentConsolePage(BasePage):
         self.task_scheduler = TaskScheduler()
         self.capability_service = CapabilityService()
         self.repository = AgentRepository()
-        
+
         self.supervisor = SupervisorService(
             registry=self.registry,
             message_bus=self.message_bus,
@@ -190,7 +191,9 @@ class AgentConsolePage(BasePage):
         input_layout.addWidget(self.message_input)
 
         send_btn = QPushButton("Process")
-        send_btn.setStyleSheet("background-color: #0066cc; color: white; padding: 8px; width: 80px;")
+        send_btn.setStyleSheet(
+            "background-color: #0066cc; color: white; padding: 8px; width: 80px;"
+        )
         send_btn.clicked.connect(self._on_process_request)
         input_layout.addWidget(send_btn)
 
@@ -281,7 +284,7 @@ class AgentConsolePage(BasePage):
         info_text = f"Agents Registered: {status.get('agents_registered')}\n"
         info_text += f"Current Session: {status.get('current_session_id', 'None')}\n\n"
 
-        scheduler_stats = status.get('scheduler_stats', {})
+        scheduler_stats = status.get("scheduler_stats", {})
         info_text += f"Queue Size: {scheduler_stats.get('queue_size', 0)}\n"
         info_text += f"Running: {scheduler_stats.get('running_tasks', 0)}\n"
         info_text += f"Completed: {scheduler_stats.get('completed_tasks', 0)}\n"

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from acd.infrastructure.career.rule_engine import CareerRuleEngine
 from acd.infrastructure.career.recommendation_engine import RecommendationRankingEngine
+from acd.infrastructure.career.rule_engine import CareerRuleEngine
 
 
 class CareerSimulationService:
@@ -15,7 +15,9 @@ class CareerSimulationService:
         recommendation_engine: RecommendationRankingEngine | None = None,
     ) -> None:
         self.rule_engine = rule_engine or CareerRuleEngine()
-        self.recommendation_engine = recommendation_engine or RecommendationRankingEngine(self.rule_engine)
+        self.recommendation_engine = recommendation_engine or RecommendationRankingEngine(
+            self.rule_engine
+        )
 
     def simulate_skill_improvement(
         self,
@@ -25,13 +27,13 @@ class CareerSimulationService:
         improvement_levels: int,
     ) -> dict[str, Any]:
         """Simulate improving a specific skill.
-        
+
         Args:
             current_profile: Current profile snapshot
             target_role: Target position
             skill_name: Skill to improve
             improvement_levels: How many levels to improve (1-10)
-            
+
         Returns:
             Comparison of compatibility before and after
         """
@@ -52,7 +54,9 @@ class CareerSimulationService:
             "scenario": f"Melhorar {skill_name} em {improvement_levels} níveis",
             "current_compatibility": round(current_analysis["compatibility"], 1),
             "simulated_compatibility": round(simulated_analysis["compatibility"], 1),
-            "improvement": round(simulated_analysis["compatibility"] - current_analysis["compatibility"], 1),
+            "improvement": round(
+                simulated_analysis["compatibility"] - current_analysis["compatibility"], 1
+            ),
             "skill": skill_name,
             "from_level": current_level,
             "to_level": min(10, current_level + improvement_levels),
@@ -65,12 +69,12 @@ class CareerSimulationService:
         certification: str,
     ) -> dict[str, Any]:
         """Simulate obtaining a certification.
-        
+
         Args:
             current_profile: Current profile snapshot
             target_role: Target position
             certification: Certification to obtain
-            
+
         Returns:
             Compatibility impact of certification
         """
@@ -89,7 +93,9 @@ class CareerSimulationService:
             "scenario": f"Obter certificação {certification}",
             "current_compatibility": round(current_analysis["compatibility"], 1),
             "simulated_compatibility": round(simulated_analysis["compatibility"], 1),
-            "improvement": round(simulated_analysis["compatibility"] - current_analysis["compatibility"], 1),
+            "improvement": round(
+                simulated_analysis["compatibility"] - current_analysis["compatibility"], 1
+            ),
             "certification": certification,
         }
 
@@ -100,12 +106,12 @@ class CareerSimulationService:
         improvements: dict[str, Any],
     ) -> dict[str, Any]:
         """Simulate multiple improvements at once.
-        
+
         Args:
             current_profile: Current profile snapshot
             target_role: Target position
             improvements: Dictionary with skill improvements and certifications
-            
+
         Returns:
             Compatibility impact analysis
         """
@@ -131,7 +137,9 @@ class CareerSimulationService:
             "scenario": "Cenário de múltiplas melhorias",
             "current_compatibility": round(current_analysis["compatibility"], 1),
             "simulated_compatibility": round(simulated_analysis["compatibility"], 1),
-            "improvement": round(simulated_analysis["compatibility"] - current_analysis["compatibility"], 1),
+            "improvement": round(
+                simulated_analysis["compatibility"] - current_analysis["compatibility"], 1
+            ),
             "improvements_applied": {
                 "skills": list(improvements.get("skills", {}).keys()),
                 "certifications": improvements.get("certifications", []),
@@ -145,12 +153,12 @@ class CareerSimulationService:
         scenarios: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Compare multiple scenarios to determine best path.
-        
+
         Args:
             current_profile: Current profile snapshot
             target_role: Target position
             scenarios: List of scenarios to compare
-            
+
         Returns:
             Ranked list of scenarios by impact
         """
@@ -172,23 +180,27 @@ class CareerSimulationService:
 
             analysis = self.rule_engine.analyze_compatibility(simulated_profile, target_role)
 
-            results.append({
-                "name": scenario.get("name", "Unnamed scenario"),
-                "compatibility": round(analysis["compatibility"], 1),
-                "improvements": scenario,
-            })
+            results.append(
+                {
+                    "name": scenario.get("name", "Unnamed scenario"),
+                    "compatibility": round(analysis["compatibility"], 1),
+                    "improvements": scenario,
+                }
+            )
 
         # Sort by compatibility (highest first)
         return sorted(results, key=lambda x: x["compatibility"], reverse=True)
 
-    def what_if_query(self, query: str, current_profile: dict[str, Any], target_role: str) -> dict[str, Any]:
+    def what_if_query(
+        self, query: str, current_profile: dict[str, Any], target_role: str
+    ) -> dict[str, Any]:
         """Answer "what-if" questions about career development.
-        
+
         Args:
             query: Natural language query (e.g., "Se eu melhorar meu inglês?")
             current_profile: Current profile snapshot
             target_role: Target position
-            
+
         Returns:
             Simulation results
         """

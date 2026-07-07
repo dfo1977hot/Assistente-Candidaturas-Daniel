@@ -1,7 +1,8 @@
 """Service for metrics collection and analysis."""
 
+from datetime import datetime
 from typing import Any
-from datetime import datetime, timedelta
+
 from sqlalchemy.orm import Session
 
 from acd.infrastructure.platform import (

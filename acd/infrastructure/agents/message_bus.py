@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 """Message Bus for agent communication."""
 
-from datetime import datetime
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
-from acd.domain.agents.message import MessageType, AgentMessage
+from acd.domain.agents.message import MessageType
 
 
 class MessageBus:
@@ -75,7 +78,7 @@ class MessageBus:
             "task_id": task_id,
             "requires_response": requires_response,
             "session_id": session_id,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
             "read": False,
         }
 
@@ -111,7 +114,9 @@ class MessageBus:
         messages = self._messages
 
         if receiver_id is not None:
-            messages = [m for m in messages if m["receiver_id"] == receiver_id or m["receiver_id"] is None]
+            messages = [
+                m for m in messages if m["receiver_id"] == receiver_id or m["receiver_id"] is None
+            ]
 
         if message_type is not None:
             messages = [m for m in messages if m["message_type"] == message_type]
@@ -203,7 +208,7 @@ class MessageBus:
         Returns:
             Number of messages removed
         """
-        cutoff = datetime.utcnow()
+        cutoff = datetime.now(UTC)
         cutoff = cutoff.replace(day=cutoff.day - before_days)
 
         original_count = len(self._messages)

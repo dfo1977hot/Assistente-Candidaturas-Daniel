@@ -1,21 +1,18 @@
 from __future__ import annotations
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QWidget,
-    QScrollArea,
+    QComboBox,
     QFrame,
     QGridLayout,
-    QPushButton,
+    QLabel,
     QLineEdit,
+    QPushButton,
+    QScrollArea,
     QSpinBox,
-    QComboBox,
-    QDialog,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.career_planning_service import CareerPlanningService
@@ -62,7 +59,9 @@ class SkillGapItem(QFrame):
         layout.setSpacing(4)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        skill_label = QLabel(f"{skill['skill']} (Nível {skill['current']:.1f} → {skill['required']:.1f})")
+        skill_label = QLabel(
+            f"{skill['skill']} (Nível {skill['current']:.1f} → {skill['required']:.1f})"
+        )
         skill_label.setFont(QFont("Arial", 10, QFont.Bold))
 
         severity_colors = {
@@ -87,7 +86,9 @@ class SkillGapItem(QFrame):
             "medium": "#fff9e6",
             "low": "#e6f9e6",
         }
-        self.setStyleSheet(f"QFrame {{ border: 1px solid #ddd; border-radius: 4px; background-color: {bg_colors.get(severity, '#fff')}; }}")
+        self.setStyleSheet(
+            f"QFrame {{ border: 1px solid #ddd; border-radius: 4px; background-color: {bg_colors.get(severity, '#fff')}; }}"
+        )
 
 
 class MilestoneItem(QFrame):
@@ -110,7 +111,9 @@ class MilestoneItem(QFrame):
         layout.addWidget(date)
 
         self.setLayout(layout)
-        self.setStyleSheet("QFrame { border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }")
+        self.setStyleSheet(
+            "QFrame { border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }"
+        )
 
 
 class CareerPage(BasePage):
@@ -161,7 +164,9 @@ class CareerPage(BasePage):
     def create_goal_section(self) -> QWidget:
         """Create section for adding new goal."""
         widget = QFrame()
-        widget.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        widget.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QGridLayout()
         layout.setSpacing(12)
@@ -195,7 +200,9 @@ class CareerPage(BasePage):
 
         # Create button
         create_btn = QPushButton("Criar Objetivo")
-        create_btn.setStyleSheet("QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }")
+        create_btn.setStyleSheet(
+            "QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }"
+        )
         layout.addWidget(create_btn, 2, 0, 1, 4)
 
         widget.setLayout(layout)
@@ -204,7 +211,9 @@ class CareerPage(BasePage):
     def create_goals_section(self) -> QWidget:
         """Create section showing active goals."""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        container.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -232,7 +241,9 @@ class CareerPage(BasePage):
     def create_gaps_section(self) -> QWidget:
         """Create section showing skill gaps."""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        container.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)

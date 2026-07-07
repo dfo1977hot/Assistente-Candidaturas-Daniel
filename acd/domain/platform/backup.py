@@ -1,14 +1,15 @@
 """Backup entity for data preservation."""
 
-from enum import Enum
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+from enum import StrEnum
+
 from sqlalchemy import JSON, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class BackupType(str, Enum):
+class BackupType(StrEnum):
     """Types of backups."""
 
     MANUAL = "manual"
@@ -17,7 +18,7 @@ class BackupType(str, Enum):
     INCREMENTAL = "incremental"
 
 
-class BackupStatus(str, Enum):
+class BackupStatus(StrEnum):
     """Backup status."""
 
     PENDING = "pending"

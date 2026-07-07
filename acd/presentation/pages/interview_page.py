@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -31,7 +30,7 @@ class InterviewPage(BasePage):
 
         self.interview_service = InterviewService()
         self.application_service = ApplicationService()
-        self.current_interview_id: Optional[int] = None
+        self.current_interview_id: int | None = None
 
         self.application_combo = QComboBox()
         self.datetime_input = QDateTimeEdit()
@@ -51,7 +50,9 @@ class InterviewPage(BasePage):
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["ID", "Candidatura", "Tipo", "Data", "Resultado", "Entrevistador"])
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Candidatura", "Tipo", "Data", "Resultado", "Entrevistador"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -62,10 +63,18 @@ class InterviewPage(BasePage):
         self._load_interviews()
 
     def _setup_controls(self) -> None:
-        self.type_combo.addItems(["RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"])
-        self.result_combo.addItems(["Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"])
-        self.filter_type_combo.addItems(["", "RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"])
-        self.filter_result_combo.addItems(["", "Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"])
+        self.type_combo.addItems(
+            ["RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"]
+        )
+        self.result_combo.addItems(
+            ["Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"]
+        )
+        self.filter_type_combo.addItems(
+            ["", "RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"]
+        )
+        self.filter_result_combo.addItems(
+            ["", "Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"]
+        )
 
         form = QFormLayout()
         form.addRow(QLabel("Candidatura"), self.application_combo)
@@ -167,7 +176,9 @@ class InterviewPage(BasePage):
     def _delete_interview(self) -> None:
         if self.current_interview_id is None:
             return
-        confirmation = QMessageBox.question(self, "Confirmar exclusão", "Deseja excluir esta entrevista?")
+        confirmation = QMessageBox.question(
+            self, "Confirmar exclusão", "Deseja excluir esta entrevista?"
+        )
         if confirmation != QMessageBox.Yes:
             return
         self.interview_service.delete_interview(self.current_interview_id)
@@ -192,7 +203,9 @@ class InterviewPage(BasePage):
         if query:
             interviews = self.interview_service.search_interviews(query)
         else:
-            interviews = self.interview_service.filter_interviews(interview_type=interview_type, result=result)
+            interviews = self.interview_service.filter_interviews(
+                interview_type=interview_type, result=result
+            )
         self._render_interviews(interviews)
 
     def _render_interviews(self, interviews: list) -> None:
@@ -201,7 +214,9 @@ class InterviewPage(BasePage):
             self.table.setItem(row, 0, QTableWidgetItem(str(interview.id)))
             self.table.setItem(row, 1, QTableWidgetItem(f"#{interview.application_id}"))
             self.table.setItem(row, 2, QTableWidgetItem(interview.interview_type))
-            self.table.setItem(row, 3, QTableWidgetItem(interview.interview_date.strftime("%d/%m/%Y %H:%M")))
+            self.table.setItem(
+                row, 3, QTableWidgetItem(interview.interview_date.strftime("%d/%m/%Y %H:%M"))
+            )
             self.table.setItem(row, 4, QTableWidgetItem(interview.result))
             self.table.setItem(row, 5, QTableWidgetItem(interview.interviewer))
         self.table.resizeColumnsToContents()

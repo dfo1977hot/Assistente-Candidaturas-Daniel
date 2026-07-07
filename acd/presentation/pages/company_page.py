@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
@@ -26,7 +24,7 @@ class CompanyPage(BasePage):
         super().__init__("Empresas")
 
         self.service = CompanyService()
-        self.current_company_id: Optional[int] = None
+        self.current_company_id: int | None = None
 
         self.name_input = QLineEdit()
         self.segment_input = QLineEdit()
@@ -194,7 +192,9 @@ class CompanyPage(BasePage):
             self.table.setItem(
                 row,
                 6,
-                QTableWidgetItem(company.created_at.strftime("%d/%m/%Y") if company.created_at else ""),
+                QTableWidgetItem(
+                    company.created_at.strftime("%d/%m/%Y") if company.created_at else ""
+                ),
             )
         self.table.resizeColumnsToContents()
 
@@ -212,6 +212,8 @@ class CompanyPage(BasePage):
             self.table.setItem(
                 row,
                 6,
-                QTableWidgetItem(company.created_at.strftime("%d/%m/%Y") if company.created_at else ""),
+                QTableWidgetItem(
+                    company.created_at.strftime("%d/%m/%Y") if company.created_at else ""
+                ),
             )
         self.table.resizeColumnsToContents()

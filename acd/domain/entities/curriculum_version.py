@@ -1,13 +1,13 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from acd.models.base import Base
 from acd.domain.entities.curriculum import Curriculum
+from acd.models.base import Base
 
 
 class CurriculumVersion(Base):
@@ -22,7 +22,7 @@ class CurriculumVersion(Base):
     file_path: Mapped[str] = mapped_column(String(500), nullable=True, default="")
     file_type: Mapped[str] = mapped_column(String(50), nullable=True, default="")
     checksum: Mapped[str] = mapped_column(String(100), nullable=True, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     curriculum: Mapped[Curriculum] = relationship(back_populates="versions")
 

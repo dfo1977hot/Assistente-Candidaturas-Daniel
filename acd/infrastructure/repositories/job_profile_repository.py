@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 
 from acd.database import database as database_module
@@ -34,7 +32,7 @@ class JobProfileRepository:
             session.commit()
             return True
 
-    def get_by_job(self, job_id: int) -> Optional[JobProfile]:
+    def get_by_job(self, job_id: int) -> JobProfile | None:
         with database_module.SessionLocal() as session:
             stmt = select(JobProfile).where(JobProfile.job_id == job_id)
             return session.scalar(stmt)

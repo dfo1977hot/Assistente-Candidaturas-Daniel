@@ -1,7 +1,7 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import date, datetime
-from typing import Optional
 
 from sqlalchemy import (
     Date,
@@ -64,12 +64,12 @@ class Job(Base):
         default="",
     )
 
-    salary_min: Mapped[Optional[float]] = mapped_column(
+    salary_min: Mapped[float | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,
     )
 
-    salary_max: Mapped[Optional[float]] = mapped_column(
+    salary_max: Mapped[float | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,
     )
@@ -104,12 +104,12 @@ class Job(Base):
         default="",
     )
 
-    application_deadline: Mapped[Optional[date]] = mapped_column(
+    application_deadline: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
 
-    application_date: Mapped[Optional[date]] = mapped_column(
+    application_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
@@ -128,14 +128,14 @@ class Job(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now,
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
     )
 
@@ -151,4 +151,3 @@ class Job(Base):
             f"company_id={self.company_id}, "
             f"status='{self.status}')>"
         )
-

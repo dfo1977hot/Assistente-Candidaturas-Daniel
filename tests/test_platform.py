@@ -1,43 +1,37 @@
 """Test suite for Sprint 3.9 Platform Foundation."""
 
-import pytest
-import tempfile
 import os
-from datetime import datetime, timedelta
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+import tempfile
 
-from acd.models.base import Base
+import pytest
+from sqlalchemy import create_engine
+
+from acd.application.platform import PlatformUseCases
+from acd.application.platform.services import (
+    AuditService,
+    BackupService,
+    ConfigurationService,
+    HealthService,
+    MetricsService,
+)
 from acd.domain.platform import (
-    HealthReport, HealthStatus, HealthCheckType,
-    SystemStatus, SystemLog, LogLevel, SystemMetrics,
-    Backup, BackupStatus, Configuration
+    BackupStatus,
+    HealthCheckType,
+    HealthStatus,
+    LogLevel,
 )
 from acd.infrastructure.platform import (
-    StructuredLogger,
-    MetricsCollector,
     ConfigurationProvider,
     EnvironmentConfigurationSource,
-    DatabaseConfigurationSource,
-    JsonFileConfigurationSource,
     HealthCheckRegistry,
-    DatabaseHealthCheck,
-    FilesystemHealthCheck,
+    JsonFileConfigurationSource,
     MemoryHealthCheck,
-    get_collector,
-    get_provider,
+    MetricsCollector,
+    StructuredLogger,
     get_registry,
 )
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.application.platform.services import (
-    HealthService,
-    BackupService,
-    RestoreService,
-    ConfigurationService,
-    MetricsService,
-    AuditService,
-)
-from acd.application.platform import PlatformUseCases
+from acd.models.base import Base
 
 
 @pytest.fixture
@@ -56,8 +50,9 @@ def session(temp_db):
     session = Session()
     session._connection = temp_db.connect()
     session._transaction = session._connection.begin()
-    
+
     from sqlalchemy.orm import sessionmaker
+
     SessionLocal = sessionmaker(bind=temp_db)
     return SessionLocal()
 
@@ -156,10 +151,10 @@ class TestConfigurationProvider:
 
     def test_json_file_source(self):
         """Test JSON file source."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            f.write('{}')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("{}")
             temp_file = f.name
-        
+
         try:
             source = JsonFileConfigurationSource(temp_file)
             source.set("test_key", "test_value")
@@ -171,7 +166,7 @@ class TestConfigurationProvider:
         """Test provider cascading through sources."""
         provider = ConfigurationProvider()
         provider.add_source("env", EnvironmentConfigurationSource())
-        
+
         provider.set("test_key", "test_value", "env")
         assert provider.get("test_key") == "test_value"
 
@@ -213,9 +208,7 @@ class TestPlatformRepository:
     def test_health_report_creation(self, repository):
         """Test health report creation."""
         report = repository.create_health_report(
-            HealthCheckType.DATABASE.value,
-            HealthStatus.HEALTHY.value,
-            "All systems operational"
+            HealthCheckType.DATABASE.value, HealthStatus.HEALTHY.value, "All systems operational"
         )
         assert report.id is not None
         assert report.status == HealthStatus.HEALTHY.value
@@ -223,38 +216,31 @@ class TestPlatformRepository:
     def test_system_log_creation(self, repository):
         """Test system log creation."""
         log = repository.create_log(
-            LogLevel.INFO.value,
-            "test_module",
-            "test_operation",
-            "Test message"
+            LogLevel.INFO.value, "test_module", "test_operation", "Test message"
         )
         assert log.id is not None
         assert log.module == "test_module"
 
     def test_metrics_recording(self, repository):
         """Test metrics recording."""
-        metric = repository.record_metric(
-            "test_metric",
-            42.0,
-            "units"
-        )
+        metric = repository.record_metric("test_metric", 42.0, "units")
         assert metric.id is not None
         assert metric.metric_value == 42.0
 
     def test_backup_creation(self, repository):
         """Test backup creation."""
         from acd.domain.platform.backup import BackupType
-        backup = repository.create_backup(
-            BackupType.MANUAL.value,
-            "test_backup",
-            "/tmp/backup"
-        )
+
+        backup = repository.create_backup(BackupType.MANUAL.value, "test_backup", "/tmp/backup")
         assert backup.id is not None
         assert backup.name == "test_backup"
 
     def test_configuration_management(self, repository):
         """Test configuration management."""
-        config = repository.set_config("test_key", "test_value")
+        repository.set_config(
+            "test_key",
+            "test_value",
+        )
         retrieved = repository.get_config("test_key")
         assert retrieved.value == "test_value"
 
@@ -273,16 +259,14 @@ class TestHealthService:
         service = HealthService(session)
         registry = get_registry()
         registry.register(MemoryHealthCheck())
-        
+
         results = service.run_all_checks()
         assert len(results) > 0
 
     def test_get_health_history(self, session, repository):
         """Test getting health history."""
         repository.create_health_report(
-            HealthCheckType.DATABASE.value,
-            HealthStatus.HEALTHY.value,
-            "Test"
+            HealthCheckType.DATABASE.value, HealthStatus.HEALTHY.value, "Test"
         )
         service = HealthService(session)
         history = service.get_health_history()
@@ -299,11 +283,7 @@ class TestBackupService:
 
     def test_backup_listing(self, session, repository):
         """Test listing backups."""
-        repository.create_backup(
-            BackupStatus.COMPLETED.value,
-            "test_backup",
-            "/tmp/backup"
-        )
+        repository.create_backup(BackupStatus.COMPLETED.value, "test_backup", "/tmp/backup")
         service = BackupService(session)
         backups = service.list_backups()
         assert len(backups) > 0
@@ -352,20 +332,13 @@ class TestAuditService:
     def test_log_critical_operation(self, session):
         """Test logging critical operation."""
         service = AuditService(session)
-        log = service.log_critical_operation(
-            "TEST_OPERATION",
-            "test_module",
-            user_id="test_user"
-        )
+        log = service.log_critical_operation("TEST_OPERATION", "test_module", user_id="test_user")
         assert log["operation"] == "TEST_OPERATION"
 
     def test_audit_trail(self, session, repository):
         """Test audit trail retrieval."""
         repository.create_log(
-            LogLevel.WARNING.value,
-            "test_module",
-            "critical_op",
-            "Critical operation"
+            LogLevel.WARNING.value, "test_module", "critical_op", "Critical operation"
         )
         service = AuditService(session)
         trail = service.get_audit_trail(module="test_module")
@@ -386,7 +359,7 @@ class TestPlatformUseCases:
         use_cases = PlatformUseCases(session)
         registry = get_registry()
         registry.register(MemoryHealthCheck())
-        
+
         health = use_cases.get_system_health()
         assert "overall_status" in health
 
@@ -408,7 +381,7 @@ class TestPlatformUseCases:
         use_cases = PlatformUseCases(session)
         registry = get_registry()
         registry.register(MemoryHealthCheck())
-        
+
         overview = use_cases.get_system_overview()
         assert "health" in overview
         assert "metrics" in overview

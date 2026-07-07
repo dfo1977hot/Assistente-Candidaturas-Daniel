@@ -60,12 +60,20 @@ class PromptRepository:
 
     def get_resume_versions(self, curriculum_id: int) -> list[ResumeVersion]:
         with database_module.SessionLocal() as session:
-            stmt = select(ResumeVersion).where(ResumeVersion.curriculum_id == curriculum_id).order_by(ResumeVersion.created_at.desc())
+            stmt = (
+                select(ResumeVersion)
+                .where(ResumeVersion.curriculum_id == curriculum_id)
+                .order_by(ResumeVersion.created_at.desc())
+            )
             return list(session.scalars(stmt).all())
 
     def get_cover_letter_versions(self, curriculum_id: int) -> list[CoverLetterVersion]:
         with database_module.SessionLocal() as session:
-            stmt = select(CoverLetterVersion).where(CoverLetterVersion.curriculum_id == curriculum_id).order_by(CoverLetterVersion.created_at.desc())
+            stmt = (
+                select(CoverLetterVersion)
+                .where(CoverLetterVersion.curriculum_id == curriculum_id)
+                .order_by(CoverLetterVersion.created_at.desc())
+            )
             return list(session.scalars(stmt).all())
 
     def get_statistics(self) -> dict[str, Any]:

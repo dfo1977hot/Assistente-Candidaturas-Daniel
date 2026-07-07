@@ -1,7 +1,7 @@
 """Knowledge reuse service for applying learned patterns."""
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,7 @@ class KnowledgeReuseService:
         Returns:
             List of applicable insights
         """
-        insights = self.repository.list_insights(is_actionable=True, limit=limit*2)
+        insights = self.repository.list_insights(is_actionable=True, limit=limit * 2)
 
         result = []
         for insight in insights:
@@ -50,7 +50,9 @@ class KnowledgeReuseService:
 
         return result
 
-    def get_skill_recommendations(self, current_skills: list[str] | None = None) -> list[dict[str, Any]]:
+    def get_skill_recommendations(
+        self, current_skills: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """Get skill recommendations based on learned patterns.
 
         Args:
@@ -59,22 +61,21 @@ class KnowledgeReuseService:
         Returns:
             Skill recommendations
         """
-        insights = self.repository.list_insights(
-            is_actionable=True,
-            limit=100
-        )
+        insights = self.repository.list_insights(is_actionable=True, limit=100)
 
         recommendations = []
         for insight in insights:
             if insight.insight_type == "SKILL_RECOMMENDATION":
                 for rec in insight.recommendations:
-                    recommendations.append({
-                        "skill": rec.get("action", "").replace("Emphasize ", "").split(" ")[0],
-                        "rationale": rec.get("rationale", ""),
-                        "expected_benefit": rec.get("expected_benefit", ""),
-                        "confidence": insight.confidence,
-                        "source": insight.title,
-                    })
+                    recommendations.append(
+                        {
+                            "skill": rec.get("action", "").replace("Emphasize ", "").split(" ")[0],
+                            "rationale": rec.get("rationale", ""),
+                            "expected_benefit": rec.get("expected_benefit", ""),
+                            "confidence": insight.confidence,
+                            "source": insight.title,
+                        }
+                    )
 
         return recommendations[:10]
 
@@ -84,21 +85,20 @@ class KnowledgeReuseService:
         Returns:
             Platform recommendations
         """
-        insights = self.repository.list_insights(
-            is_actionable=True,
-            limit=100
-        )
+        insights = self.repository.list_insights(is_actionable=True, limit=100)
 
         recommendations = []
         for insight in insights:
             if insight.insight_type == "PLATFORM_ADVICE":
                 for rec in insight.recommendations:
-                    recommendations.append({
-                        "platform": rec.get("action", ""),
-                        "rationale": rec.get("rationale", ""),
-                        "success_rate": rec.get("expected_benefit", ""),
-                        "confidence": insight.confidence,
-                    })
+                    recommendations.append(
+                        {
+                            "platform": rec.get("action", ""),
+                            "rationale": rec.get("rationale", ""),
+                            "success_rate": rec.get("expected_benefit", ""),
+                            "confidence": insight.confidence,
+                        }
+                    )
 
         return recommendations
 
@@ -108,10 +108,7 @@ class KnowledgeReuseService:
         Returns:
             Timing information
         """
-        insights = self.repository.list_insights(
-            is_actionable=True,
-            limit=100
-        )
+        insights = self.repository.list_insights(is_actionable=True, limit=100)
 
         timing_info = {
             "best_day": None,
@@ -122,11 +119,13 @@ class KnowledgeReuseService:
         for insight in insights:
             if insight.insight_type == "TIMING_INSIGHT":
                 for rec in insight.recommendations:
-                    timing_info["recommendations"].append({
-                        "recommendation": rec.get("action", ""),
-                        "rationale": rec.get("rationale", ""),
-                        "confidence": insight.confidence,
-                    })
+                    timing_info["recommendations"].append(
+                        {
+                            "recommendation": rec.get("action", ""),
+                            "rationale": rec.get("rationale", ""),
+                            "confidence": insight.confidence,
+                        }
+                    )
 
         return timing_info
 
@@ -136,21 +135,20 @@ class KnowledgeReuseService:
         Returns:
             Letter improvement suggestions
         """
-        insights = self.repository.list_insights(
-            is_actionable=True,
-            limit=100
-        )
+        insights = self.repository.list_insights(is_actionable=True, limit=100)
 
         improvements = []
         for insight in insights:
             if insight.insight_type == "LETTER_IMPROVEMENT":
                 for rec in insight.recommendations:
-                    improvements.append({
-                        "improvement": rec.get("action", ""),
-                        "rationale": rec.get("rationale", ""),
-                        "expected_impact": rec.get("expected_benefit", ""),
-                        "confidence": insight.confidence,
-                    })
+                    improvements.append(
+                        {
+                            "improvement": rec.get("action", ""),
+                            "rationale": rec.get("rationale", ""),
+                            "expected_impact": rec.get("expected_benefit", ""),
+                            "confidence": insight.confidence,
+                        }
+                    )
 
         return improvements
 
@@ -163,23 +161,22 @@ class KnowledgeReuseService:
         Returns:
             Sector strategies
         """
-        insights = self.repository.list_insights(
-            is_actionable=True,
-            limit=100
-        )
+        insights = self.repository.list_insights(is_actionable=True, limit=100)
 
         strategies = []
         for insight in insights:
             if insight.insight_type == "SECTOR_STRATEGY":
                 if sector is None or sector.lower() in insight.description.lower():
                     for rec in insight.recommendations:
-                        strategies.append({
-                            "strategy": rec.get("action", ""),
-                            "sector": sector or "General",
-                            "rationale": rec.get("rationale", ""),
-                            "expected_benefit": rec.get("expected_benefit", ""),
-                            "confidence": insight.confidence,
-                        })
+                        strategies.append(
+                            {
+                                "strategy": rec.get("action", ""),
+                                "sector": sector or "General",
+                                "rationale": rec.get("rationale", ""),
+                                "expected_benefit": rec.get("expected_benefit", ""),
+                                "confidence": insight.confidence,
+                            }
+                        )
 
         return strategies
 
@@ -197,7 +194,7 @@ class KnowledgeReuseService:
         return {
             "success": success,
             "insight_id": insight_id,
-            "applied_at": datetime.utcnow().isoformat() if success else None,
+            "applied_at": datetime.now(UTC).isoformat() if success else None,
         }
 
     def get_knowledge_impact(self) -> dict[str, Any]:
@@ -225,7 +222,7 @@ class KnowledgeReuseService:
                     try:
                         pct = float(insight.expected_impact.split("+")[1].split("%")[0])
                         improvements.append(pct)
-                    except (IndexError, ValueError):
+                    except IndexError, ValueError:
                         pass
 
             if improvements:
@@ -246,7 +243,7 @@ class KnowledgeReuseService:
         # Check if insight recommendations mention context items
         for rec in insight.recommendations:
             action = str(rec.get("action", "")).lower()
-            for key, value in context.items():
+            for _key, value in context.items():
                 if isinstance(value, str) and value.lower() in action:
                     return True
                 elif isinstance(value, list):

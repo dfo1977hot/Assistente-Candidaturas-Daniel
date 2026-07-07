@@ -7,8 +7,14 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from acd.models.base import Base
 import acd.database.database as database_module
+
+# Importa o registro centralizado dos modelos ORM.
+# Este import não é utilizado diretamente, mas garante que todos os
+# modelos sejam registrados no Base.metadata antes do create_all().
+import acd.database.model_registry  # noqa: F401
+
+from acd.models.base import Base
 
 
 @pytest.fixture(scope="session")
@@ -24,6 +30,13 @@ def test_engine():
         future=True,
     )
 
+    print("\n=== TABELAS REGISTRADAS ===")
+    print(sorted(Base.metadata.tables.keys()))
+
+    for table in Base.metadata.tables.values():
+        for fk in table.foreign_keys:
+            print(f"{table.name}: {fk.target_fullname}")
+
     Base.metadata.create_all(engine)
 
     yield engine
@@ -31,7 +44,6 @@ def test_engine():
     engine.dispose()
 
     os.close(db_fd)
-
     os.remove(db_path)
 
 

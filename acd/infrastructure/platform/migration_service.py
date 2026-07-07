@@ -1,8 +1,8 @@
 """Migration service for database schema versioning and controlled evolution."""
 
-from typing import Callable, Any
-from datetime import datetime
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -180,6 +180,7 @@ def create_example_migrations() -> list[Migration]:
     def upgrade_v1(session):
         """Create initial platform tables."""
         from acd.models.base import Base
+
         Base.metadata.create_all(session.bind)
 
     def downgrade_v1(session):

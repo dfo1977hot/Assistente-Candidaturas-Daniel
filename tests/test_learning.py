@@ -1,27 +1,29 @@
 """Tests for learning functionality."""
 
-import pytest
-from datetime import datetime, timedelta
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from datetime import UTC, datetime, timedelta
 
-from acd.models.base import Base
-from acd.domain.learning.learning_record import LearningRecord, LearningRecordStatus, LearningSourceType
-from acd.domain.learning.outcome import Outcome, OutcomeType, OutcomeResult
-from acd.domain.learning.pattern import Pattern, PatternType
-from acd.domain.learning.hypothesis import Hypothesis, HypothesisStatus
-from acd.domain.learning.insight import Insight, InsightType
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from acd.application.learning import LearningUseCases, RegisterOutcomeRequest
+from acd.domain.learning.insight import InsightType
+from acd.domain.learning.learning_record import (
+    LearningSourceType,
+)
+from acd.domain.learning.outcome import Outcome, OutcomeResult, OutcomeType
+from acd.domain.learning.pattern import PatternType
 from acd.infrastructure.learning import (
     ConfidenceCalculator,
-    PatternDetector,
-    InsightGenerator,
     EvidenceAggregator,
-    LearningPolicyEngine,
+    InsightGenerator,
     LearningEngine,
+    LearningPolicyEngine,
+    PatternDetector,
 )
 from acd.infrastructure.repositories.learning import LearningRepository
-from acd.services.learning import LearningService, ApprovalService, KnowledgeReuseService
-from acd.application.learning import LearningUseCases, RegisterOutcomeRequest
+from acd.models.base import Base
+from acd.services.learning import ApprovalService, KnowledgeReuseService, LearningService
 
 
 # Fixtures
@@ -30,12 +32,12 @@ def test_db():
     """Create test database."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    
+
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
-    
+
     yield session
-    
+
     session.close()
     Base.metadata.drop_all(engine)
 
@@ -153,11 +155,13 @@ class TestPatternDetector:
         for i in range(20):
             outcome = Outcome(
                 outcome_type=OutcomeType.APPLICATION_SUBMITTED.value,
-                result=OutcomeResult.SUCCESS.value if i < 13 else OutcomeResult.FAILURE.value,  # 65% success
+                result=(
+                    OutcomeResult.SUCCESS.value if i < 13 else OutcomeResult.FAILURE.value
+                ),  # 65% success
                 company="Test Company",
                 position_title="Test Position",
                 skills_mentioned=["Python"],
-                recorded_date=datetime.now() - timedelta(days=i),
+                recorded_date=datetime.now(UTC) - timedelta(days=i),
             )
             test_db.add(outcome)
         test_db.commit()
@@ -165,7 +169,7 @@ class TestPatternDetector:
         outcomes = test_db.query(Outcome).all()
         assert len(outcomes) == 20
         patterns = pattern_detector.detect_skill_success_pattern(outcomes, min_skill_frequency=3)
-        
+
         # Pattern should be detected - Python has 65% success rate which > 60% min threshold
         if len(patterns) > 0:
             assert patterns[0]["type"] == PatternType.SKILL_SUCCESS.value
@@ -181,14 +185,14 @@ class TestPatternDetector:
                 company="Test Company",
                 position_title="Test Position",
                 platform="LinkedIn" if i % 2 == 0 else "Indeed",
-                recorded_date=datetime.utcnow() - timedelta(days=i),
+                recorded_date=datetime.now(UTC) - timedelta(days=i),
             )
             test_db.add(outcome)
         test_db.commit()
 
         outcomes = test_db.query(Outcome).all()
         patterns = pattern_detector.detect_platform_conversion_pattern(outcomes)
-        
+
         assert len(patterns) > 0
 
     def test_detect_all_patterns(self, pattern_detector, test_db):
@@ -203,14 +207,14 @@ class TestPatternDetector:
                 skills_mentioned=["Python", "Django"],
                 platform="LinkedIn",
                 sector="Technology",
-                recorded_date=datetime.utcnow() - timedelta(days=i),
+                recorded_date=datetime.now(UTC) - timedelta(days=i),
             )
             test_db.add(outcome)
         test_db.commit()
 
         outcomes = test_db.query(Outcome).all()
         patterns = pattern_detector.detect_all_patterns(outcomes)
-        
+
         assert len(patterns) > 0
 
 
@@ -231,7 +235,7 @@ class TestInsightGenerator:
         }
 
         insight = insight_generator.generate_from_pattern(pattern_data)
-        
+
         assert insight["title"] is not None
         assert insight["description"] is not None
         assert insight["confidence"] == 0.85
@@ -261,7 +265,7 @@ class TestInsightGenerator:
         ]
 
         insights = insight_generator.generate_multiple(patterns)
-        
+
         assert len(insights) == 2
         assert all(i.get("title") for i in insights)
         assert all(i.get("recommendations") for i in insights)
@@ -279,7 +283,7 @@ class TestLearningRepository:
             description="Test record",
             evidence={"test": "data"},
         )
-        
+
         assert record.id is not None
         assert record.description == "Test record"
 
@@ -309,7 +313,7 @@ class TestLearningRepository:
             description="Test",
             evidence={},
         )
-        
+
         result = repository.approve_record(record.id, "Approved")
         assert result is True
 
@@ -321,7 +325,7 @@ class TestLearningRepository:
             insight_type=InsightType.SKILL_RECOMMENDATION.value,
             expected_impact="Positive impact expected",
         )
-        
+
         assert insight.id is not None
         assert insight.title == "Test Insight"
 
@@ -353,7 +357,7 @@ class TestLearningService:
         )
 
         stats = learning_service.get_statistics()
-        
+
         assert "total_records" in stats or "outcomes" in stats or len(stats) > 0
 
 
@@ -371,7 +375,7 @@ class TestApprovalService:
         )
 
         pending = approval_service.get_pending_approvals()
-        
+
         assert len(pending) > 0
 
     def test_approve_learning_record(self, approval_service, repository):
@@ -384,7 +388,7 @@ class TestApprovalService:
         )
 
         result = approval_service.approve_learning_record(record.id, "Looks good")
-        
+
         assert result["success"] is True
 
 
@@ -402,12 +406,12 @@ class TestLearningUseCases:
         )
 
         result = use_cases.register_outcome(request)
-        
+
         assert result["outcome_recorded"] is True
 
     def test_get_statistics_use_case(self, use_cases):
         """Test statistics use case."""
         result = use_cases.get_statistics()
-        
+
         assert result["success"] is True
         assert "statistics" in result

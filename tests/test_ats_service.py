@@ -6,14 +6,14 @@ import pytest
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job_profile import JobProfile
 from acd.infrastructure.repositories.ats_repository import ATSRepository
-from acd.services.ats_service import ATSService
-from acd.services.knowledge_service import RuleBasedSimilarityEngine
 from acd.services.ats_service import (
+    ATSService,
     ExplainabilityEngine,
     GapAnalysisEngine,
     RuleBasedRecommendationStrategy,
     RuleBasedScoreEngine,
 )
+from acd.services.knowledge_service import RuleBasedSimilarityEngine
 
 
 @pytest.fixture
@@ -40,17 +40,6 @@ def ats_setup(monkeypatch):
     )
 
     from acd.models.base import Base
-
-    import acd.models.company
-    import acd.domain.entities.job
-    import acd.domain.entities.job_profile
-    import acd.domain.entities.curriculum
-    import acd.domain.entities.curriculum_version
-    import acd.domain.entities.application
-    import acd.domain.entities.ats_score
-    import acd.domain.entities.skill_gap
-    import acd.domain.entities.recommendation
-    import acd.domain.entities.score_detail
 
     Base.metadata.drop_all(bind=database_module.engine)
     Base.metadata.create_all(bind=database_module.engine)

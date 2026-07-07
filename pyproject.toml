@@ -3,11 +3,43 @@ name = "acd"
 version = "0.1.0"
 description = "Assistente de Candidaturas do Daniel"
 
+# ==========================================================
+# BLACK
+# ==========================================================
+
 [tool.black]
-line-length = 88
+line-length = 100
+target-version = ["py314"]
+
+# ==========================================================
+# RUFF
+# ==========================================================
 
 [tool.ruff]
-line-length = 88
+exclude = [
+        "docs/ARCHITECTURE_GUIDE.py",
+]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # Pyflakes
+    "I",   # isort (imports)
+    "UP",  # pyupgrade
+    "B",   # bugbear
+]
+
+ignore = [
+    "E501", # linhas longas (o Black resolve)
+]
+
+# ==========================================================
+# PYTEST
+# ==========================================================
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"

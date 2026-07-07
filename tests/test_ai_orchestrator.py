@@ -1,26 +1,18 @@
-import json
 import os
 import tempfile
-from datetime import datetime
 
 import pytest
 
-from acd.database import database as database_module
-from acd.domain.agent.agent_goal import AgentGoal
-from acd.domain.agent.execution_plan import ExecutionPlan
-from acd.domain.agent.task import Task
-from acd.domain.agent.agent_memory import AgentMemory
-from acd.domain.agent.reasoning_step import ReasoningStep
-from acd.domain.agent.tool_call import ToolCall
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
-from acd.infrastructure.agent.tool_registry import ToolRegistry, DefaultToolRegistry, ToolDefinition
-from acd.infrastructure.agent.context_builder import ContextBuilder
-from acd.infrastructure.agent.planning_engine import PlanningEngine
-from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
-from acd.services.ai_execution_service import AIExecutionService, AgentMemoryService
 from acd.application.agent.ask_agent import ask_agent
 from acd.application.agent.create_plan import create_plan
-from acd.application.agent.execute_plan import execute_plan, approve_plan
+from acd.application.agent.execute_plan import approve_plan, execute_plan
+from acd.database import database as database_module
+from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
+from acd.infrastructure.agent.context_builder import ContextBuilder
+from acd.infrastructure.agent.planning_engine import PlanningEngine
+from acd.infrastructure.agent.tool_registry import DefaultToolRegistry, ToolDefinition, ToolRegistry
+from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
+from acd.services.ai_execution_service import AgentMemoryService, AIExecutionService
 
 
 @pytest.fixture
@@ -30,18 +22,12 @@ def temp_database(monkeypatch):
     db_path = os.path.join(temp_dir, "test_acd_agent.db")
     monkeypatch.setattr("acd.database.database.DATABASE_URL", f"sqlite:///{db_path}")
 
-    import acd.database.database as database_module
-
     # Import all entities FIRST to register ORM metadata
-    import acd.domain.agent.agent_goal
-    import acd.domain.agent.execution_plan
-    import acd.domain.agent.task
-    import acd.domain.agent.agent_memory
-    import acd.domain.agent.reasoning_step
-    import acd.domain.agent.tool_call
 
     database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(f"sqlite:///{db_path}", echo=False, future=True)
+    database_module.engine = database_module.create_engine(
+        f"sqlite:///{db_path}", echo=False, future=True
+    )
     database_module.SessionLocal = database_module.sessionmaker(
         bind=database_module.engine, autoflush=False, autocommit=False
     )
@@ -101,12 +87,16 @@ class TestContextBuilder:
         """Test building context."""
         builder = ContextBuilder()
 
-        builder.add_user_profile({
-            "skills": ["Python", "SQL"],
-            "experience_years": 5,
-        }).add_career_goals([
-            {"title": "Senior Developer"},
-        ])
+        builder.add_user_profile(
+            {
+                "skills": ["Python", "SQL"],
+                "experience_years": 5,
+            }
+        ).add_career_goals(
+            [
+                {"title": "Senior Developer"},
+            ]
+        )
 
         context = builder.build()
 
@@ -118,10 +108,12 @@ class TestContextBuilder:
         """Test getting context summary."""
         builder = ContextBuilder()
 
-        builder.add_user_profile({
-            "skills": ["Python"],
-            "experience_years": 3,
-        })
+        builder.add_user_profile(
+            {
+                "skills": ["Python"],
+                "experience_years": 3,
+            }
+        )
 
         summary = builder.get_context_summary()
 
@@ -367,9 +359,7 @@ class TestApplicationLayer:
 
     def test_ask_agent(self, temp_database):
         """Test asking agent."""
-        result = ask_agent(
-            "Quero conseguir uma vaga de desenvolvedor Python"
-        )
+        result = ask_agent("Quero conseguir uma vaga de desenvolvedor Python")
 
         assert result.get("success") is True
         assert "intent" in result

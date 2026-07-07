@@ -1,10 +1,11 @@
 """Metrics collector for system performance monitoring."""
 
-import psutil
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
-from collections import defaultdict
+
+import psutil
 
 from acd.domain.platform.system_metrics import SystemMetrics
 
@@ -137,10 +138,7 @@ class MetricsCollector:
             return None
 
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
-        recent_metrics = [
-            m for m in self.metrics[metric_name]
-            if m["timestamp"] >= cutoff_time
-        ]
+        recent_metrics = [m for m in self.metrics[metric_name] if m["timestamp"] >= cutoff_time]
 
         if not recent_metrics:
             return None
@@ -214,8 +212,7 @@ class MetricsCollector:
         for metric_name in self.metrics:
             original_count = len(self.metrics[metric_name])
             self.metrics[metric_name] = [
-                m for m in self.metrics[metric_name]
-                if m["timestamp"] >= cutoff_time
+                m for m in self.metrics[metric_name] if m["timestamp"] >= cutoff_time
             ]
             cleared += original_count - len(self.metrics[metric_name])
 

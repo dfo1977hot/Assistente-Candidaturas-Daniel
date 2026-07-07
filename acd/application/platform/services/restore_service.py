@@ -1,15 +1,16 @@
 """Service for backup restoration."""
 
+import hashlib
 import os
 import shutil
-import hashlib
-from typing import Any
 from datetime import datetime
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from acd.domain.platform.backup import BackupStatus
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.domain.platform.backup import BackupStatus
 
 
 class RestoreService:
@@ -92,10 +93,10 @@ class RestoreService:
 
         # Calculate checksum
         checksum = hashlib.sha256()
-        for root, dirs, files in os.walk(backup.file_path):
+        for root, _dirs, files in os.walk(backup.file_path):
             for file in sorted(files):
                 file_path = os.path.join(root, file)
-                with open(file_path, 'rb') as f:
+                with open(file_path, "rb") as f:
                     checksum.update(f.read())
 
         return checksum.hexdigest() == backup.checksum
@@ -134,13 +135,15 @@ class RestoreService:
         restore_points = []
 
         for backup in completed_backups:
-            restore_points.append({
-                "id": backup.id,
-                "name": backup.name,
-                "type": backup.backup_type,
-                "size_mb": backup.file_size_mb,
-                "created_at": backup.created_at.isoformat() if backup.created_at else None,
-                "is_valid": self._verify_backup(backup),
-            })
+            restore_points.append(
+                {
+                    "id": backup.id,
+                    "name": backup.name,
+                    "type": backup.backup_type,
+                    "size_mb": backup.file_size_mb,
+                    "created_at": backup.created_at.isoformat() if backup.created_at else None,
+                    "is_valid": self._verify_backup(backup),
+                }
+            )
 
         return restore_points

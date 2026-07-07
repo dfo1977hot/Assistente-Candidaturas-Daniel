@@ -1,7 +1,7 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,15 +21,15 @@ class Curriculum(Base):
     language: Mapped[str] = mapped_column(String(50), nullable=False, default="pt-BR")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Ativo")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
     )
 
-    versions: Mapped[list["CurriculumVersion"]] = relationship(back_populates="curriculum")
+    versions: Mapped[list[CurriculumVersion]] = relationship(back_populates="curriculum")
 
     def __repr__(self) -> str:
         return f"<Curriculum {self.name} {self.version}>"

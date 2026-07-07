@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -19,4 +20,4 @@ class AnalyticsRecommendation(Base):
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     action: Mapped[str] = mapped_column(Text, nullable=False, default="")
     read: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

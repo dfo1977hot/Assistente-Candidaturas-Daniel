@@ -1,10 +1,10 @@
 """Health check registry for extensible system diagnostics."""
 
 import time
-from typing import Callable, Any
 from abc import ABC, abstractmethod
+from typing import Any
 
-from acd.domain.platform.health_report import HealthReport, HealthStatus, HealthCheckType
+from acd.domain.platform.health_report import HealthCheckType, HealthStatus
 
 
 class HealthCheck(ABC):
@@ -49,7 +49,7 @@ class DatabaseHealthCheck(HealthCheck):
         start_time = time.time()
         try:
             # Simple connectivity test
-            result = self.session.execute("SELECT 1")
+            self.session.execute("SELECT 1")
             duration_ms = (time.time() - start_time) * 1000
 
             return {
@@ -91,6 +91,7 @@ class FilesystemHealthCheck(HealthCheck):
         start_time = time.time()
         try:
             import os
+
             all_accessible = True
             inaccessible_paths = []
 
@@ -151,6 +152,7 @@ class MemoryHealthCheck(HealthCheck):
         start_time = time.time()
         try:
             import psutil
+
             memory = psutil.virtual_memory()
             duration_ms = (time.time() - start_time) * 1000
 

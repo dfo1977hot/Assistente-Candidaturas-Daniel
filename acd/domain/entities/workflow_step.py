@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -19,4 +20,4 @@ class WorkflowStep(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     command: Mapped[str] = mapped_column(String(200), nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

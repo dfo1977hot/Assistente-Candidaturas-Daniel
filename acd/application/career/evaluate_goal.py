@@ -14,13 +14,13 @@ def evaluate_goal(
     gap_service: GapAnalysisService | None = None,
 ) -> dict[str, Any]:
     """Evaluate a career goal against current profile.
-    
+
     Args:
         goal_id: Career goal ID
         current_profile: Current skills, certifications, languages
         planning_service: CareerPlanningService instance
         gap_service: GapAnalysisService instance
-        
+
     Returns:
         Goal evaluation with gaps and recommendations
     """

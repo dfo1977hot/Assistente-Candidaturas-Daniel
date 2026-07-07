@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -19,5 +20,5 @@ class GenerationLog(Base):
     response_time_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     tokens_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     estimated_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     details: Mapped[str] = mapped_column(Text, nullable=False, default="")

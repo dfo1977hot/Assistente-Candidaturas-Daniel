@@ -2,7 +2,6 @@
 
 import random
 from datetime import datetime
-from typing import Optional
 
 
 class FeatureFlagService:
@@ -10,7 +9,7 @@ class FeatureFlagService:
 
     def __init__(self, session=None):
         """Initialize feature flag service.
-        
+
         Args:
             session: SQLAlchemy database session
         """
@@ -23,15 +22,15 @@ class FeatureFlagService:
         self,
         feature_name: str,
         current_version: str = "0.4.0",
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
     ) -> bool:
         """Check if a feature is enabled.
-        
+
         Args:
             feature_name: Name of the feature
             current_version: Current application version
             user_id: Optional user ID for user-specific rollouts
-        
+
         Returns:
             True if feature is enabled
         """
@@ -46,11 +45,7 @@ class FeatureFlagService:
             return False
 
         try:
-            flag = (
-                self.session.query(FeatureFlag)
-                .filter_by(feature_name=feature_name)
-                .first()
-            )
+            flag = self.session.query(FeatureFlag).filter_by(feature_name=feature_name).first()
 
             if not flag:
                 return False
@@ -85,7 +80,7 @@ class FeatureFlagService:
         self,
         feature_name: str,
         current_version: str,
-        user_id: Optional[str],
+        user_id: str | None,
     ) -> bool:
         """Check flag using cached data."""
         cached = self._cache.get(feature_name, {})
@@ -103,7 +98,7 @@ class FeatureFlagService:
 
         return True
 
-    def _check_flag(self, flag, current_version: str, user_id: Optional[str]) -> bool:
+    def _check_flag(self, flag, current_version: str, user_id: str | None) -> bool:
         """Check flag status."""
         if not flag.is_enabled:
             return False
@@ -116,9 +111,9 @@ class FeatureFlagService:
 
         return True
 
-    def _check_rollout(self, user_id: Optional[str], rollout_percentage: int) -> bool:
+    def _check_rollout(self, user_id: str | None, rollout_percentage: int) -> bool:
         """Check if user is in rollout percentage.
-        
+
         Uses consistent hashing based on user_id if provided.
         """
         if rollout_percentage >= 100:
@@ -143,11 +138,7 @@ class FeatureFlagService:
             return False
 
         try:
-            flag = (
-                self.session.query(FeatureFlag)
-                .filter_by(feature_name=feature_name)
-                .first()
-            )
+            flag = self.session.query(FeatureFlag).filter_by(feature_name=feature_name).first()
 
             if not flag:
                 # Create new flag
@@ -177,11 +168,7 @@ class FeatureFlagService:
             return False
 
         try:
-            flag = (
-                self.session.query(FeatureFlag)
-                .filter_by(feature_name=feature_name)
-                .first()
-            )
+            flag = self.session.query(FeatureFlag).filter_by(feature_name=feature_name).first()
 
             if not flag:
                 return False
@@ -195,15 +182,13 @@ class FeatureFlagService:
             self.session.rollback()
             return False
 
-    def set_rollout_percentage(
-        self, feature_name: str, percentage: int
-    ) -> bool:
+    def set_rollout_percentage(self, feature_name: str, percentage: int) -> bool:
         """Set rollout percentage for gradual rollout.
-        
+
         Args:
             feature_name: Feature name
             percentage: Percentage 0-100
-        
+
         Returns:
             True if successful
         """
@@ -216,11 +201,7 @@ class FeatureFlagService:
             return False
 
         try:
-            flag = (
-                self.session.query(FeatureFlag)
-                .filter_by(feature_name=feature_name)
-                .first()
-            )
+            flag = self.session.query(FeatureFlag).filter_by(feature_name=feature_name).first()
 
             if not flag:
                 flag = FeatureFlag(
@@ -272,7 +253,7 @@ class FeatureFlagService:
 
 
 # Global feature flag service instance
-_feature_flag_service: Optional[FeatureFlagService] = None
+_feature_flag_service: FeatureFlagService | None = None
 
 
 def get_feature_flag_service() -> FeatureFlagService:

@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 """Task scheduler for agent tasks."""
 
-from typing import Any
-from datetime import datetime
-from enum import Enum
 import heapq
+from datetime import UTC, datetime
+from typing import Any
 
 
 class TaskScheduler:
@@ -48,7 +49,7 @@ class TaskScheduler:
             "input_data": input_data or {},
             "depends_on": depends_on or [],
             "status": "pending",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
             "started_at": None,
             "completed_at": None,
             "result": None,
@@ -76,7 +77,7 @@ class TaskScheduler:
                 continue
 
             task["status"] = "assigned"
-            task["started_at"] = datetime.utcnow()
+            task["started_at"] = datetime.now(UTC)
             self._running_tasks[task_id] = task
             return task
 
@@ -113,7 +114,7 @@ class TaskScheduler:
 
         task = self._running_tasks[task_id]
         task["status"] = "completed"
-        task["completed_at"] = datetime.utcnow()
+        task["completed_at"] = datetime.now(UTC)
         task["result"] = result or {}
 
         self._completed_tasks.append(task)
@@ -136,7 +137,7 @@ class TaskScheduler:
 
         task = self._running_tasks[task_id]
         task["status"] = "failed"
-        task["completed_at"] = datetime.utcnow()
+        task["completed_at"] = datetime.now(UTC)
         task["error"] = error
 
         self._failed_tasks.append(task)
@@ -228,12 +229,13 @@ class TaskScheduler:
         """
         from datetime import timedelta
 
-        cutoff = datetime.utcnow() - timedelta(hours=older_than_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=older_than_hours)
 
         original_count = len(self._completed_tasks)
         self._completed_tasks = [
-            t for t in self._completed_tasks
-            if (t.get("completed_at") or datetime.utcnow()) > cutoff
+            t
+            for t in self._completed_tasks
+            if (t.get("completed_at") or datetime.now(UTC)) > cutoff
         ]
 
         return original_count - len(self._completed_tasks)

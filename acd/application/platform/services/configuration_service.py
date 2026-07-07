@@ -1,6 +1,7 @@
 """Service for configuration management."""
 
 from typing import Any
+
 from sqlalchemy.orm import Session
 
 from acd.infrastructure.platform import (
@@ -98,9 +99,7 @@ class ConfigurationService:
         """
         with self.logger.operation("get_section"):
             configs = self.repository.get_all_configs(category=category)
-            return {
-                c.key: c.get_typed_value() for c in configs
-            }
+            return {c.key: c.get_typed_value() for c in configs}
 
     def get_all_configs(self) -> dict[str, Any]:
         """Get all configurations.
@@ -109,9 +108,7 @@ class ConfigurationService:
             All configurations
         """
         configs = self.repository.get_all_configs()
-        return {
-            c.key: c.get_typed_value() for c in configs
-        }
+        return {c.key: c.get_typed_value() for c in configs}
 
     def validate_config(self, key: str, value: Any) -> bool:
         """Validate configuration value.
@@ -133,6 +130,7 @@ class ConfigurationService:
         # Check pattern
         if "pattern" in rules:
             import re
+
             if not re.match(rules["pattern"], str_value):
                 return False
 
@@ -144,7 +142,7 @@ class ConfigurationService:
                     return False
                 if "max" in rules and num_value > rules["max"]:
                     return False
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return False
 
         return True

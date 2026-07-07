@@ -1,4 +1,5 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
@@ -15,4 +16,4 @@ class AnswerTemplate(Base):
     profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

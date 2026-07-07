@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import select
 
@@ -42,16 +42,13 @@ class ApplicationRepository:
             session.commit()
             return True
 
-    def get_by_id(self, application_id: int) -> Optional[Application]:
+    def get_by_id(self, application_id: int) -> Application | None:
         with database_module.SessionLocal() as session:
             return session.get(Application, application_id)
 
     def get_all(self) -> list[Application]:
         with database_module.SessionLocal() as session:
-            stmt = (
-                select(Application)
-                .order_by(Application.created_at.desc())
-            )
+            stmt = select(Application).order_by(Application.created_at.desc())
 
             return list(session.scalars(stmt).all())
 
@@ -64,9 +61,7 @@ class ApplicationRepository:
 
             stmt = (
                 select(Application)
-                .where(
-                    Application.recruiter_name.ilike(f"%{query}%")
-                )
+                .where(Application.recruiter_name.ilike(f"%{query}%"))
                 .order_by(Application.created_at.desc())
             )
 
@@ -75,10 +70,10 @@ class ApplicationRepository:
     def filter(
         self,
         *,
-        company_id: Optional[int] = None,
-        job_id: Optional[int] = None,
-        status: Optional[str] = None,
-        channel: Optional[str] = None,
+        company_id: int | None = None,
+        job_id: int | None = None,
+        status: str | None = None,
+        channel: str | None = None,
     ) -> list[Application]:
 
         with database_module.SessionLocal() as session:
@@ -86,28 +81,18 @@ class ApplicationRepository:
             stmt = select(Application)
 
             if company_id is not None:
-                stmt = stmt.where(
-                    Application.company_id == company_id
-                )
+                stmt = stmt.where(Application.company_id == company_id)
 
             if job_id is not None:
-                stmt = stmt.where(
-                    Application.job_id == job_id
-                )
+                stmt = stmt.where(Application.job_id == job_id)
 
             if status:
-                stmt = stmt.where(
-                    Application.status == status
-                )
+                stmt = stmt.where(Application.status == status)
 
             if channel:
-                stmt = stmt.where(
-                    Application.application_channel == channel
-                )
+                stmt = stmt.where(Application.application_channel == channel)
 
-            stmt = stmt.order_by(
-                Application.created_at.desc()
-            )
+            stmt = stmt.order_by(Application.created_at.desc())
 
             return list(session.scalars(stmt).all())
 
@@ -117,10 +102,7 @@ class ApplicationRepository:
 
     def exists(self, application_id: int) -> bool:
         with database_module.SessionLocal() as session:
-            return (
-                session.get(Application, application_id)
-                is not None
-            )
+            return session.get(Application, application_id) is not None
 
     def count(self) -> int:
         with database_module.SessionLocal() as session:
@@ -134,7 +116,7 @@ class ApplicationRepository:
         self,
         application_id: int,
         new_status: str,
-    ) -> Optional[Application]:
+    ) -> Application | None:
 
         with database_module.SessionLocal() as session:
 
@@ -196,11 +178,7 @@ class ApplicationRepository:
 
         with database_module.SessionLocal() as session:
 
-            applications = (
-                session.scalars(
-                    select(Application)
-                ).all()
-            )
+            applications = session.scalars(select(Application)).all()
 
         counter = Counter()
 

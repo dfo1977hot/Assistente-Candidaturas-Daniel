@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from acd.domain.automation.connector import Connector
-from acd.domain.automation.application_result import ApplicationResult
-
 
 class MockConnector:
     """Conector mock para ambiente de teste e desenvolvimento."""

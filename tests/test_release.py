@@ -1,33 +1,24 @@
 """Tests for Release Management (Sprint 4.0)."""
 
 import pytest
-from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from acd.models.base import Base
+from acd.application.release import ReleaseManager
+from acd.application.release.services import (
+    InstallationService,
+    MigrationService,
+    UpdateService,
+)
 from acd.infrastructure.release import (
+    FeatureFlagService,
+    PluginLoader,
     SemanticVersion,
     VersionManager,
-    PluginLoader,
-    FeatureFlagService,
     get_plugin_loader,
 )
 from acd.infrastructure.repositories.release import ReleaseRepository
-from acd.application.release.services import (
-    InstallationService,
-    UpdateService,
-    MigrationService,
-    DocumentationService,
-)
-from acd.application.release import ReleaseManager
-from acd.domain.release import (
-    Release,
-    ReleaseStatus,
-    InstalledVersion,
-    UpdateHistory,
-    FeatureFlag,
-)
+from acd.models.base import Base
 
 
 @pytest.fixture

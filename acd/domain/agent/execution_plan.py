@@ -1,8 +1,9 @@
 from __future__ import annotations
+from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, ForeignKey, Boolean
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
@@ -19,8 +20,12 @@ class ExecutionPlan(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     strategy: Mapped[str] = mapped_column(Text, nullable=False)  # Explanation of chosen strategy
     tasks_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)  # pending, approved, executing, completed, failed, cancelled
-    approval_status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)  # pending, approved, rejected
+    status: Mapped[str] = mapped_column(
+        String(50), default="pending", nullable=False
+    )  # pending, approved, executing, completed, failed, cancelled
+    approval_status: Mapped[str] = mapped_column(
+        String(50), default="pending", nullable=False
+    )  # pending, approved, rejected
     requires_human_approval: Mapped[bool] = mapped_column(default=False, nullable=False)
     estimated_duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     actual_duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -30,5 +35,7 @@ class ExecutionPlan(Base):
     approved_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
+    )

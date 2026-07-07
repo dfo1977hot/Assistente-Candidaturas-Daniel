@@ -1,12 +1,13 @@
 """Service for audit logging and compliance tracking."""
 
-from typing import Any
 from datetime import datetime, timedelta
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from acd.domain.platform.system_log import LogLevel
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.domain.platform.system_log import LogLevel
 
 
 class AuditService:
@@ -56,7 +57,11 @@ class AuditService:
             return {
                 "id": log_entry.id,
                 "operation": operation,
-                "timestamp": log_entry.timestamp.isoformat() if log_entry.timestamp else None,
+                "timestamp": (
+                    log_entry.timestamp.isoformat()
+                    if log_entry.timestamp
+                    else None
+                ),
             }
 
     def get_audit_trail(
@@ -81,20 +86,28 @@ class AuditService:
             hours_back=days * 24,
         )
 
-        filtered = [l for l in logs if operation is None or l.operation == operation]
+        filtered = [
+            log
+            for log in logs
+            if operation is None or log.operation == operation
+        ]
 
         return [
             {
-                "id": l.id,
-                "operation": l.operation,
-                "module": l.module,
-                "message": l.message,
-                "result": l.result,
-                "user_id": l.user_id,
-                "timestamp": l.timestamp.isoformat() if l.timestamp else None,
-                "metadata": l.metadata,
+                "id": log.id,
+                "operation": log.operation,
+                "module": log.module,
+                "message": log.message,
+                "result": log.result,
+                "user_id": log.user_id,
+                "timestamp": (
+                    log.timestamp.isoformat()
+                    if log.timestamp
+                    else None
+                ),
+                "metadata": log.metadata,
             }
-            for l in filtered
+            for log in filtered
         ]
 
     def get_user_activity(
@@ -112,18 +125,27 @@ class AuditService:
             User activity
         """
         logs = self.repository.list_logs(hours_back=days * 24)
-        user_logs = [l for l in logs if l.user_id == user_id]
+
+        user_logs = [
+            log
+            for log in logs
+            if log.user_id == user_id
+        ]
 
         return [
             {
-                "id": l.id,
-                "operation": l.operation,
-                "module": l.module,
-                "level": l.level,
-                "result": l.result,
-                "timestamp": l.timestamp.isoformat() if l.timestamp else None,
+                "id": log.id,
+                "operation": log.operation,
+                "module": log.module,
+                "level": log.level,
+                "result": log.result,
+                "timestamp": (
+                    log.timestamp.isoformat()
+                    if log.timestamp
+                    else None
+                ),
             }
-            for l in user_logs
+            for log in user_logs
         ]
 
     def get_failed_operations(
@@ -145,14 +167,18 @@ class AuditService:
 
         return [
             {
-                "id": l.id,
-                "operation": l.operation,
-                "module": l.module,
-                "message": l.message,
-                "error_type": l.error_type,
-                "timestamp": l.timestamp.isoformat() if l.timestamp else None,
+                "id": log.id,
+                "operation": log.operation,
+                "module": log.module,
+                "message": log.message,
+                "error_type": log.error_type,
+                "timestamp": (
+                    log.timestamp.isoformat()
+                    if log.timestamp
+                    else None
+                ),
             }
-            for l in logs
+            for log in logs
         ]
 
     def generate_compliance_report(
@@ -170,13 +196,26 @@ class AuditService:
         with self.logger.operation("generate_compliance_report"):
             logs = self.repository.list_logs(hours_back=days * 24)
 
-            # Calculate statistics
             total_operations = len(logs)
-            errors = len([l for l in logs if l.level == LogLevel.ERROR.value])
-            warnings = len([l for l in logs if l.level == LogLevel.WARNING.value])
 
-            # Group by module
-            modules = {}
+            errors = len(
+                [
+                    log
+                    for log in logs
+                    if log.level == LogLevel.ERROR.value
+                ]
+            )
+
+            warnings = len(
+                [
+                    log
+                    for log in logs
+                    if log.level == LogLevel.WARNING.value
+                ]
+            )
+
+            modules: dict[str, dict[str, int]] = {}
+
             for log in logs:
                 if log.module not in modules:
                     modules[log.module] = {
@@ -184,7 +223,9 @@ class AuditService:
                         "errors": 0,
                         "warnings": 0,
                     }
+
                 modules[log.module]["total"] += 1
+
                 if log.level == LogLevel.ERROR.value:
                     modules[log.module]["errors"] += 1
                 elif log.level == LogLevel.WARNING.value:
@@ -196,7 +237,11 @@ class AuditService:
                 "total_operations": total_operations,
                 "total_errors": errors,
                 "total_warnings": warnings,
-                "error_rate": (errors / total_operations * 100) if total_operations > 0 else 0,
+                "error_rate": (
+                    errors / total_operations * 100
+                    if total_operations > 0
+                    else 0
+                ),
                 "modules": modules,
             }
 
@@ -214,27 +259,34 @@ class AuditService:
         Returns:
             Exported logs
         """
-        # Get all logs in range
         if end_date is None:
             end_date = datetime.now()
+
         if start_date is None:
             start_date = end_date - timedelta(days=30)
 
-        hours_back = int((end_date - start_date).total_seconds() / 3600)
+        hours_back = int(
+            (end_date - start_date).total_seconds() / 3600
+        )
+
         logs = self.repository.list_logs(hours_back=hours_back)
 
         return [
             {
-                "id": l.id,
-                "timestamp": l.timestamp.isoformat() if l.timestamp else None,
-                "level": l.level,
-                "module": l.module,
-                "operation": l.operation,
-                "message": l.message,
-                "user_id": l.user_id,
-                "result": l.result,
-                "error_type": l.error_type,
-                "correlation_id": l.correlation_id,
+                "id": log.id,
+                "timestamp": (
+                    log.timestamp.isoformat()
+                    if log.timestamp
+                    else None
+                ),
+                "level": log.level,
+                "module": log.module,
+                "operation": log.operation,
+                "message": log.message,
+                "user_id": log.user_id,
+                "result": log.result,
+                "error_type": log.error_type,
+                "correlation_id": log.correlation_id,
             }
-            for l in logs
+            for log in logs
         ]

@@ -1,6 +1,4 @@
-from PySide6.QtWidgets import QWidget
-from PySide6.QtWidgets import QVBoxLayout
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class BasePage(QWidget):

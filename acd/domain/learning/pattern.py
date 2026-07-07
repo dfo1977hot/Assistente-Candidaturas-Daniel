@@ -1,16 +1,17 @@
 """Pattern entity for detected patterns in data."""
 
-from datetime import datetime
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import String, Text, Integer, DateTime, JSON, Enum as SQLEnum, Numeric
+from sqlalchemy import JSON, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class PatternType(str, Enum):
+class PatternType(StrEnum):
     """Type of pattern detected."""
 
     CONVERSION_RATE = "conversion_rate"
@@ -36,13 +37,21 @@ class Pattern(Base):
     criteria: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     criteria_explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
     evidence_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    confidence: Mapped[float] = mapped_column(Numeric(precision=5, scale=4), nullable=False, default=0.5)
-    frequency: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="How often pattern occurs")
-    impact_score: Mapped[float] = mapped_column(Numeric(precision=5, scale=4), nullable=False, default=0.0, comment="Expected impact (0-1)")
+    confidence: Mapped[float] = mapped_column(
+        Numeric(precision=5, scale=4), nullable=False, default=0.5
+    )
+    frequency: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="How often pattern occurs"
+    )
+    impact_score: Mapped[float] = mapped_column(
+        Numeric(precision=5, scale=4), nullable=False, default=0.0, comment="Expected impact (0-1)"
+    )
     related_learning_records: Mapped[list[int]] = mapped_column(JSON, default=list, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now(UTC), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
     last_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:
@@ -59,11 +68,11 @@ class Pattern(Base):
         self.evidence_count += evidence_count
         self.frequency += 1
         self.impact_score = min(1.0, float(self.impact_score) + impact_delta)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def confirm(self) -> None:
         """Mark pattern as confirmed."""
-        self.last_confirmed_at = datetime.utcnow()
+        self.last_confirmed_at = datetime.now(UTC)
 
     def get_confidence_percentage(self) -> float:
         """Get confidence as percentage."""

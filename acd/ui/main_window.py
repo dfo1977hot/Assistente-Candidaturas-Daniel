@@ -1,27 +1,27 @@
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QWidget,
     QHBoxLayout,
-    QStatusBar,
+    QMainWindow,
     QStackedWidget,
+    QStatusBar,
+    QWidget,
 )
 
 from acd.core.router import Router
+from acd.presentation.pages.agent_console_page import AgentConsolePage
+from acd.presentation.pages.ai_resume_page import AIResumePage
+from acd.presentation.pages.analytics_page import AnalyticsPage
 from acd.presentation.pages.application_page import ApplicationPage
+from acd.presentation.pages.assistant_page import AssistantPage
+from acd.presentation.pages.ats_page import ATSPage
+from acd.presentation.pages.base_page import BasePage
+from acd.presentation.pages.career_page import CareerPage
 from acd.presentation.pages.company_page import CompanyPage
 from acd.presentation.pages.curriculum_page import CurriculumPage
 from acd.presentation.pages.interview_page import InterviewPage
 from acd.presentation.pages.job_page import JobPage
 from acd.presentation.pages.workflow_page import WorkflowPage
-from acd.presentation.pages.analytics_page import AnalyticsPage
-from acd.presentation.pages.career_page import CareerPage
-from acd.presentation.pages.assistant_page import AssistantPage
-from acd.presentation.pages.agent_console_page import AgentConsolePage
-from acd.presentation.pages.ai_resume_page import AIResumePage
-from acd.presentation.pages.ats_page import ATSPage
-from acd.presentation.pages.base_page import BasePage
-from acd.ui.sidebar import Sidebar
 from acd.ui.dashboard import Dashboard
+from acd.ui.sidebar import Sidebar
 
 
 class MainWindow(QMainWindow):

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import select
 
 from acd.database import database as database_module
+from acd.domain.connector.field_mapping import FieldMapping
 from acd.domain.connector.platform import Platform
 from acd.domain.connector.schema import PlatformSchema
-from acd.domain.connector.field_mapping import FieldMapping
 
 
 class ConnectorRepository:
@@ -29,7 +27,15 @@ class ConnectorRepository:
             session.refresh(schema)
             return schema
 
-    def create_mapping(self, *, platform_id: int, source_field: str, target_field: str, transformation: str = "", priority: int = 0) -> FieldMapping:
+    def create_mapping(
+        self,
+        *,
+        platform_id: int,
+        source_field: str,
+        target_field: str,
+        transformation: str = "",
+        priority: int = 0,
+    ) -> FieldMapping:
         with database_module.SessionLocal() as session:
             mapping = FieldMapping(
                 platform_id=platform_id,
@@ -43,7 +49,7 @@ class ConnectorRepository:
             session.refresh(mapping)
             return mapping
 
-    def get_platform(self, platform_id: int) -> Optional[Platform]:
+    def get_platform(self, platform_id: int) -> Platform | None:
         with database_module.SessionLocal() as session:
             return session.get(Platform, platform_id)
 

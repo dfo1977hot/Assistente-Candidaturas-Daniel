@@ -1,18 +1,22 @@
 """System status page for platform monitoring."""
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QPushButton, QLabel, QTabWidget
-)
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from acd.application.platform import PlatformUseCases
-from acd.presentation.platform.widgets.health_card import HealthCard
-from acd.presentation.platform.widgets.metrics_panel import MetricsPanel
 from acd.presentation.platform.widgets.backup_panel import BackupPanel
-from acd.presentation.platform.widgets.settings_panel import SettingsPanel
+from acd.presentation.platform.widgets.health_card import HealthCard
 from acd.presentation.platform.widgets.log_viewer import LogViewer
+from acd.presentation.platform.widgets.metrics_panel import MetricsPanel
+from acd.presentation.platform.widgets.settings_panel import SettingsPanel
 
 
 class SystemPage(QWidget):
