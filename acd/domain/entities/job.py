@@ -1,7 +1,7 @@
 from __future__ import annotations
-from acd.core.datetime_utils import utc_now
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Date,
@@ -14,6 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 from acd.models.company import Company
 
@@ -34,7 +35,11 @@ class Job(Base):
         Index("ix_jobs_application_date", "application_date"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
     company_id: Mapped[int] = mapped_column(
         ForeignKey("companies.id"),
@@ -64,12 +69,12 @@ class Job(Base):
         default="",
     )
 
-    salary_min: Mapped[float | None] = mapped_column(
+    salary_min: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,
     )
 
-    salary_max: Mapped[float | None] = mapped_column(
+    salary_max: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,
     )
@@ -145,9 +150,11 @@ class Job(Base):
     )
 
     def __repr__(self) -> str:
+        """Return a developer-friendly representation."""
+
         return (
             f"<Job(id={self.id}, "
-            f"title='{self.title}', "
+            f"title={self.title!r}, "
             f"company_id={self.company_id}, "
-            f"status='{self.status}')>"
+            f"status={self.status!r})>"
         )

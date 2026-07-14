@@ -2,7 +2,6 @@
 
 from typing import Any
 
-from acd.domain.agents.message import MessageType
 from acd.infrastructure.agents.capability_service import CapabilityService
 from acd.infrastructure.agents.message_bus import MessageBus
 from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
@@ -38,7 +37,6 @@ class ResumeAgent(BaseAgent):
             Task result
         """
         task_type = task_input.get("task_type", "")
-        task_input.get("user_request", "")
 
         self.record_decision(
             decision=f"Processing {task_type}",
@@ -63,6 +61,8 @@ class ResumeAgent(BaseAgent):
         Returns:
             Result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Resume",
@@ -79,6 +79,8 @@ class ResumeAgent(BaseAgent):
         Returns:
             Result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Resume",
@@ -95,6 +97,8 @@ class ResumeAgent(BaseAgent):
         Returns:
             Result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Resume",
@@ -131,6 +135,8 @@ class ATSAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "ATS",
@@ -168,6 +174,8 @@ class AutomationAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Automation",
@@ -204,6 +212,8 @@ class CareerAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Career",
@@ -240,6 +250,8 @@ class InterviewAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Interview",
@@ -276,6 +288,8 @@ class AnalyticsAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Analytics",
@@ -316,6 +330,8 @@ class WorkflowAgent(BaseAgent):
         Returns:
             Task result
         """
+        del task_input
+
         return {
             "success": True,
             "agent": "Workflow",

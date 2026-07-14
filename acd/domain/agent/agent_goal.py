@@ -1,5 +1,4 @@
 from __future__ import annotations
-from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 from decimal import Decimal
@@ -7,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 

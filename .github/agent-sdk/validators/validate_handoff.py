@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import sys
 from datetime import datetime
+import json
 from pathlib import Path
+import sys
 
 ALLOWED_STATUS = {"approved", "blocked", "needs_changes"}
 ALLOWED_RISK = {"very_low", "low", "medium", "high"}

@@ -137,7 +137,7 @@ class BaseAgent(ABC):
         Returns:
             Task result
         """
-        pass
+        raise NotImplementedError
 
     def process_message(self, message: dict[str, Any]) -> None:
         """Process incoming message. Can be overridden by subclass.

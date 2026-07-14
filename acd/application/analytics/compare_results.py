@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
+
+logger = logging.getLogger(__name__)
 
 
 def compare_results(
@@ -28,7 +31,7 @@ def compare_results(
         if latest:
             snapshots.append(latest)
     except Exception:
-        pass
+        logger.exception("Unable to retrieve latest analytics snapshot.")
 
     return {
         "period1": period1,

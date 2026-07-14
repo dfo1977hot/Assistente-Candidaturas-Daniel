@@ -1,11 +1,11 @@
 from __future__ import annotations
-from acd.core.datetime_utils import utc_now
 
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from acd.core.datetime_utils import utc_now
 from acd.domain.entities.job import Job
 from acd.models.base import Base
 from acd.models.company import Company

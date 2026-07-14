@@ -4,8 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, Numeric, String, Text
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import JSON, DateTime, Enum as SQLEnum, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base

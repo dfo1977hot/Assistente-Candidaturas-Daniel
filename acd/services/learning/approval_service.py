@@ -1,6 +1,6 @@
 """Approval service for managing learning approvals."""
 
-from datetime import UTC, datetime, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session

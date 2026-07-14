@@ -1,0 +1,1 @@
+"""Architecture reports package."""

@@ -9,12 +9,14 @@ from sqlalchemy.orm import sessionmaker
 
 import acd.database.database as database_module
 
-# Importa o registro centralizado dos modelos ORM.
-# Este import não é utilizado diretamente, mas garante que todos os
-# modelos sejam registrados no Base.metadata antes do create_all().
+# Garante o registro de todos os modelos ORM antes do create_all().
 import acd.database.model_registry  # noqa: F401
-
 from acd.models.base import Base
+
+pytest_plugins = [
+    "tests.fixtures.database",
+    "tests.fixtures.company",
+]
 
 
 @pytest.fixture(scope="session")
@@ -30,28 +32,31 @@ def test_engine():
         future=True,
     )
 
-    print("\n=== TABELAS REGISTRADAS ===")
-    print(sorted(Base.metadata.tables.keys()))
+    Base.metadata.create_all(bind=engine)
 
-    for table in Base.metadata.tables.values():
-        for fk in table.foreign_keys:
-            print(f"{table.name}: {fk.target_fullname}")
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
 
-    Base.metadata.create_all(engine)
+        os.close(db_fd)
 
-    yield engine
-
-    engine.dispose()
-
-    os.close(db_fd)
-    os.remove(db_path)
+        if os.path.exists(db_path):
+            os.remove(db_path)
 
 
 @pytest.fixture(scope="function")
 def db_session(test_engine):
     """
     Cria uma sessão isolada para cada teste.
+
+    Antes de cada teste o banco é recriado para garantir
+    isolamento completo entre os casos de teste.
     """
+
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
 
     SessionLocal = sessionmaker(
         bind=test_engine,
@@ -62,17 +67,17 @@ def db_session(test_engine):
 
     session = SessionLocal()
 
-    yield session
-
-    session.rollback()
-    session.close()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 
 @pytest.fixture(autouse=True)
 def override_database(db_session, test_engine, monkeypatch):
     """
-    Faz toda a aplicação utilizar o banco temporário
-    durante os testes.
+    Faz toda a aplicação utilizar o banco temporário durante os testes.
     """
 
     monkeypatch.setattr(
@@ -84,5 +89,12 @@ def override_database(db_session, test_engine, monkeypatch):
     monkeypatch.setattr(
         database_module,
         "SessionLocal",
-        lambda: db_session,
+        sessionmaker(
+            bind=test_engine,
+            autoflush=False,
+            autocommit=False,
+            future=True,
+        ),
     )
+
+    yield

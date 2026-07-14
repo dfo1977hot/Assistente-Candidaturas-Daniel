@@ -1,6 +1,6 @@
+from datetime import UTC, datetime, timedelta
 import os
 import tempfile
-from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -11,6 +11,7 @@ from acd.infrastructure.repositories.career_repository import CareerRepository
 from acd.services.career_planning_service import CareerPlanningService
 from acd.services.career_simulation_service import CareerSimulationService
 from acd.services.gap_analysis_service import GapAnalysisService
+
 
 @pytest.fixture
 def temp_database(monkeypatch):

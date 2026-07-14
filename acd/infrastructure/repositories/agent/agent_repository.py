@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from datetime import UTC, datetime
 from acd.database import database as database_module
 from acd.domain.agent.agent_goal import AgentGoal
 from acd.domain.agent.execution_plan import ExecutionPlan
@@ -12,8 +12,8 @@ from acd.domain.agent.reasoning_step import ReasoningStep
 from acd.domain.agent.tool_call import ToolCall
 
 if TYPE_CHECKING:
-    from acd.domain.agents.memory import AgentMemory
     from acd.domain.agent.plan_task import PlanTask
+    from acd.domain.agents.memory import AgentMemory
 
 
 class AgentRepository:
@@ -113,7 +113,6 @@ class AgentRepository:
 
     def approve_plan(self, plan_id: int, approved: bool = True) -> ExecutionPlan | None:
         """Approve or reject plan."""
-        from datetime import datetime
 
         return self.update_plan(
             plan_id,

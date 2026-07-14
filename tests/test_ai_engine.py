@@ -1,49 +1,22 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.application.prompt.prompt_builder import PromptBuilder, PromptContext
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job_profile import JobProfile
 from acd.infrastructure.ai.providers import MockAIProvider
-from acd.services.ai_generation_service import CoverLetterGenerationService, ResumeGenerationService
+from acd.services.ai_generation_service import (
+    CoverLetterGenerationService,
+    ResumeGenerationService,
+)
 
 
 @pytest.fixture
-def ai_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-ai-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_ai.db")
-    monkeypatch.setattr(
-        "acd.database.database.DATABASE_URL",
-        f"sqlite:///{db_path}",
-    )
-
-    import acd.database.database as database_module
-
-    database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(
-        f"sqlite:///{db_path}",
-        echo=False,
-        future=True,
-    )
-    database_module.SessionLocal = database_module.sessionmaker(
-        bind=database_module.engine,
-        autoflush=False,
-        autocommit=False,
-    )
-
-    from acd.models.base import Base
-
-    Base.metadata.drop_all(bind=database_module.engine)
-    Base.metadata.create_all(bind=database_module.engine)
-
-    yield
-
-    Base.metadata.drop_all(bind=database_module.engine)
+def ai_provider() -> MockAIProvider:
+    """Mock provider compartilhado entre os testes."""
+    return MockAIProvider()
 
 
-def test_prompt_builder_builds_resume_prompt(ai_setup):
+def test_prompt_builder_builds_resume_prompt():
     context = PromptContext(
         vacancy_title="Analista de Dados",
         vacancy_description="Vaga para analista com Power BI e SQL.",
@@ -63,18 +36,27 @@ def test_prompt_builder_builds_resume_prompt(ai_setup):
     assert "pt-BR" in prompt
 
 
-def test_mock_ai_provider_generates_content():
-    provider = MockAIProvider()
-    result = provider.generate_text(
-        prompt="Prompt de teste", model="mock", temperature=0.2, max_tokens=200, language="pt-BR"
+def test_mock_ai_provider_generates_content(ai_provider: MockAIProvider):
+    result = ai_provider.generate_text(
+        prompt="Prompt de teste",
+        model="mock",
+        temperature=0.2,
+        max_tokens=200,
+        language="pt-BR",
     )
 
     assert "mock" in result.lower()
     assert "teste" in result.lower()
 
 
-def test_resume_generation_service_creates_new_version(ai_setup):
-    curriculum = Curriculum(name="Analista", description="Power BI, Excel, Lean")
+def test_resume_generation_service_creates_new_version(
+    ai_provider: MockAIProvider,
+):
+    curriculum = Curriculum(
+        name="Analista",
+        description="Power BI, Excel, Lean",
+    )
+
     job_profile = JobProfile(
         job_id=1,
         raw_description="Vaga analista",
@@ -85,10 +67,13 @@ def test_resume_generation_service_creates_new_version(ai_setup):
         certifications="",
         keywords="Power BI",
     )
-    service = ResumeGenerationService(provider=MockAIProvider())
+
+    service = ResumeGenerationService(provider=ai_provider)
 
     result = service.generate_resume(
-        curriculum=curriculum, job_profile=job_profile, language="pt-BR"
+        curriculum=curriculum,
+        job_profile=job_profile,
+        language="pt-BR",
     )
 
     assert result["version"] == "v2.0"
@@ -96,8 +81,14 @@ def test_resume_generation_service_creates_new_version(ai_setup):
     assert result["explanation"]
 
 
-def test_cover_letter_generation_service_persists_content(ai_setup):
-    curriculum = Curriculum(name="Analista", description="Power BI, Excel, Lean")
+def test_cover_letter_generation_service_persists_content(
+    ai_provider: MockAIProvider,
+):
+    curriculum = Curriculum(
+        name="Analista",
+        description="Power BI, Excel, Lean",
+    )
+
     job_profile = JobProfile(
         job_id=1,
         raw_description="Vaga analista",
@@ -108,10 +99,13 @@ def test_cover_letter_generation_service_persists_content(ai_setup):
         certifications="",
         keywords="Power BI",
     )
-    service = CoverLetterGenerationService(provider=MockAIProvider())
+
+    service = CoverLetterGenerationService(provider=ai_provider)
 
     result = service.generate_cover_letter(
-        curriculum=curriculum, job_profile=job_profile, language="pt-BR"
+        curriculum=curriculum,
+        job_profile=job_profile,
+        language="pt-BR",
     )
 
     assert result["content"]

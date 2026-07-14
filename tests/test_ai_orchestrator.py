@@ -1,44 +1,14 @@
-import os
-import tempfile
 
-import pytest
 
 from acd.application.agent.ask_agent import ask_agent
 from acd.application.agent.create_plan import create_plan
 from acd.application.agent.execute_plan import approve_plan, execute_plan
-from acd.database import database as database_module
 from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
 from acd.infrastructure.agent.context_builder import ContextBuilder
 from acd.infrastructure.agent.planning_engine import PlanningEngine
 from acd.infrastructure.agent.tool_registry import DefaultToolRegistry, ToolDefinition, ToolRegistry
 from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.services.ai_execution_service import AgentMemoryService, AIExecutionService
-
-
-@pytest.fixture
-def temp_database(monkeypatch):
-    """Create a temporary database for testing."""
-    temp_dir = tempfile.mkdtemp(prefix="acd-agent-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_agent.db")
-    monkeypatch.setattr("acd.database.database.DATABASE_URL", f"sqlite:///{db_path}")
-
-    # Import all entities FIRST to register ORM metadata
-
-    database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(
-        f"sqlite:///{db_path}", echo=False, future=True
-    )
-    database_module.SessionLocal = database_module.sessionmaker(
-        bind=database_module.engine, autoflush=False, autocommit=False
-    )
-
-    from acd.models.base import Base
-
-    Base.metadata.create_all(database_module.engine)
-
-    yield
-
-    Base.metadata.drop_all(database_module.engine)
 
 
 class TestToolRegistry:
@@ -232,7 +202,7 @@ class TestAIOrchestrator:
 class TestAgentRepository:
     """Test agent repository."""
 
-    def test_create_goal(self, temp_database):
+    def test_create_goal(self, db_session):
         """Test creating a goal."""
         repo = AgentRepository()
 
@@ -245,7 +215,7 @@ class TestAgentRepository:
         assert goal.id is not None
         assert goal.title == "Test Goal"
 
-    def test_create_and_list_goals(self, temp_database):
+    def test_create_and_list_goals(self, db_session):
         """Test creating and listing goals."""
         repo = AgentRepository()
 
@@ -256,7 +226,7 @@ class TestAgentRepository:
 
         assert len(goals) >= 2
 
-    def test_create_plan(self, temp_database):
+    def test_create_plan(self, db_session):
         """Test creating a plan."""
         repo = AgentRepository()
 
@@ -272,7 +242,7 @@ class TestAgentRepository:
         assert plan.id is not None
         assert plan.goal_id == goal.id
 
-    def test_create_task(self, temp_database):
+    def test_create_task(self, db_session):
         """Test creating a task."""
         repo = AgentRepository()
 
@@ -293,7 +263,7 @@ class TestAgentRepository:
 class TestAIExecutionService:
     """Test execution service."""
 
-    def test_get_execution_status(self, temp_database):
+    def test_get_execution_status(self, db_session):
         """Test getting execution status."""
         repo = AgentRepository()
         service = AIExecutionService(repo)
@@ -306,7 +276,7 @@ class TestAIExecutionService:
         assert status.get("plan_id") == plan.id
         assert "progress_percentage" in status
 
-    def test_cancel_plan(self, temp_database):
+    def test_cancel_plan(self, db_session):
         """Test canceling a plan."""
         repo = AgentRepository()
         service = AIExecutionService(repo)
@@ -322,7 +292,7 @@ class TestAIExecutionService:
 class TestAgentMemoryService:
     """Test memory service."""
 
-    def test_save_decision(self, temp_database):
+    def test_save_decision(self, db_session):
         """Test saving decision."""
         repo = AgentRepository()
         service = AgentMemoryService(repo)
@@ -332,7 +302,7 @@ class TestAgentMemoryService:
         assert result.get("success") is True
         assert "memory_id" in result
 
-    def test_save_preference(self, temp_database):
+    def test_save_preference(self, db_session):
         """Test saving preference."""
         repo = AgentRepository()
         service = AgentMemoryService(repo)
@@ -341,7 +311,7 @@ class TestAgentMemoryService:
 
         assert result.get("success") is True
 
-    def test_get_recent_decisions(self, temp_database):
+    def test_get_recent_decisions(self, db_session):
         """Test getting recent decisions."""
         repo = AgentRepository()
         service = AgentMemoryService(repo)
@@ -357,14 +327,14 @@ class TestAgentMemoryService:
 class TestApplicationLayer:
     """Test application layer use cases."""
 
-    def test_ask_agent(self, temp_database):
+    def test_ask_agent(self, db_session):
         """Test asking agent."""
         result = ask_agent("Quero conseguir uma vaga de desenvolvedor Python")
 
         assert result.get("success") is True
         assert "intent" in result
 
-    def test_create_plan_use_case(self, temp_database):
+    def test_create_plan_use_case(self, db_session):
         """Test create plan use case."""
         goal_data = {
             "title": "Find job",
@@ -379,7 +349,7 @@ class TestApplicationLayer:
         assert "plan_id" in result
         assert "task_count" in result
 
-    def test_approve_plan_use_case(self, temp_database):
+    def test_approve_plan_use_case(self, db_session):
         """Test approve plan use case."""
         # First create a plan
         goal_data = {
@@ -397,7 +367,7 @@ class TestApplicationLayer:
         assert result.get("success") is True
         assert result.get("status") == "approved"
 
-    def test_execute_plan_use_case(self, temp_database):
+    def test_execute_plan_use_case(self, db_session):
         """Test execute plan use case."""
         # Create and approve plan
         goal_data = {

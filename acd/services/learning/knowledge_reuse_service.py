@@ -1,11 +1,16 @@
 """Knowledge reuse service for applying learned patterns."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
+import logging
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from acd.infrastructure.repositories.learning import LearningRepository
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeReuseService:
@@ -15,7 +20,7 @@ class KnowledgeReuseService:
         """Initialize knowledge reuse service.
 
         Args:
-            session: SQLAlchemy session
+            session: SQLAlchemy session.
         """
         self.repository = LearningRepository(session)
 
@@ -24,23 +29,17 @@ class KnowledgeReuseService:
         context: dict[str, Any] | None = None,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
-        """Get insights applicable to current context.
+        """Get insights applicable to current context."""
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=limit * 2,
+        )
 
-        Args:
-            context: Current context (skills, platform, sector, etc)
-            limit: Maximum insights to return
+        result: list[dict[str, Any]] = []
 
-        Returns:
-            List of applicable insights
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=limit * 2)
-
-        result = []
         for insight in insights:
-            # Check if insight matches context
             if context:
-                matches = self._insight_matches_context(insight, context)
-                if matches:
+                if self._insight_matches_context(insight, context):
                     result.append(self._format_insight(insight))
             else:
                 result.append(self._format_insight(insight))
@@ -51,27 +50,39 @@ class KnowledgeReuseService:
         return result
 
     def get_skill_recommendations(
-        self, current_skills: list[str] | None = None
+        self,
+        current_skills: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Get skill recommendations based on learned patterns.
+        """Get skill recommendations based on learned patterns."""
 
-        Args:
-            current_skills: Current user skills
+        del current_skills
 
-        Returns:
-            Skill recommendations
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=100)
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=100,
+        )
 
-        recommendations = []
+        recommendations: list[dict[str, Any]] = []
+
         for insight in insights:
             if insight.insight_type == "SKILL_RECOMMENDATION":
                 for rec in insight.recommendations:
                     recommendations.append(
                         {
-                            "skill": rec.get("action", "").replace("Emphasize ", "").split(" ")[0],
-                            "rationale": rec.get("rationale", ""),
-                            "expected_benefit": rec.get("expected_benefit", ""),
+                            "skill": rec.get(
+                                "action",
+                                "",
+                            )
+                            .replace("Emphasize ", "")
+                            .split(" ")[0],
+                            "rationale": rec.get(
+                                "rationale",
+                                "",
+                            ),
+                            "expected_benefit": rec.get(
+                                "expected_benefit",
+                                "",
+                            ),
                             "confidence": insight.confidence,
                             "source": insight.title,
                         }
@@ -79,15 +90,18 @@ class KnowledgeReuseService:
 
         return recommendations[:10]
 
-    def get_platform_recommendations(self) -> list[dict[str, Any]]:
-        """Get platform recommendations based on learned patterns.
+    def get_platform_recommendations(
+        self,
+    ) -> list[dict[str, Any]]:
+        """Get platform recommendations based on learned patterns."""
 
-        Returns:
-            Platform recommendations
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=100)
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=100,
+        )
 
-        recommendations = []
+        recommendations: list[dict[str, Any]] = []
+
         for insight in insights:
             if insight.insight_type == "PLATFORM_ADVICE":
                 for rec in insight.recommendations:
@@ -95,20 +109,25 @@ class KnowledgeReuseService:
                         {
                             "platform": rec.get("action", ""),
                             "rationale": rec.get("rationale", ""),
-                            "success_rate": rec.get("expected_benefit", ""),
+                            "success_rate": rec.get(
+                                "expected_benefit",
+                                "",
+                            ),
                             "confidence": insight.confidence,
                         }
                     )
 
         return recommendations
 
-    def get_timing_recommendations(self) -> dict[str, Any]:
-        """Get timing recommendations for submissions.
+    def get_timing_recommendations(
+        self,
+    ) -> dict[str, Any]:
+        """Get timing recommendations."""
 
-        Returns:
-            Timing information
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=100)
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=100,
+        )
 
         timing_info = {
             "best_day": None,
@@ -121,23 +140,32 @@ class KnowledgeReuseService:
                 for rec in insight.recommendations:
                     timing_info["recommendations"].append(
                         {
-                            "recommendation": rec.get("action", ""),
-                            "rationale": rec.get("rationale", ""),
+                            "recommendation": rec.get(
+                                "action",
+                                "",
+                            ),
+                            "rationale": rec.get(
+                                "rationale",
+                                "",
+                            ),
                             "confidence": insight.confidence,
                         }
                     )
 
         return timing_info
 
-    def get_letter_improvements(self) -> list[dict[str, Any]]:
-        """Get recommendations for improving letters.
+    def get_letter_improvements(
+        self,
+    ) -> list[dict[str, Any]]:
+        """Get recommendations for improving letters."""
 
-        Returns:
-            Letter improvement suggestions
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=100)
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=100,
+        )
 
-        improvements = []
+        improvements: list[dict[str, Any]] = []
+
         for insight in insights:
             if insight.insight_type == "LETTER_IMPROVEMENT":
                 for rec in insight.recommendations:
@@ -145,25 +173,29 @@ class KnowledgeReuseService:
                         {
                             "improvement": rec.get("action", ""),
                             "rationale": rec.get("rationale", ""),
-                            "expected_impact": rec.get("expected_benefit", ""),
+                            "expected_impact": rec.get(
+                                "expected_benefit",
+                                "",
+                            ),
                             "confidence": insight.confidence,
                         }
                     )
 
         return improvements
 
-    def get_sector_strategy(self, sector: str | None = None) -> list[dict[str, Any]]:
-        """Get sector-specific strategy.
+    def get_sector_strategy(
+        self,
+        sector: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get sector-specific strategy."""
 
-        Args:
-            sector: Specific sector or None for all
+        insights = self.repository.list_insights(
+            is_actionable=True,
+            limit=100,
+        )
 
-        Returns:
-            Sector strategies
-        """
-        insights = self.repository.list_insights(is_actionable=True, limit=100)
+        strategies: list[dict[str, Any]] = []
 
-        strategies = []
         for insight in insights:
             if insight.insight_type == "SECTOR_STRATEGY":
                 if sector is None or sector.lower() in insight.description.lower():
@@ -172,38 +204,49 @@ class KnowledgeReuseService:
                             {
                                 "strategy": rec.get("action", ""),
                                 "sector": sector or "General",
-                                "rationale": rec.get("rationale", ""),
-                                "expected_benefit": rec.get("expected_benefit", ""),
+                                "rationale": rec.get(
+                                    "rationale",
+                                    "",
+                                ),
+                                "expected_benefit": rec.get(
+                                    "expected_benefit",
+                                    "",
+                                ),
                                 "confidence": insight.confidence,
                             }
                         )
 
         return strategies
 
-    def apply_insight(self, insight_id: int) -> dict[str, Any]:
-        """Mark insight as applied.
+    def apply_insight(
+        self,
+        insight_id: int,
+    ) -> dict[str, Any]:
+        """Mark insight as applied."""
 
-        Args:
-            insight_id: Insight ID
-
-        Returns:
-            Application result
-        """
-        success = self.repository.mark_insight_applied(insight_id)
+        success = self.repository.mark_insight_applied(
+            insight_id,
+        )
 
         return {
             "success": success,
             "insight_id": insight_id,
-            "applied_at": datetime.now(UTC).isoformat() if success else None,
+            "applied_at": (
+                datetime.now(UTC).isoformat()
+                if success
+                else None
+            ),
         }
 
-    def get_knowledge_impact(self) -> dict[str, Any]:
-        """Get impact of applied knowledge.
+    def get_knowledge_impact(
+        self,
+    ) -> dict[str, Any]:
+        """Get impact of applied knowledge."""
 
-        Returns:
-            Impact metrics
-        """
-        insights = self.repository.list_insights(is_applied=True, limit=1000)
+        insights = self.repository.list_insights(
+            is_applied=True,
+            limit=1000,
+        )
 
         impact = {
             "total_applied_insights": len(insights),
@@ -212,55 +255,81 @@ class KnowledgeReuseService:
         }
 
         if insights:
-            confidence_sum = sum(i.confidence for i in insights)
-            impact["average_confidence"] = confidence_sum / len(insights)
+            confidence_sum = sum(
+                insight.confidence
+                for insight in insights
+            )
 
-            # Estimate improvement from expected_impact fields
-            improvements = []
+            impact["average_confidence"] = (
+                confidence_sum / len(insights)
+            )
+
+            improvements: list[float] = []
+
             for insight in insights:
                 if "Could improve" in insight.expected_impact:
                     try:
-                        pct = float(insight.expected_impact.split("+")[1].split("%")[0])
-                        improvements.append(pct)
-                    except IndexError, ValueError:
-                        pass
+                        percentage = float(
+                            insight.expected_impact.split("+")[1]
+                            .split("%")[0]
+                        )
+                        improvements.append(
+                            percentage,
+                        )
+                    except (
+                        IndexError,
+                        ValueError,
+                    ):
+                        logger.debug(
+                            "Unable to parse expected impact: %s",
+                            insight.expected_impact,
+                        )
 
             if improvements:
-                impact["estimated_improvement"] = sum(improvements) / len(improvements)
+                impact["estimated_improvement"] = (
+                    sum(improvements)
+                    / len(improvements)
+                )
 
         return impact
 
-    def _insight_matches_context(self, insight: Any, context: dict[str, Any]) -> bool:
-        """Check if insight matches current context.
+    def _insight_matches_context(
+        self,
+        insight: Any,
+        context: dict[str, Any],
+    ) -> bool:
+        """Check whether an insight matches the current context."""
 
-        Args:
-            insight: Insight to check
-            context: Current context
+        for recommendation in insight.recommendations:
+            action = str(
+                recommendation.get(
+                    "action",
+                    "",
+                )
+            ).lower()
 
-        Returns:
-            True if matches
-        """
-        # Check if insight recommendations mention context items
-        for rec in insight.recommendations:
-            action = str(rec.get("action", "")).lower()
-            for _key, value in context.items():
-                if isinstance(value, str) and value.lower() in action:
+            for value in context.values():
+                if (
+                    isinstance(value, str)
+                    and value.lower() in action
+                ):
                     return True
-                elif isinstance(value, list):
-                    for v in value:
-                        if str(v).lower() in action:
-                            return True
-        return True  # Default to including if no specific match
 
-    def _format_insight(self, insight: Any) -> dict[str, Any]:
-        """Format insight for presentation.
+                if isinstance(value, list):
+                    if any(
+                        str(item).lower() in action
+                        for item in value
+                    ):
+                        return True
 
-        Args:
-            insight: Insight to format
+        return True
 
-        Returns:
-            Formatted insight
-        """
+    def _format_insight(
+        self,
+        insight: Any,
+    ) -> dict[str, Any]:
+        """Format insight for presentation."""
+
         return {
             "id": insight.id,
             "title": insight.title,

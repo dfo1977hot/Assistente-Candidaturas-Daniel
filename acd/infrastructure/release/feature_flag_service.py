@@ -1,7 +1,7 @@
 """Feature flag service for feature toggling."""
 
-import random
 from datetime import datetime
+import random
 
 
 class FeatureFlagService:

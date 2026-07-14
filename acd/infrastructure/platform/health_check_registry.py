@@ -1,7 +1,7 @@
 """Health check registry for extensible system diagnostics."""
 
-import time
 from abc import ABC, abstractmethod
+import time
 from typing import Any
 
 from acd.domain.platform.health_report import HealthCheckType, HealthStatus
@@ -17,7 +17,7 @@ class HealthCheck(ABC):
         Returns:
             Health check result with status, message, details
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_name(self) -> str:
@@ -26,7 +26,7 @@ class HealthCheck(ABC):
         Returns:
             Check name
         """
-        pass
+        raise NotImplementedError
 
 
 class DatabaseHealthCheck(HealthCheck):
@@ -61,12 +61,12 @@ class DatabaseHealthCheck(HealthCheck):
                 },
                 "response_time_ms": duration_ms,
             }
-        except Exception as e:
+        except Exception as exc:
             duration_ms = (time.time() - start_time) * 1000
             return {
                 "status": HealthStatus.UNHEALTHY.value,
-                "message": f"Database check failed: {str(e)}",
-                "error_message": str(e),
+                "message": f"Database check failed: {str(exc)}",
+                "error_message": str(exc),
                 "response_time_ms": duration_ms,
             }
 
@@ -122,12 +122,12 @@ class FilesystemHealthCheck(HealthCheck):
                     },
                     "response_time_ms": duration_ms,
                 }
-        except Exception as e:
+        except Exception as exc:
             duration_ms = (time.time() - start_time) * 1000
             return {
                 "status": HealthStatus.UNHEALTHY.value,
-                "message": f"Filesystem check failed: {str(e)}",
-                "error_message": str(e),
+                "message": f"Filesystem check failed: {str(exc)}",
+                "error_message": str(exc),
                 "response_time_ms": duration_ms,
             }
 
@@ -176,12 +176,12 @@ class MemoryHealthCheck(HealthCheck):
                     },
                     "response_time_ms": duration_ms,
                 }
-        except Exception as e:
+        except Exception as exc:
             duration_ms = (time.time() - start_time) * 1000
             return {
                 "status": HealthStatus.UNHEALTHY.value,
-                "message": f"Memory check failed: {str(e)}",
-                "error_message": str(e),
+                "message": f"Memory check failed: {str(exc)}",
+                "error_message": str(exc),
                 "response_time_ms": duration_ms,
             }
 
@@ -221,11 +221,11 @@ class HealthCheckRegistry:
         for check_name, check in self.checks.items():
             try:
                 results[check_name] = check.check()
-            except Exception as e:
+            except Exception as exc:
                 results[check_name] = {
                     "status": HealthStatus.UNHEALTHY.value,
-                    "message": f"Check failed: {str(e)}",
-                    "error_message": str(e),
+                    "message": f"Check failed: {str(exc)}",
+                    "error_message": str(exc),
                 }
         return results
 
@@ -243,11 +243,11 @@ class HealthCheckRegistry:
 
         try:
             return self.checks[check_name].check()
-        except Exception as e:
+        except Exception as exc:
             return {
                 "status": HealthStatus.UNHEALTHY.value,
-                "message": f"Check failed: {str(e)}",
-                "error_message": str(e),
+                "message": f"Check failed: {str(exc)}",
+                "error_message": str(exc),
             }
 
     def get_overall_status(self) -> str:

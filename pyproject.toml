@@ -1,7 +1,34 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "acd"
 version = "0.1.0"
 description = "Assistente de Candidaturas do Daniel"
+requires-python = ">=3.14"
+
+dependencies = [
+    "sqlalchemy>=2.0",
+]
+
+# ==========================================================
+# SETUPTOOLS
+# ==========================================================
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["acd*"]
+exclude = [
+    "tests*",
+    "data*",
+    "logs*",
+    "config*",
+    "backups*",
+    "docs*",
+]
 
 # ==========================================================
 # BLACK
@@ -16,30 +43,62 @@ target-version = ["py314"]
 # ==========================================================
 
 [tool.ruff]
-exclude = [
-        "docs/ARCHITECTURE_GUIDE.py",
-]
 line-length = 100
 target-version = "py314"
 
+exclude = [
+    "docs/ARCHITECTURE_GUIDE.py",
+]
+
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle
-    "F",   # Pyflakes
-    "I",   # isort (imports)
-    "UP",  # pyupgrade
-    "B",   # bugbear
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
 ]
 
 ignore = [
-    "E501", # linhas longas (o Black resolve)
+    "E501",
 ]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
 
 # ==========================================================
 # PYTEST
 # ==========================================================
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests"]
 addopts = "-ra"
+testpaths = [
+    "tests",
+]
+pythonpath = [
+    ".",
+]
+
+# ==========================================================
+# DEPTRY
+# ==========================================================
+
+[tool.deptry]
+ignore = []
+
+# ==========================================================
+# COVERAGE
+# ==========================================================
+
+[tool.coverage.run]
+branch = true
+source = [
+    "acd",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+fail_under = 85

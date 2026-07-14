@@ -1,9 +1,9 @@
 """Installation service for initial setup."""
 
+from datetime import UTC, datetime
+from pathlib import Path
 import platform
 import sys
-from datetime import datetime
-from pathlib import Path
 
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.release import VersionManager
@@ -36,7 +36,7 @@ class InstallationService:
         Returns:
             Installation result {success, message, installation_id, duration_seconds}
         """
-        start_time = datetime.now()
+        start_time = datetime.now(UTC)
         log_entry = None
 
         try:
@@ -56,8 +56,10 @@ class InstallationService:
                 # Verify version format
                 try:
                     VersionManager.parse_version(app_version)
-                except ValueError:
-                    raise ValueError(f"Invalid version format: {app_version}")
+                except ValueError as err:
+                    raise ValueError(
+                        f"Invalid version format: {app_version}"
+                    ) from err
 
                 # Create installation directory
                 install_dir = Path(installation_path)
@@ -80,7 +82,7 @@ class InstallationService:
                 installed.installation_path = str(install_dir.absolute())
                 installed.installation_type = InstallationStatus.FRESH_INSTALL.value
                 installed.status = InstallationStatus.ACTIVE.value
-                installed.installation_date = datetime.now()
+                installed.installation_date = datetime.now(UTC)
                 installed.system_info = {
                     "os": platform.system(),
                     "os_version": platform.release(),
@@ -90,7 +92,7 @@ class InstallationService:
                 self.session.commit()
 
                 # Calculate duration
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (datetime.now(UTC) - start_time).total_seconds()
 
                 # Update log
                 self.repository.update_installation_log(
@@ -113,7 +115,7 @@ class InstallationService:
                 }
 
         except Exception as e:
-            duration = (datetime.now() - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
 
             # Update log with error
             if log_entry:

@@ -1,7 +1,6 @@
 """Agent message entity."""
 
 from __future__ import annotations
-from acd.core.datetime_utils import utc_now
 
 from datetime import datetime
 from enum import StrEnum
@@ -10,6 +9,7 @@ from typing import Any
 from sqlalchemy import JSON, DateTime, Enum as SQLEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 

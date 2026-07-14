@@ -1,14 +1,16 @@
 """Plugin loader for dynamic extension loading."""
 
+from dataclasses import dataclass, field
 import importlib
 import json
-import sys
-from dataclasses import dataclass
+import logging
 from pathlib import Path
+import sys
 from typing import Any
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+@dataclass(slots=True)
 class PluginMetadata:
     """Plugin metadata."""
 
@@ -19,10 +21,10 @@ class PluginMetadata:
     entry_point: str
     min_app_version: str
     max_app_version: str | None = None
-    dependencies: list[str] = None
-    tags: list[str] = None
+    dependencies: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -43,13 +45,13 @@ class PluginInterface:
         """Return plugin metadata."""
         raise NotImplementedError
 
-    def initialize(self, context: dict) -> bool:
+    def initialize(self, context: dict[str, Any]) -> bool:
         """Initialize plugin with context."""
         raise NotImplementedError
 
     def shutdown(self) -> None:
         """Shutdown plugin."""
-        pass
+        return None
 
     def get_capabilities(self) -> list[str]:
         """Get list of capabilities provided by plugin."""
@@ -59,7 +61,7 @@ class PluginInterface:
 class PluginLoader:
     """Load and manage plugins dynamically."""
 
-    def __init__(self, plugin_dirs: list[str] | None = None):
+    def __init__(self, plugin_dirs: list[str] | None = None) -> None:
         """Initialize plugin loader.
 
         Args:
@@ -78,7 +80,7 @@ class PluginLoader:
             if str(plugin_path) not in sys.path:
                 sys.path.insert(0, str(plugin_path))
 
-    def set_context(self, context: dict) -> None:
+    def set_context(self, context: dict[str, Any]) -> None:
         """Set context for plugin initialization."""
         self.context = context
 
@@ -98,7 +100,7 @@ class PluginLoader:
             # Look for plugin.json files
             for manifest_file in plugin_path.glob("*/plugin.json"):
                 try:
-                    with open(manifest_file) as f:
+                    with manifest_file.open(encoding="utf-8") as f:
                         manifest = json.load(f)
                         plugins.append(manifest.get("name"))
                 except Exception:
@@ -133,7 +135,7 @@ class PluginLoader:
             if not manifest_file.is_file():
                 return False
 
-            with open(manifest_file) as f:
+            with manifest_file.open(encoding="utf-8") as f:
                 manifest = json.load(f)
 
             # Create metadata
@@ -192,8 +194,8 @@ class PluginLoader:
 
             return True
 
-        except Exception as e:
-            print(f"Error loading plugin {plugin_name}: {str(e)}")
+        except Exception:
+            logger.exception("Error loading plugin %s", plugin_name)
             return False
 
     def unload_plugin(self, plugin_name: str) -> bool:
@@ -245,7 +247,7 @@ class PluginLoader:
         """List all loaded plugins."""
         return list(self.loaded_plugins.keys())
 
-    def get_plugin_info(self, plugin_name: str) -> dict | None:
+    def get_plugin_info(self, plugin_name: str) -> dict[str, object] | None:
         """Get plugin information."""
         if plugin_name not in self.plugin_metadata:
             return None
@@ -262,7 +264,7 @@ class PluginLoader:
             try:
                 plugin.shutdown()
             except Exception:
-                pass
+                return None
 
         self.loaded_plugins.clear()
 

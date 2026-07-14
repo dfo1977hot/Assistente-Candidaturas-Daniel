@@ -1,8 +1,8 @@
 """Metrics collector for system performance monitoring."""
 
-import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+import time
 from typing import Any
 
 import psutil

@@ -1,9 +1,10 @@
 """Update service for application updates."""
 
-import shutil
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+import shutil
 
+from acd.domain.release import UpdateHistory
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.release import VersionManager
 from acd.infrastructure.repositories.release import ReleaseRepository
@@ -134,7 +135,7 @@ class UpdateService:
                     if db_path.exists():
                         backup_file = (
                             backup_dir
-                            / f"db_backup_{from_version}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                            / f"db_backup_{from_version}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.db"
                         )
                         shutil.copy2(db_path, backup_file)
                         backup_path = str(backup_file.absolute())
@@ -301,6 +302,3 @@ class UpdateService:
             if u.can_rollback()
         ]
 
-
-# Import UpdateHistory from domain
-from acd.domain.release import UpdateHistory

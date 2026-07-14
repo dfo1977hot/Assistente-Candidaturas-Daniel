@@ -1,9 +1,9 @@
 from datetime import datetime
-from acd.core.datetime_utils import utc_now
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 

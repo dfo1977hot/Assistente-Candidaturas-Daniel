@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import logging
 from typing import Any, Protocol
 
 
@@ -12,19 +13,24 @@ class EventHandler(Protocol):
         ...
 
 
+logger = logging.getLogger(__name__)
+
+EventCallback = Callable[[str, dict[str, Any]], None]
+
+
 class EventBus:
     """Central event bus for workflow orchestration."""
 
     def __init__(self) -> None:
-        self._handlers: dict[str, list[Callable]] = {}
+        self._handlers: dict[str, list[EventCallback]] = {}
 
-    def subscribe(self, event_type: str, handler: Callable) -> None:
+    def subscribe(self, event_type: str, handler: EventCallback) -> None:
         """Subscribe to an event type."""
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)
 
-    def unsubscribe(self, event_type: str, handler: Callable) -> None:
+    def unsubscribe(self, event_type: str, handler: EventCallback) -> None:
         """Unsubscribe from an event type."""
         if event_type in self._handlers:
             self._handlers[event_type].remove(handler)
@@ -36,4 +42,4 @@ class EventBus:
                 try:
                     handler(event_type, data)
                 except Exception:
-                    pass
+                    logger.exception("Unhandled exception while processing event %s", event_type)

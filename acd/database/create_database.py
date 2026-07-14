@@ -1,19 +1,27 @@
 """Database initialization."""
 
-# Importa todos os modelos ORM para registrá-los no Base.metadata
-import acd.database.model_registry  # noqa: F401
+from __future__ import annotations
+
+import logging
 
 from acd.database.database import engine
+
+# Importa todos os modelos ORM para registrá-los no Base.metadata
+import acd.database.model_registry  # noqa: F401
 from acd.models.base import Base
+
+logger = logging.getLogger(__name__)
 
 
 def create_database() -> None:
-    """Create database schema if it does not exist."""
+    """Create the database schema if it does not already exist."""
     Base.metadata.create_all(engine)
     _ensure_companies_columns()
 
 
 def _ensure_companies_columns() -> None:
+    """Ensure the companies table contains all required columns."""
+
     required_columns = {
         "segment": "TEXT NOT NULL DEFAULT ''",
         "state": "TEXT NOT NULL DEFAULT ''",
@@ -41,4 +49,4 @@ def _ensure_companies_columns() -> None:
 
 if __name__ == "__main__":
     create_database()
-    print("Banco criado com sucesso.")
+    logger.info("Database schema created successfully.")

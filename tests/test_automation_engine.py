@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.domain.entities.application import Application
@@ -13,36 +10,9 @@ from acd.services.automation_service import AutomationContext, AutomationService
 
 
 @pytest.fixture
-def automation_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-automation-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_automation.db")
-    monkeypatch.setattr(
-        "acd.database.database.DATABASE_URL",
-        f"sqlite:///{db_path}",
-    )
-
-    import acd.database.database as database_module
-
-    database_module.engine.dispose()
-    database_module.engine = database_module.create_engine(
-        f"sqlite:///{db_path}",
-        echo=False,
-        future=True,
-    )
-    database_module.SessionLocal = database_module.sessionmaker(
-        bind=database_module.engine,
-        autoflush=False,
-        autocommit=False,
-    )
-
-    from acd.models.base import Base
-
-    Base.metadata.drop_all(bind=database_module.engine)
-    Base.metadata.create_all(bind=database_module.engine)
-
-    yield
-
-    Base.metadata.drop_all(bind=database_module.engine)
+def automation_setup(db_session):
+    """Reuse the shared database fixture."""
+    yield db_session
 
 
 def test_connector_factory_selects_mock_connector():
@@ -59,9 +29,23 @@ def test_browser_manager_initializes_context():
 
 def test_automation_service_executes_mock_flow(automation_setup):
     service = AutomationService()
-    application = Application(job_id=1, company_id=1, status="Pronta para Aplicação")
-    curriculum = Curriculum(name="Analista", description="Power BI, Excel")
-    job = Job(title="Analista", company_id=1)
+
+    application = Application(
+        job_id=1,
+        company_id=1,
+        status="Pronta para Aplicação",
+    )
+
+    curriculum = Curriculum(
+        name="Analista",
+        description="Power BI, Excel",
+    )
+
+    job = Job(
+        title="Analista",
+        company_id=1,
+    )
+
     job_profile = JobProfile(
         job_id=1,
         raw_description="Vaga de analista",
@@ -72,6 +56,7 @@ def test_automation_service_executes_mock_flow(automation_setup):
         certifications="",
         keywords="Power BI",
     )
+
     context = AutomationContext(
         application=application,
         curriculum=curriculum,

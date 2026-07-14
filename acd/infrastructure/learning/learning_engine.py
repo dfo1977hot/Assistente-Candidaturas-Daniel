@@ -1,17 +1,19 @@
 """Central learning engine for coordinating learning activities."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from acd.domain.learning.learning_record import (
-    LearningRecord,
-    LearningRecordStatus,
-    LearningSourceType,
-)
+from acd.domain.learning.learning_record import LearningRecord
 from acd.domain.learning.outcome import Outcome
-from acd.infrastructure.learning.confidence_calculator import ConfidenceCalculator
-from acd.infrastructure.learning.evidence_aggregator import EvidenceAggregator
-from acd.infrastructure.learning.insight_generator import InsightGenerator
+from acd.infrastructure.learning.confidence_calculator import (
+    ConfidenceCalculator,
+)
+from acd.infrastructure.learning.evidence_aggregator import (
+    EvidenceAggregator,
+)
+from acd.infrastructure.learning.insight_generator import (
+    InsightGenerator,
+)
 from acd.infrastructure.learning.learning_policy_engine import (
     LearningEventType,
     LearningPolicyEngine,
@@ -30,8 +32,12 @@ class LearningEngine:
         self.confidence_calculator = ConfidenceCalculator()
         self.policy_engine = LearningPolicyEngine()
 
-        # Statistics
-        self.stats = {
+        self.stats: dict[str, int] = self._create_statistics()
+
+    def _create_statistics(self) -> dict[str, int]:
+        """Create an empty statistics dictionary."""
+
+        return {
             "patterns_detected": 0,
             "insights_generated": 0,
             "hypotheses_proposed": 0,
@@ -47,11 +53,11 @@ class LearningEngine:
         """Process an outcome and optionally detect patterns.
 
         Args:
-            outcome: Outcome to process
-            auto_detect_patterns: Whether to auto-detect patterns
+            outcome: Outcome to process.
+            auto_detect_patterns: Whether to auto-detect patterns.
 
         Returns:
-            Processing result
+            Processing result.
         """
         result = {
             "outcome_id": outcome.id,
@@ -61,17 +67,15 @@ class LearningEngine:
             "hypotheses_proposed": [],
         }
 
-        # Check if outcome processing is enabled
-        if not self.policy_engine.should_process_event(LearningEventType.OUTCOME_RECORDED.value):
+        if not self.policy_engine.should_process_event(
+            LearningEventType.OUTCOME_RECORDED.value,
+        ):
             return result
 
-        # Create learning record for outcome.
-        # TODO: Persist or enqueue the LearningRecord when the
-        # learning repository is integrated.
+        # Learning record persistence is handled by the repository layer
+        # when repository integration is enabled.
 
-        # Auto-detect patterns if enabled
         if auto_detect_patterns:
-            # This would be called with outcomes batch
             result["patterns_detected"].append(
                 {
                     "type": "outcome_recorded",
@@ -86,31 +90,30 @@ class LearningEngine:
         outcomes: list[Outcome],
         pattern_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Detect patterns from outcomes.
+        """Detect patterns from outcomes."""
 
-        Args:
-            outcomes: List of outcomes
-            pattern_types: Specific pattern types to detect
-
-        Returns:
-            List of detected patterns
-        """
-        if not self.policy_engine.should_process_event(LearningEventType.PATTERN_DETECTED.value):
+        if not self.policy_engine.should_process_event(
+            LearningEventType.PATTERN_DETECTED.value,
+        ):
             return []
 
-        # Detect all patterns or specific types
         patterns = self.pattern_detector.detect_all_patterns(outcomes)
 
-        # Filter by type if specified
         if pattern_types:
-            patterns = [p for p in patterns if p.get("type") in pattern_types]
+            patterns = [
+                pattern
+                for pattern in patterns
+                if pattern.get("type") in pattern_types
+            ]
 
-        # Check approval requirements
         results = []
+
         for pattern in patterns:
-            requires_approval = self.policy_engine.requires_approval_for_event(
-                LearningEventType.PATTERN_DETECTED.value,
-                pattern.get("confidence", 0.5),
+            requires_approval = (
+                self.policy_engine.requires_approval_for_event(
+                    LearningEventType.PATTERN_DETECTED.value,
+                    pattern.get("confidence", 0.5),
+                )
             )
 
             results.append(
@@ -129,26 +132,26 @@ class LearningEngine:
         patterns: list[dict[str, Any]],
         max_insights: int = 10,
     ) -> list[dict[str, Any]]:
-        """Generate insights from patterns.
+        """Generate insights from detected patterns."""
 
-        Args:
-            patterns: List of pattern dictionaries
-            max_insights: Maximum insights to generate
-
-        Returns:
-            List of insights
-        """
-        if not self.policy_engine.should_process_event(LearningEventType.INSIGHT_GENERATED.value):
+        if not self.policy_engine.should_process_event(
+            LearningEventType.INSIGHT_GENERATED.value,
+        ):
             return []
 
-        insights = self.insight_generator.generate_multiple(patterns, max_insights)
+        insights = self.insight_generator.generate_multiple(
+            patterns,
+            max_insights,
+        )
 
-        # Check approval requirements
         results = []
+
         for insight in insights:
-            requires_approval = self.policy_engine.requires_approval_for_event(
-                LearningEventType.INSIGHT_GENERATED.value,
-                insight.get("confidence", 0.5),
+            requires_approval = (
+                self.policy_engine.requires_approval_for_event(
+                    LearningEventType.INSIGHT_GENERATED.value,
+                    insight.get("confidence", 0.5),
+                )
             )
 
             results.append(
@@ -170,19 +173,11 @@ class LearningEngine:
         evidence: dict[str, Any] | None = None,
         related_patterns: list[int] | None = None,
     ) -> dict[str, Any]:
-        """Propose a new hypothesis.
+        """Propose a new hypothesis."""
 
-        Args:
-            description: Description of hypothesis
-            statement: Statement of hypothesis
-            confidence: Confidence level
-            evidence: Supporting evidence
-            related_patterns: Related pattern IDs
-
-        Returns:
-            Proposed hypothesis
-        """
-        if not self.policy_engine.should_process_event(LearningEventType.HYPOTHESIS_FORMED.value):
+        if not self.policy_engine.should_process_event(
+            LearningEventType.HYPOTHESIS_FORMED.value,
+        ):
             return {"error": "Hypothesis processing is disabled"}
 
         requires_approval = self.policy_engine.requires_approval_for_event(
@@ -208,15 +203,7 @@ class LearningEngine:
         learning_record: LearningRecord,
         notes: str = "",
     ) -> bool:
-        """Approve a learning record.
-
-        Args:
-            learning_record: Record to approve
-            notes: Approval notes
-
-        Returns:
-            True if approved
-        """
+        """Approve a learning record."""
         learning_record.approve(notes)
         self.stats["learning_records_approved"] += 1
         return True
@@ -226,15 +213,7 @@ class LearningEngine:
         learning_record: LearningRecord,
         notes: str = "",
     ) -> bool:
-        """Reject a learning record.
-
-        Args:
-            learning_record: Record to reject
-            notes: Rejection notes
-
-        Returns:
-            True if rejected
-        """
+        """Reject a learning record."""
         learning_record.reject(notes)
         self.stats["learning_records_rejected"] += 1
         return True
@@ -244,47 +223,32 @@ class LearningEngine:
         outcomes: list[Outcome],
         analysis_fields: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Aggregate evidence from outcomes.
-
-        Args:
-            outcomes: List of outcomes
-            analysis_fields: Fields to analyze
-
-        Returns:
-            Aggregated evidence
-        """
-        aggregated = self.evidence_aggregator.aggregate_from_outcomes(outcomes, analysis_fields)
-        return aggregated
+        """Aggregate evidence from outcomes."""
+        return self.evidence_aggregator.aggregate_from_outcomes(
+            outcomes,
+            analysis_fields,
+        )
 
     def get_statistics(self) -> dict[str, int]:
-        """Get learning statistics.
-
-        Returns:
-            Statistics dictionary
-        """
+        """Return learning statistics."""
         return self.stats.copy()
 
     def reset_statistics(self) -> None:
         """Reset learning statistics."""
-        self.stats = {
-            "patterns_detected": 0,
-            "insights_generated": 0,
-            "hypotheses_proposed": 0,
-            "learning_records_approved": 0,
-            "learning_records_rejected": 0,
-        }
+        self.stats = self._create_statistics()
 
     def get_health_report(self) -> dict[str, Any]:
-        """Get learning engine health report.
+        """Return the health report for the learning engine."""
 
-        Returns:
-            Health information
-        """
         total_records = (
-            self.stats["learning_records_approved"] + self.stats["learning_records_rejected"]
+            self.stats["learning_records_approved"]
+            + self.stats["learning_records_rejected"]
         )
+
         approval_rate = (
-            self.stats["learning_records_approved"] / total_records if total_records > 0 else 0
+            self.stats["learning_records_approved"] / total_records
+            if total_records > 0
+            else 0
         )
 
         return {

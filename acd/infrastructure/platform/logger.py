@@ -1,11 +1,11 @@
 """Structured logging framework for the platform."""
 
-import logging
-import time
-import uuid
 from contextlib import contextmanager
 from datetime import datetime
+import logging
+import time
 from typing import Any
+import uuid
 
 from acd.domain.platform.system_log import LogLevel, SystemLog
 
