@@ -106,3 +106,52 @@ def test_workflow_template_service_creates_from_template(workflow_setup):
     result = template_service.create_workflow_from_template("Apenas ATS")
     assert result is not None
     assert "id" in result or "error" not in result
+
+def test_event_bus_unsubscribe_removes_handler(workflow_setup):
+    """Handlers removed by unsubscribe must no longer receive events."""
+
+    event_bus = EventBus()
+
+    received = []
+
+    def handler(event_type, data):
+        received.append((event_type, data))
+
+    event_bus.subscribe("workflow_started", handler)
+    event_bus.unsubscribe("workflow_started", handler)
+
+    event_bus.publish("workflow_started", {"id": 1})
+
+    assert received == []
+
+
+def test_event_bus_publish_without_subscribers(workflow_setup):
+    """Publishing an event without subscribers must not fail."""
+
+    event_bus = EventBus()
+
+    event_bus.publish(
+        "unknown_event",
+        {"value": 1},
+    )
+
+
+def test_event_bus_handler_exception_is_ignored(workflow_setup, caplog):
+    """Exceptions raised by handlers must be logged without stopping publication."""
+
+    event_bus = EventBus()
+
+    def failing_handler(event_type, data):
+        raise RuntimeError("boom")
+
+    event_bus.subscribe(
+        "workflow_started",
+        failing_handler,
+    )
+
+    event_bus.publish(
+        "workflow_started",
+        {},
+    )
+
+    assert "Unhandled exception" in caplog.text
