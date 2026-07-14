@@ -15,8 +15,13 @@ class PlannerFacade:
     um PlannerResult, sem conter regras de negócio.
     """
 
-    def __init__(self) -> None:
-        self._planner_service = PlannerService()
+    def __init__(
+        self,
+        planner_service: PlannerService,
+    ) -> None:
+        """Inicializa a fachada do Planner."""
+
+        self._planner_service = planner_service
 
     def analyze(
         self,
@@ -24,6 +29,16 @@ class PlannerFacade:
     ) -> PlannerResult:
         """
         Executa o Planner.
+
+        Parameters
+        ----------
+        analyses:
+            Lista de análises utilizadas no planejamento.
+
+        Returns
+        -------
+        PlannerResult
+            Resultado consolidado do planejamento.
         """
 
         return self._planner_service.plan(analyses)

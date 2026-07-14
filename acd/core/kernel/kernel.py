@@ -18,7 +18,6 @@ class Kernel:
     """Application Kernel."""
 
     def __init__(self) -> None:
-
         self.context = ApplicationContext()
 
         self.services = ServiceRegistry()
@@ -26,20 +25,22 @@ class Kernel:
         self.container = DependencyContainer()
 
         self.events = EventBus()
-
         self.commands = CommandBus()
-
         self.queries = QueryBus()
+
+        self.services.register(EventBus, self.events)
+        self.services.register(CommandBus, self.commands)
+        self.services.register(QueryBus, self.queries)
+        self.services.register(
+            DependencyContainer,
+            self.container,
+        )
 
     def clear(self) -> None:
         """Reset kernel state."""
 
         self.services.clear()
-
         self.container.clear()
-
         self.events.clear()
-
         self.commands.clear()
-
         self.queries.clear()
