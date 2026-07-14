@@ -5,7 +5,7 @@ from typing import Any
 
 from acd.domain.entities.workflow import Workflow
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
-from acd.infrastructure.workflow.event_bus import EventBus
+from acd.infrastructure.workflow.workflow_event_bus import EventBus
 from acd.infrastructure.workflow.workflow_runner import WorkflowRunner
 
 

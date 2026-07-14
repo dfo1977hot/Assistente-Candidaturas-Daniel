@@ -8,7 +8,7 @@ from acd.domain.workflow.execution_context import ExecutionContext
 from acd.domain.workflow.workflow_state import WorkflowState
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
 from acd.infrastructure.workflow.command_dispatcher import CommandDispatcher
-from acd.infrastructure.workflow.event_bus import EventBus
+from acd.infrastructure.workflow.workflow_event_bus import EventBus
 
 
 class WorkflowRunner:
