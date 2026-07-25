@@ -1,0 +1,9 @@
+{
+    "schema_version":  1,
+    "approved_on":  "2026-07-25",
+    "global_coverage":  70.02416380516343,
+    "branch_coverage":  52.80040733197556,
+    "architectural_target":  85.0,
+    "test_count":  1065,
+    "notes":  "Baseline measured with branch coverage enabled. It may only move upward after a reviewed Full Quality Gate."
+}
