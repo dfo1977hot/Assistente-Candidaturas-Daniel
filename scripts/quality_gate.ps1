@@ -17,6 +17,61 @@ function Invoke-Check([string[]]$Arguments) {
     }
 }
 
+function New-PytestBaseTemp([string]$GateName) {
+    $tempRoot = [System.IO.Path]::GetFullPath(
+        (Join-Path ([System.IO.Path]::GetTempPath()) "acd-pytest")
+    )
+    [System.IO.Directory]::CreateDirectory($tempRoot) | Out-Null
+
+    $uniqueName = "$($GateName.ToLowerInvariant())-$((Get-Date).ToString('yyyyMMdd-HHmmss'))-$([guid]::NewGuid().ToString('N'))"
+    $tempPath = [System.IO.Path]::GetFullPath((Join-Path $tempRoot $uniqueName))
+    $expectedPrefix = $tempRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $tempPath.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Pytest basetemp escaped the managed temporary root: '$tempPath'."
+    }
+
+    [System.IO.Directory]::CreateDirectory($tempPath) | Out-Null
+    $probePath = Join-Path $tempPath ".write-probe"
+    $probeValue = [guid]::NewGuid().ToString("N")
+    [System.IO.File]::WriteAllText($probePath, $probeValue, [System.Text.UTF8Encoding]::new($false))
+    if ([System.IO.File]::ReadAllText($probePath) -ne $probeValue) {
+        throw "Pytest basetemp read/write validation failed: '$tempPath'."
+    }
+    [System.IO.File]::Delete($probePath)
+
+    Write-Host "Pytest basetemp: $tempPath"
+    return $tempPath
+}
+
+function Remove-PytestBaseTemp([string]$TempPath) {
+    $tempRoot = [System.IO.Path]::GetFullPath(
+        (Join-Path ([System.IO.Path]::GetTempPath()) "acd-pytest")
+    )
+    $resolvedPath = [System.IO.Path]::GetFullPath($TempPath)
+    $expectedPrefix = $tempRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedPath.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove basetemp outside the managed temporary root: '$resolvedPath'."
+    }
+
+    if (Test-Path -LiteralPath $resolvedPath) {
+        Remove-Item -LiteralPath $resolvedPath -Recurse -Force -ErrorAction Stop
+    }
+    Write-Host "Pytest basetemp removed: $resolvedPath"
+}
+
+function Invoke-Pytest([string]$GateName, [string[]]$Arguments) {
+    $tempPath = New-PytestBaseTemp $GateName
+    $code = 1
+    try {
+        & $python -m pytest @Arguments --basetemp $tempPath
+        $code = $LASTEXITCODE
+    }
+    finally {
+        Remove-PytestBaseTemp $tempPath
+    }
+    $script:PytestExitCode = $code
+}
+
 function Get-CoverageMetrics([string]$ReportPath) {
     $parserPath = Join-Path $PSScriptRoot "coverage_report.py"
     $metricsJson = & $python $parserPath $ReportPath
@@ -68,19 +123,20 @@ if ($Gate -eq "Fast") {
         Write-Error "Fast gate requires one or more targeted tests via -Tests."
         exit 2
     }
-    Invoke-Check (@("-m", "pytest") + $Tests)
-    exit 0
+    Invoke-Pytest "Fast" $Tests
+    exit $script:PytestExitCode
 }
 
 $baselinePath = Join-Path $projectRoot "quality\coverage-baseline.json"
 $reportPath = Join-Path $projectRoot ".coverage-full.json"
-$tempPath = Join-Path $projectRoot ".coverage-runtime"
 $baseline = Get-Content $baselinePath -Raw | ConvertFrom-Json
 
-Invoke-Check @(
-    "-m", "pytest", "--cov=acd", "--cov-report=json:$reportPath",
-    "--cov-fail-under=0", "--basetemp", $tempPath
+Invoke-Pytest "Full" @(
+    "--cov=acd", "--cov-report=json:$reportPath", "--cov-fail-under=0"
 )
+if ($script:PytestExitCode -ne 0) {
+    exit $script:PytestExitCode
+}
 
 $metrics = Get-CoverageMetrics $reportPath
 $actual = [decimal]$metrics.global_coverage

@@ -145,6 +145,74 @@ class TestConfidenceCalculator:
         assert confidence_calculator.get_confidence_label(0.1) == "Very Low"
 
 
+class TestEvidenceAggregator:
+    """Behavioral tests for evidence consolidation used by LearningEngine."""
+
+    def test_aggregate_outcomes_groups_fields_and_calculates_success_rate(
+        self, evidence_aggregator
+    ):
+        """Evidence preserves counts, time range, and success information by field."""
+
+        start = datetime(2026, 1, 10, tzinfo=UTC)
+        outcomes = [
+            Outcome(
+                outcome_type=OutcomeType.APPLICATION_SUBMITTED.value,
+                result=OutcomeResult.SUCCESS.value,
+                company="Acme",
+                position_title="Engineer",
+                skills_mentioned=["Python", "SQL"],
+                platform="LinkedIn",
+                sector="Technology",
+                curriculum_id=7,
+                recorded_date=start,
+            ),
+            Outcome(
+                outcome_type=OutcomeType.APPLICATION_SUBMITTED.value,
+                result=OutcomeResult.FAILURE.value,
+                company="Acme",
+                position_title="Engineer",
+                skills_mentioned=["Python"],
+                platform="LinkedIn",
+                sector="Technology",
+                curriculum_id=7,
+                recorded_date=start + timedelta(days=2),
+            ),
+        ]
+
+        aggregated = evidence_aggregator.aggregate_from_outcomes(outcomes)
+
+        assert aggregated["total_outcomes"] == 2
+        assert aggregated["successful_outcomes"] == 1
+        assert aggregated["failed_outcomes"] == 1
+        assert aggregated["success_rate"] == 0.5
+        assert aggregated["details"]["skills_mentioned"]["Python"] == {
+            "count": 2,
+            "success_count": 1,
+            "success_rate": 0.5,
+        }
+        assert aggregated["details"]["platform"]["LinkedIn"]["success_rate"] == 0.5
+        assert aggregated["details"]["sector"]["Technology"]["count"] == 2
+        assert aggregated["details"]["curriculum_id"]["7"]["success_count"] == 1
+        assert aggregated["time_range"] == {
+            "start": start.isoformat(),
+            "end": (start + timedelta(days=2)).isoformat(),
+            "days": 2,
+        }
+
+    def test_aggregate_empty_outcomes_and_calculate_coverage(self, evidence_aggregator):
+        """Empty evidence has no time range, while detail maps produce field coverage."""
+
+        empty = evidence_aggregator.aggregate_from_outcomes([], analysis_fields=["platform"])
+
+        assert empty["success_rate"] == 0.0
+        assert empty["time_range"] == {"start": None, "end": None, "days": 0}
+        assert empty["details"]["platform"] == {}
+        assert evidence_aggregator.calculate_coverage(empty) == {}
+        assert evidence_aggregator.calculate_coverage(
+            {"total_outcomes": 4, "details": {"platform": {"LinkedIn": {}}}}
+        ) == {"platform": 0.25}
+
+
 # Pattern Detector Tests
 class TestPatternDetector:
     """Tests for pattern detector."""

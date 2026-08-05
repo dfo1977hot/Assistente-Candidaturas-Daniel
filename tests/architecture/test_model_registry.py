@@ -18,9 +18,10 @@ Relationships, etc.) belongs to test_metadata_integrity.py.
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy.orm import configure_mappers
 
-import acd.database.model_registry  # noqa: F401
+import acd.database.model_registry as registry
 from acd.models.base import Base
 
 # ==========================================================
@@ -210,3 +211,25 @@ def test_model_registry_loaded_expected_amount_of_tables() -> None:
     """
 
     assert len(Base.metadata.tables) >= 15
+
+
+def test_model_registry_wraps_model_import_failures(monkeypatch) -> None:
+    """Registry import failures must retain the offending module name."""
+    monkeypatch.setattr(registry, "ORM_MODEL_MODULES", ("acd.domain.unavailable",))
+
+    def fail_import(module: str) -> None:
+        raise ModuleNotFoundError(module)
+
+    monkeypatch.setattr(registry.importlib, "import_module", fail_import)
+
+    with pytest.raises(registry.ModelRegistryError, match="acd.domain.unavailable"):
+        registry.load_models()
+
+
+def test_model_registry_rejects_incomplete_registered_metadata(monkeypatch) -> None:
+    """Registry must reject metadata that does not match its explicit manifest."""
+    monkeypatch.setattr(registry, "ORM_MODEL_MODULES", ())
+    monkeypatch.setattr(registry, "EXPECTED_ORM_TABLES", frozenset({"missing_table"}))
+
+    with pytest.raises(registry.ModelRegistryError, match="missing_table"):
+        registry.load_models()

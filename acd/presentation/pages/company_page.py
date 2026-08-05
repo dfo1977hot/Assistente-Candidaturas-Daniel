@@ -20,10 +20,10 @@ from acd.services.company_service import CompanyService
 class CompanyPage(BasePage):
     """Página de cadastro e gerenciamento de empresas."""
 
-    def __init__(self) -> None:
+    def __init__(self, service: CompanyService) -> None:
         super().__init__("Empresas")
 
-        self.service = CompanyService()
+        self.service = service
         self.current_company_id: int | None = None
 
         self.name_input = QLineEdit()

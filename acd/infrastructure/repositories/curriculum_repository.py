@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
+from acd.application.structured_resume_snapshot import (
+    StructuredResumeSnapshot,
+    StructuredResumeSnapshotCodec,
+)
 from acd.database import database as database_module
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.curriculum_version import CurriculumVersion
@@ -10,14 +14,32 @@ from acd.domain.entities.curriculum_version import CurriculumVersion
 class CurriculumRepository:
     """Repositório para currículos e versões."""
 
-    def create(self, curriculum: Curriculum) -> Curriculum:
+    def create(
+        self,
+        curriculum: Curriculum,
+        structured_resume: StructuredResumeSnapshot | None = None,
+    ) -> Curriculum:
+        """Persist a curriculum, optionally with a validated structured snapshot."""
+        if structured_resume is not None:
+            curriculum.structured_content_json = StructuredResumeSnapshotCodec().dumps(
+                structured_resume
+            )
         with database_module.SessionLocal() as session:
             session.add(curriculum)
             session.commit()
             session.refresh(curriculum)
             return curriculum
 
-    def update(self, curriculum: Curriculum) -> Curriculum:
+    def update(
+        self,
+        curriculum: Curriculum,
+        structured_resume: StructuredResumeSnapshot | None = None,
+    ) -> Curriculum:
+        """Update a curriculum, optionally replacing its validated snapshot."""
+        if structured_resume is not None:
+            curriculum.structured_content_json = StructuredResumeSnapshotCodec().dumps(
+                structured_resume
+            )
         with database_module.SessionLocal() as session:
             session.add(curriculum)
             session.commit()

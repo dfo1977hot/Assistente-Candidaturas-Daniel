@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.orm import joinedload
 
 from acd.database import database as database_module
 from acd.domain.entities.job import Job
@@ -49,11 +50,12 @@ class JobRepository:
 
     def get_by_id(self, job_id: int) -> Job | None:
         with database_module.SessionLocal() as session:
-            return session.get(Job, job_id)
+            stmt = select(Job).options(joinedload(Job.company)).where(Job.id == job_id)
+            return session.scalar(stmt)
 
     def get_all(self) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).order_by(Job.created_at.desc())
+            stmt = select(Job).options(joinedload(Job.company)).order_by(Job.created_at.desc())
             return list(session.scalars(stmt).all())
 
     def search(self, query: str) -> list[Job]:
@@ -62,6 +64,7 @@ class JobRepository:
 
             stmt = (
                 select(Job)
+                .options(joinedload(Job.company))
                 .where(
                     or_(
                         Job.title.ilike(search_text),
@@ -84,7 +87,7 @@ class JobRepository:
         employment_type: str | None = None,
     ) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job)
+            stmt = select(Job).options(joinedload(Job.company))
 
             if company_id is not None:
                 stmt = stmt.where(Job.company_id == company_id)
@@ -104,19 +107,34 @@ class JobRepository:
 
     def list_by_company(self, company_id: int) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).where(Job.company_id == company_id).order_by(Job.created_at.desc())
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(Job.company_id == company_id)
+                .order_by(Job.created_at.desc())
+            )
 
             return list(session.scalars(stmt).all())
 
     def list_by_status(self, status: str) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).where(Job.status == status).order_by(Job.created_at.desc())
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(Job.status == status)
+                .order_by(Job.created_at.desc())
+            )
 
             return list(session.scalars(stmt).all())
 
     def list_recent(self, limit: int = 20) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).order_by(Job.created_at.desc()).limit(limit)
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .order_by(Job.created_at.desc())
+                .limit(limit)
+            )
 
             return list(session.scalars(stmt).all())
 

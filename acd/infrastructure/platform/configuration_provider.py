@@ -3,9 +3,15 @@
 from abc import ABC, abstractmethod
 import json
 import os
+import re
 from typing import Any
 
 from acd.domain.platform.configuration import Configuration
+
+_SECRET_NAME = re.compile(
+    r"password|passwd|secret|token|api[_-]?key|authorization|cookie|connection[_-]?string",
+    re.IGNORECASE,
+)
 
 
 class ConfigurationSource(ABC):
@@ -47,17 +53,32 @@ class ConfigurationSource(ABC):
 class EnvironmentConfigurationSource(ConfigurationSource):
     """Configuration from environment variables."""
 
+    def __init__(self) -> None:
+        self._authorized_names: set[str] = set()
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get from environment."""
-        return os.getenv(key.upper(), default)
+        normalized = key.upper()
+        if _SECRET_NAME.search(normalized):
+            return default
+        self._authorized_names.add(normalized)
+        return os.environ.get(normalized, default)
 
     def set(self, key: str, value: Any) -> None:
         """Set in environment."""
-        os.environ[key.upper()] = str(value)
+        normalized = key.upper()
+        if _SECRET_NAME.search(normalized):
+            raise ValueError("Secret environment values require the secret provider")
+        self._authorized_names.add(normalized)
+        os.environ[normalized] = str(value)
 
     def get_all(self) -> dict[str, Any]:
-        """Get all environment variables."""
-        return dict(os.environ)
+        """Return only non-secret environment values."""
+        return {
+            key: os.environ[key]
+            for key in self._authorized_names
+            if key in os.environ and not _SECRET_NAME.search(key)
+        }
 
 
 class DatabaseConfigurationSource(ConfigurationSource):

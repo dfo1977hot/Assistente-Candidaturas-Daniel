@@ -28,11 +28,11 @@ from acd.services.job_service import JobService
 class JobPage(BasePage):
     """Página de cadastro e gerenciamento de vagas."""
 
-    def __init__(self) -> None:
+    def __init__(self, job_service: JobService, company_service: CompanyService) -> None:
         super().__init__("Vagas")
 
-        self.job_service = JobService()
-        self.company_service = CompanyService()
+        self.job_service = job_service
+        self.company_service = company_service
         self.current_job_id: int | None = None
         self.company_combo = QComboBox()
         self.title_input = QLineEdit()

@@ -25,11 +25,13 @@ from acd.services.interview_service import InterviewService
 class InterviewPage(BasePage):
     """Página de cadastro e gerenciamento de entrevistas."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, interview_service: InterviewService, application_service: ApplicationService
+    ) -> None:
         super().__init__("Entrevistas")
 
-        self.interview_service = InterviewService()
-        self.application_service = ApplicationService()
+        self.interview_service = interview_service
+        self.application_service = application_service
         self.current_interview_id: int | None = None
 
         self.application_combo = QComboBox()

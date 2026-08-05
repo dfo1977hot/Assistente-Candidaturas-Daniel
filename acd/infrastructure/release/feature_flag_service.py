@@ -3,6 +3,8 @@
 from datetime import datetime
 import random
 
+from acd.version import get_version
+
 
 class FeatureFlagService:
     """Service for managing feature flags."""
@@ -21,7 +23,7 @@ class FeatureFlagService:
     def is_enabled(
         self,
         feature_name: str,
-        current_version: str = "0.4.0",
+        current_version: str = get_version(),
         user_id: str | None = None,
     ) -> bool:
         """Check if a feature is enabled.
@@ -221,7 +223,7 @@ class FeatureFlagService:
             self.session.rollback()
             return False
 
-    def get_all_flags(self, current_version: str = "0.4.0") -> list[dict]:
+    def get_all_flags(self, current_version: str = get_version()) -> list[dict]:
         """Get all feature flags for current version."""
         from acd.domain.release import FeatureFlag
 

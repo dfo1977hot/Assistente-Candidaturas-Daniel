@@ -119,10 +119,12 @@ class MilestoneItem(QFrame):
 class CareerPage(BasePage):
     """Career planning and intelligence page."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, career_service: CareerPlanningService, gap_service: GapAnalysisService
+    ) -> None:
         super().__init__("Planejamento de Carreira")
-        self.career_service = CareerPlanningService()
-        self.gap_service = GapAnalysisService()
+        self.career_service = career_service
+        self.gap_service = gap_service
         self.setup_ui()
 
     def setup_ui(self) -> None:

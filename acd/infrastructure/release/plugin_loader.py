@@ -5,10 +5,19 @@ import importlib
 import json
 import logging
 from pathlib import Path
-import sys
 from typing import Any
 
+from acd.observability import log_event
+from acd.security.plugin_policy import (
+    MAX_PLUGIN_MANIFEST_BYTES,
+    validate_plugin_manifest,
+    validate_plugin_name,
+)
+from acd.security.secure_paths import AuthorizedPathPolicy
+from acd.security.security_errors import PluginRejectedError
+
 logger = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class PluginMetadata:
@@ -61,24 +70,32 @@ class PluginInterface:
 class PluginLoader:
     """Load and manage plugins dynamically."""
 
-    def __init__(self, plugin_dirs: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        plugin_dirs: list[str] | None = None,
+        *,
+        allowed_plugins: frozenset[str] | None = None,
+    ) -> None:
         """Initialize plugin loader.
 
         Args:
             plugin_dirs: List of directories to search for plugins
         """
-        self.plugin_dirs = plugin_dirs or []
+        self.plugin_dirs: list[str] = []
+        self.allowed_plugins = allowed_plugins or frozenset()
         self.loaded_plugins: dict[str, PluginInterface] = {}
         self.plugin_metadata: dict[str, PluginMetadata] = {}
+        self.disabled_plugins: set[str] = set()
         self.context: dict[str, Any] = {}
+        for directory in plugin_dirs or []:
+            self.add_plugin_dir(directory)
 
     def add_plugin_dir(self, path: str) -> None:
         """Add a plugin directory."""
         plugin_path = Path(path)
-        if plugin_path.is_dir():
-            self.plugin_dirs.append(str(plugin_path.absolute()))
-            if str(plugin_path) not in sys.path:
-                sys.path.insert(0, str(plugin_path))
+        resolved = str(plugin_path.expanduser().resolve())
+        if resolved not in self.plugin_dirs:
+            self.plugin_dirs.append(resolved)
 
     def set_context(self, context: dict[str, Any]) -> None:
         """Set context for plugin initialization."""
@@ -101,9 +118,14 @@ class PluginLoader:
             for manifest_file in plugin_path.glob("*/plugin.json"):
                 try:
                     with manifest_file.open(encoding="utf-8") as f:
+                        if manifest_file.stat().st_size > MAX_PLUGIN_MANIFEST_BYTES:
+                            continue
                         manifest = json.load(f)
-                        plugins.append(manifest.get("name"))
-                except Exception:
+                        name = validate_plugin_name(manifest.get("name"))
+                        if name in self.allowed_plugins and manifest_file.parent.name == name:
+                            validate_plugin_manifest(manifest, expected_name=name)
+                            plugins.append(name)
+                except OSError, UnicodeError, json.JSONDecodeError, PluginRejectedError:
                     continue
 
         return plugins
@@ -119,10 +141,13 @@ class PluginLoader:
             True if successful, False otherwise
         """
         try:
+            plugin_name = validate_plugin_name(plugin_name)
+            if plugin_name not in self.allowed_plugins:
+                raise PluginRejectedError("Plugin is not allowlisted")
             # Find plugin directory
             plugin_dir = None
             for dir_path in self.plugin_dirs:
-                potential_path = Path(dir_path) / plugin_name
+                potential_path = AuthorizedPathPolicy(Path(dir_path)).resolve_relative(plugin_name)
                 if potential_path.is_dir():
                     plugin_dir = potential_path
                     break
@@ -136,7 +161,13 @@ class PluginLoader:
                 return False
 
             with manifest_file.open(encoding="utf-8") as f:
+                if manifest_file.stat().st_size > MAX_PLUGIN_MANIFEST_BYTES:
+                    raise PluginRejectedError("Plugin manifest is too large")
                 manifest = json.load(f)
+
+            manifest, module_path, class_name = validate_plugin_manifest(
+                manifest, expected_name=plugin_name
+            )
 
             # Create metadata
             metadata = PluginMetadata(
@@ -152,16 +183,14 @@ class PluginLoader:
             )
 
             # Dynamically import plugin module
-            entry_point = manifest.get("entry_point")  # e.g., "plugin_module:PluginClass"
-            module_path, class_name = entry_point.split(":")
-
-            # Add plugin directory to path if not there
-            if str(plugin_dir) not in sys.path:
-                sys.path.insert(0, str(plugin_dir))
-
             # Import module
+            module_file = AuthorizedPathPolicy(plugin_dir).resolve_relative(
+                f"{module_path}.py", allowed_extensions=frozenset({".py"})
+            )
+            if not module_file.is_file():
+                return False
             spec = importlib.util.spec_from_file_location(
-                module_path, plugin_dir / f"{module_path}.py"
+                f"acd_authorized_plugin_{plugin_name}", module_file
             )
             if spec is None or spec.loader is None:
                 return False
@@ -191,11 +220,24 @@ class PluginLoader:
 
             # Store plugin
             self.loaded_plugins[plugin_name] = plugin_instance
+            self.disabled_plugins.discard(plugin_name)
 
             return True
 
-        except Exception:
-            logger.exception("Error loading plugin %s", plugin_name)
+        except Exception as error:
+            safe_name = plugin_name if isinstance(plugin_name, str) else "invalid"
+            self.loaded_plugins.pop(safe_name, None)
+            self.disabled_plugins.add(safe_name)
+            log_event(
+                logger,
+                logging.WARNING,
+                "plugin.disabled",
+                "Plugin was disabled after a load failure",
+                component="plugin_loader",
+                status="disabled",
+                plugin=safe_name,
+                error_type=type(error).__name__,
+            )
             return False
 
     def unload_plugin(self, plugin_name: str) -> bool:
@@ -215,7 +257,18 @@ class PluginLoader:
             plugin.shutdown()
             del self.loaded_plugins[plugin_name]
             return True
-        except Exception:
+        except Exception as error:
+            self.disabled_plugins.add(plugin_name)
+            log_event(
+                logger,
+                logging.WARNING,
+                "plugin.disabled",
+                "Plugin was disabled after a shutdown failure",
+                component="plugin_loader",
+                status="disabled",
+                plugin=plugin_name,
+                error_type=type(error).__name__,
+            )
             return False
 
     def get_plugin(self, plugin_name: str) -> PluginInterface | None:
@@ -260,11 +313,21 @@ class PluginLoader:
 
     def shutdown_all(self) -> None:
         """Shutdown all loaded plugins."""
-        for plugin in self.loaded_plugins.values():
+        for name, plugin in tuple(self.loaded_plugins.items()):
             try:
                 plugin.shutdown()
-            except Exception:
-                return None
+            except Exception as error:
+                self.disabled_plugins.add(name)
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "plugin.disabled",
+                    "Plugin was disabled after a shutdown failure",
+                    component="plugin_loader",
+                    status="disabled",
+                    plugin=name,
+                    error_type=type(error).__name__,
+                )
 
         self.loaded_plugins.clear()
 

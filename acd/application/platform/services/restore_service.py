@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from acd.database.local_state import resolve_database_path
 from acd.domain.platform.backup import BackupStatus
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
@@ -26,7 +27,7 @@ class RestoreService:
         self.session = session
         self.repository = PlatformRepository(session)
         self.logger = StructuredLogger(__name__)
-        self.database_path = database_path or "acd.db"
+        self.database_path = database_path or str(resolve_database_path())
 
     def restore_from_backup(
         self,
@@ -131,7 +132,9 @@ class RestoreService:
         Returns:
             List of restore points
         """
-        completed_backups = self.repository.list_backups(status="completed")
+        completed_backups = self.repository.list_backups(
+            status=BackupStatus.COMPLETED.value,
+        )
         restore_points = []
 
         for backup in completed_backups:

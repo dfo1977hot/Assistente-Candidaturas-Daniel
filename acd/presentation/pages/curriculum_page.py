@@ -20,10 +20,10 @@ from acd.services.curriculum_service import CurriculumService
 class CurriculumPage(BasePage):
     """Página de gerenciamento de currículos."""
 
-    def __init__(self) -> None:
+    def __init__(self, curriculum_service: CurriculumService) -> None:
         super().__init__("Currículos")
 
-        self.curriculum_service = CurriculumService()
+        self.curriculum_service = curriculum_service
         self.current_curriculum_id: int | None = None
 
         self.name_input = QLineEdit()

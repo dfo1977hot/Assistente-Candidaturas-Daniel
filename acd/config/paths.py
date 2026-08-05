@@ -35,24 +35,4 @@ DATABASE_DIR = DATA_DIR / "database"
 
 REPORTS_DIR = EXPORT_DIR / "reports"
 
-# ============================================================================
-# Ensure directories exist
-# ============================================================================
-
-_DIRECTORIES = (
-    DATA_DIR,
-    DATABASE_DIR,
-    LOG_DIR,
-    DOCS_DIR,
-    EXPORT_DIR,
-    REPORTS_DIR,
-    BACKUP_DIR,
-    TEMP_DIR,
-    CONFIG_DIR,
-)
-
-for directory in _DIRECTORIES:
-    directory.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+# Directory creation belongs to explicit runtime operations, never imports.

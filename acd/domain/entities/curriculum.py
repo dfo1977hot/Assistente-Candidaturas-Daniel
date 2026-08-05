@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from acd.core.datetime_utils import utc_now
@@ -34,6 +34,11 @@ class Curriculum(Base):
         String(1000),
         nullable=False,
         default="",
+    )
+
+    structured_content_json: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
     version: Mapped[str] = mapped_column(

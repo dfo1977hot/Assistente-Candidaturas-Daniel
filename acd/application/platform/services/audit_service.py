@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from acd.domain.platform.system_log import LogLevel
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
+from acd.observability.sanitization import sanitize_mapping, sanitize_text
 
 
 class AuditService:
@@ -46,12 +47,12 @@ class AuditService:
         with self.logger.operation("log_critical_operation"):
             log_entry = self.repository.create_log(
                 LogLevel.WARNING.value,
-                module,
-                operation,
-                f"Critical operation: {operation}",
-                user_id=user_id,
+                sanitize_text(module),
+                sanitize_text(operation),
+                f"Critical operation: {sanitize_text(operation)}",
+                user_id=sanitize_text(user_id) if user_id else None,
                 result=result,
-                metadata=details or {},
+                metadata=sanitize_mapping(details),
             )
 
             return {
@@ -138,6 +139,7 @@ class AuditService:
                 "operation": log.operation,
                 "module": log.module,
                 "level": log.level,
+                "user_id": log.user_id,
                 "result": log.result,
                 "timestamp": (
                     log.timestamp.isoformat()

@@ -19,4 +19,5 @@ class ResumeVersion(Base):
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    structured_content_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

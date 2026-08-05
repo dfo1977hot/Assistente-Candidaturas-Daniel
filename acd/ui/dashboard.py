@@ -11,15 +11,22 @@ from acd.ui.widgets.kpi_card import KPICard
 
 class Dashboard(BasePage):
 
-    def __init__(self):
+    def __init__(
+        self,
+        company_service: CompanyService,
+        job_service: JobService,
+        application_service: ApplicationService,
+        interview_service: InterviewService,
+        curriculum_service: CurriculumService,
+    ) -> None:
 
         super().__init__("Dashboard")
 
-        self.company_service = CompanyService()
-        self.job_service = JobService()
-        self.application_service = ApplicationService()
-        self.interview_service = InterviewService()
-        self.curriculum_service = CurriculumService()
+        self.company_service = company_service
+        self.job_service = job_service
+        self.application_service = application_service
+        self.interview_service = interview_service
+        self.curriculum_service = curriculum_service
         principal = self.layout
 
         grid = QGridLayout()

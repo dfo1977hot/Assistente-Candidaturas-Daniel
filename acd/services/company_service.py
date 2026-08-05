@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from acd.core.logger import logger
 from acd.infrastructure.repositories.company_repository import CompanyRepository
@@ -54,11 +53,10 @@ class CompanyService:
 
         created = self.repository.create(company)
 
-        logger.info("Empresa criada: %s", created.name)
+        logger.info("Company created: id=%s", created.id)
         self._crud_logger.info(
-            "INCLUSAO company_id=%s name=%s",
+            "company.created entity_id=%s",
             created.id,
-            created.name,
         )
 
         return created
@@ -107,11 +105,10 @@ class CompanyService:
 
         updated = self.repository.update(company)
 
-        logger.info("Empresa editada: %s", updated.name)
+        logger.info("Company updated: id=%s", updated.id)
         self._crud_logger.info(
-            "ALTERACAO company_id=%s name=%s",
+            "company.updated entity_id=%s",
             updated.id,
-            updated.name,
         )
 
         return updated
@@ -122,9 +119,9 @@ class CompanyService:
         deleted = self.repository.delete(company_id)
 
         if deleted:
-            logger.info("Empresa excluída: %s", company_id)
+            logger.info("Company deleted: id=%s", company_id)
             self._crud_logger.info(
-                "EXCLUSAO company_id=%s",
+                "company.deleted entity_id=%s",
                 company_id,
             )
 
@@ -176,29 +173,10 @@ class CompanyService:
 
 
 def _build_crud_logger() -> logging.Logger:
-    logger_name = "ACD.CRUD"
-
-    crud_logger = logging.getLogger(logger_name)
-
-    if crud_logger.handlers:
-        return crud_logger
-
-    log_dir = Path("logs")
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    handler = logging.FileHandler(
-        log_dir / "crud_validation.log",
-        encoding="utf-8",
-    )
-
-    handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(levelname)s %(message)s"
-        )
-    )
-
-    crud_logger.addHandler(handler)
-    crud_logger.setLevel(logging.INFO)
-    crud_logger.propagate = False
-
-    return crud_logger
+    """Return the file-free compatibility logger used by the legacy service."""
+    logger = logging.getLogger("acd.audit.company")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if not logger.handlers:
+        logger.addHandler(logging.NullHandler())
+    return logger

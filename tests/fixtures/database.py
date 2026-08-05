@@ -6,6 +6,7 @@ import tempfile
 import pytest
 
 from acd.database import database as database_module
+from acd.database.local_state import ensure_non_productive_database_path
 from acd.models.base import Base
 
 
@@ -17,6 +18,7 @@ def db_engine(monkeypatch):
 
     temp_dir = tempfile.mkdtemp(prefix="acd-test-", dir=".")
     db_path = os.path.join(temp_dir, "test_acd.db")
+    ensure_non_productive_database_path(db_path)
 
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",

@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from acd.database.local_state import resolve_database_path, user_data_directory
 from acd.domain.platform.backup import BackupStatus
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
@@ -26,11 +27,11 @@ class BackupService:
         self.session = session
         self.repository = PlatformRepository(session)
         self.logger = StructuredLogger(__name__)
-        self.database_path = database_path or "acd.db"
+        self.database_path = database_path or str(resolve_database_path())
 
     def create_manual_backup(
         self,
-        backup_dir: str = "./backups",
+        backup_dir: str | None = None,
         include_configs: bool = True,
         include_logs: bool = True,
     ) -> dict[str, Any]:
@@ -45,6 +46,7 @@ class BackupService:
             Backup information
         """
         with self.logger.operation("create_manual_backup"):
+            backup_dir = backup_dir or str(user_data_directory() / "backups")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"backup_{timestamp}"
             backup_path = os.path.join(backup_dir, backup_name)

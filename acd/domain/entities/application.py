@@ -20,6 +20,12 @@ class Application(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), nullable=False)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
     curriculum_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    selected_resume_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resume_versions.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
     curriculum_version: Mapped[str | None] = mapped_column(String(50), nullable=True, default="")
     cover_letter_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Rascunho")

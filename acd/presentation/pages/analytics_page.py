@@ -115,9 +115,9 @@ class RecommendationItem(QFrame):
 class AnalyticsPage(BasePage):
     """Analytics dashboard page showing metrics, KPIs, and recommendations."""
 
-    def __init__(self) -> None:
+    def __init__(self, analytics_service: AnalyticsService) -> None:
         super().__init__("Analytics Dashboard")
-        self.analytics_service = AnalyticsService()
+        self.analytics_service = analytics_service
         self.setup_ui()
 
     def setup_ui(self) -> None:

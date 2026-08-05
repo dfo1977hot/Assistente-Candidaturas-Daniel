@@ -18,6 +18,22 @@ Toda mudanca estrutural deve estar representada neste indice.
 - ADR-012 | Persisted ATS Result Integration | Accepted
 - ADR-013 | Coverage Governance and Incremental Quality Gates | Accepted
 - ADR-014 | Monotonic Coverage Baseline | Accepted
+- ADR-015 | Candidate Decision Support | Accepted
+- ADR-016 | Desktop Composition Root | Accepted
+- ADR-017 | Presentation Long-Running Task Execution | Accepted
+- ADR-018 | ATS Evaluation and Persistence Separation | Accepted
+- ADR-019 | Application Resume Source Selection | Accepted
+- ADR-020 | Versioned Structured Resume Snapshots | Accepted
+- ADR-021 | Native Structured Output Provider Boundary | Accepted
+- ADR-022 | OpenAI Structured Resume Provider | Accepted
+- ADR-023 | Local Database Path and SQLite Lifecycle | Accepted
+- ADR-024 | Observability and Local Diagnostics | Accepted
+- ADR-025 | Security and Trust Boundaries | Accepted
+- ADR-026 | Resilience and Cooperative Recovery | Accepted
+- ADR-027 | Performance, Capacity and Responsiveness Governance | Accepted
+- ADR-028 | Temporary Exception for ORM Models in the Domain Namespace | Accepted - Temporary Architectural Exception
+- ADR-029 | Containerless Desktop Runtime Composition | Accepted
+- ADR-030 | SQLite Schema Versioning and Non-Destructive Migration Policy | Accepted
 
 ## Proximo numero
-- ADR-015
+- ADR-031

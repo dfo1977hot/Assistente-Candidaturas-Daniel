@@ -1,16 +1,9 @@
-from acd.ui.dashboard import Dashboard
+from acd.desktop_composition_root import DesktopCompositionRoot
 
 
 def test_dashboard_renders_kpi_widgets(qapp):
-    dashboard = Dashboard()
-
-    assert dashboard.total_companies_card is not None
-    assert dashboard.total_jobs_card is not None
-    assert dashboard.total_applications_card is not None
-    assert dashboard.total_interviews_card is not None
-    assert dashboard.today_interviews_card is not None
-    assert dashboard.total_curricula_card is not None
-    assert dashboard.most_used_curriculum_card is not None
+    window = DesktopCompositionRoot().build_main_window()
+    dashboard = window.dashboard
 
     for card in [
         dashboard.total_companies_card,

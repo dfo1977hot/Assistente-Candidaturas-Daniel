@@ -16,10 +16,12 @@ from acd.services.workflow_template_service import WorkflowTemplateService
 class WorkflowPage(BasePage):
     """Page for workflow designer and execution."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, template_service: WorkflowTemplateService, workflow_service: WorkflowService
+    ) -> None:
         super().__init__("Workflow Designer")
-        self.template_service = WorkflowTemplateService()
-        self.workflow_service = WorkflowService()
+        self.template_service = template_service
+        self.workflow_service = workflow_service
         self._setup_ui()
 
     def _setup_ui(self) -> None:

@@ -6,9 +6,12 @@ from datetime import date
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 import acd.database.database as database_module
+from acd.database.database import enable_sqlite_foreign_keys
+from acd.database.model_registry import load_models
 from acd.domain.entities.application import Application
 from acd.domain.entities.job import Job
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
@@ -20,7 +23,9 @@ from acd.models.company import Company
 def override_database(tmp_path, monkeypatch):
     """Provide a closed, file-backed SQLite database for repository tests."""
 
+    load_models()
     engine = create_engine(f"sqlite:///{tmp_path / 'applications.db'}", future=True)
+    enable_sqlite_foreign_keys(engine)
     session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     monkeypatch.setattr(database_module, "engine", engine)
     monkeypatch.setattr(database_module, "SessionLocal", session_local)
@@ -111,3 +116,17 @@ def test_application_repository_tracks_events_statistics_and_deletion(override_d
     assert repository.delete(closed.id) is True
     assert repository.delete(closed.id) is False
     assert repository.count() == 1
+
+
+def test_application_deletion_is_blocked_when_timeline_events_exist(override_database) -> None:
+    """Foreign-key enforcement prevents creation of a new timeline orphan."""
+    job = _create_job(override_database)
+    repository = ApplicationRepository()
+    application = repository.create(_application(job))
+    repository.add_event(application.id, "created", "Application created")
+
+    with pytest.raises(IntegrityError):
+        repository.delete(application.id)
+
+    assert repository.get_by_id(application.id) is not None
+    assert len(repository.get_followups(application.id)) == 1

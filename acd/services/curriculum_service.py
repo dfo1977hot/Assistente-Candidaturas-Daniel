@@ -7,6 +7,8 @@ from acd.domain.entities.application import Application
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.curriculum_version import CurriculumVersion
 from acd.infrastructure.repositories.curriculum_repository import CurriculumRepository
+from acd.security.external_content import ExternalFilePolicy
+from acd.security.secure_paths import AuthorizedPathPolicy
 
 
 class CurriculumService:
@@ -111,15 +113,19 @@ class CurriculumService:
         curriculum = self.repository.get_by_id(curriculum_id)
         if curriculum is None:
             return None
-        destination = self.storage_root / f"{curriculum_id}_{file_name}"
-        destination.write_bytes(file_bytes)
+        validated = ExternalFilePolicy().validate(file_name, file_bytes)
+        destination = AuthorizedPathPolicy(self.storage_root).resolve_relative(
+            f"{curriculum_id}_{validated.filename}",
+            allowed_extensions=frozenset({validated.extension}),
+        )
+        destination.write_bytes(validated.content)
         version = CurriculumVersion(
             curriculum_id=curriculum_id,
             version=curriculum.version,
-            file_name=file_name,
+            file_name=validated.filename,
             file_path=str(destination),
-            file_type=file_type,
-            checksum=self._checksum(file_bytes),
+            file_type=validated.extension.removeprefix("."),
+            checksum=self._checksum(validated.content),
         )
         created_version = self.repository.create_version(curriculum_id, version)
         logger.info("Currículo importado: %s", created_version.id)
