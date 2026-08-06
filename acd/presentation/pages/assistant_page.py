@@ -13,22 +13,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
-from acd.infrastructure.agent.tool_registry import DefaultToolRegistry
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.presentation.pages.base_page import BasePage
-from acd.services.ai_execution_service import AgentMemoryService, AIExecutionService
 
 
 class AssistantPage(BasePage):
     """AI Agent Assistant page."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        orchestrator: object,
+        repository: object,
+        memory_service: object,
+        execution_service: object,
+    ) -> None:
         super().__init__("Assistente")
-        self.orchestrator = AIOrchestrator(tool_registry=DefaultToolRegistry())
-        self.repository = AgentRepository()
-        self.memory_service = AgentMemoryService(self.repository)
-        self.execution_service = AIExecutionService(self.repository)
+        self.orchestrator = orchestrator
+        self.repository = repository
+        self.memory_service = memory_service
+        self.execution_service = execution_service
 
         self._current_plan = None
         self.setup_ui()

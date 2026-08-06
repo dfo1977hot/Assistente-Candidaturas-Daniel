@@ -19,38 +19,31 @@ from acd.application.multi_agent.session import (
     process_user_request,
     start_session,
 )
-from acd.infrastructure.agents.capability_service import CapabilityService
-from acd.infrastructure.agents.context import ContextManager
-from acd.infrastructure.agents.message_bus import MessageBus
-from acd.infrastructure.agents.registry import AgentRegistry
-from acd.infrastructure.agents.task_scheduler import TaskScheduler
-from acd.infrastructure.repositories.agents.agent_repository import AgentRepository
 from acd.presentation.pages.base_page import BasePage
-from acd.services.agents.supervisor_service import SupervisorService
 
 
 class AgentConsolePage(BasePage):
     """Agent Console page for multi-agent platform visualization and control."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        registry: object,
+        message_bus: object,
+        context_manager: object,
+        task_scheduler: object,
+        capability_service: object,
+        repository: object,
+        supervisor: object,
+    ) -> None:
         super().__init__("Console de Agentes")
-
-        # Initialize multi-agent infrastructure
-        self.registry = AgentRegistry()
-        self.message_bus = MessageBus()
-        self.context_manager = ContextManager()
-        self.task_scheduler = TaskScheduler()
-        self.capability_service = CapabilityService()
-        self.repository = AgentRepository()
-
-        self.supervisor = SupervisorService(
-            registry=self.registry,
-            message_bus=self.message_bus,
-            context_manager=self.context_manager,
-            task_scheduler=self.task_scheduler,
-            capability_service=self.capability_service,
-            repository=self.repository,
-        )
+        self.registry = registry
+        self.message_bus = message_bus
+        self.context_manager = context_manager
+        self.task_scheduler = task_scheduler
+        self.capability_service = capability_service
+        self.repository = repository
+        self.supervisor = supervisor
 
         self._current_session_id: int | None = None
         self.setup_ui()

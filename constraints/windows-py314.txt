@@ -1,0 +1,15 @@
+# Validated direct dependency set for Windows and CPython 3.14.
+# Runtime: python -m pip install -c constraints/windows-py314.txt -e .
+# Development: python -m pip install -c constraints/windows-py314.txt -e ".[dev]"
+build==1.3.0
+openai==2.46.0
+pandas==3.0.3
+psutil==7.2.2
+pydantic==2.13.4
+PySide6==6.11.1
+pytest==9.1.1
+pytest-cov==7.1.0
+pytest-qt==4.5.0
+python-docx==1.2.0
+ruff==0.15.22
+SQLAlchemy==2.0.51

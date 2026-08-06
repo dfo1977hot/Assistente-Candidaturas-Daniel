@@ -13,6 +13,7 @@ from acd.infrastructure.release import (
     get_plugin_loader,
 )
 from acd.infrastructure.repositories.release import ReleaseRepository
+from acd.version import get_version
 
 
 class ReleaseManager:
@@ -234,8 +235,7 @@ class ReleaseManager:
         # Set context for plugins
         installed = self.repository.get_installed_version()
         context = {
-            "app_version": installed.current_version if installed else "0.4.0",
-            "session": self.session,
+            "app_version": installed.current_version if installed else get_version(),
         }
         self.plugin_loader.set_context(context)
 

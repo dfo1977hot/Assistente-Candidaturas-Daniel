@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
 )
+from sqlalchemy.exc import IntegrityError
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.application_service import ApplicationService
@@ -25,15 +26,19 @@ from acd.services.interview_service import InterviewService
 class InterviewPage(BasePage):
     """Página de cadastro e gerenciamento de entrevistas."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, interview_service: InterviewService, application_service: ApplicationService
+    ) -> None:
         super().__init__("Entrevistas")
 
-        self.interview_service = InterviewService()
-        self.application_service = ApplicationService()
+        self.interview_service = interview_service
+        self.application_service = application_service
         self.current_interview_id: int | None = None
 
         self.application_combo = QComboBox()
         self.datetime_input = QDateTimeEdit()
+        self.datetime_input.setCalendarPopup(True)
+        self.datetime_input.setDisplayFormat("dd/MM/yyyy HH:mm")
         self.type_combo = QComboBox()
         self.interviewer_input = QLineEdit()
         self.interviewer_email_input = QLineEdit()
@@ -54,12 +59,28 @@ class InterviewPage(BasePage):
             ["ID", "Candidatura", "Tipo", "Data", "Resultado", "Entrevistador"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
 
         self._setup_controls()
         self._load_applications()
+        self._load_interviews()
+
+    def refresh_reference_data(self) -> None:
+        """Atualiza candidaturas e entrevistas ao entrar na página."""
+        selected_application = self.application_combo.currentData()
+        self._load_applications()
+        if selected_application not in (None, ""):
+            index = self.application_combo.findData(selected_application)
+            if index >= 0:
+                self.application_combo.setCurrentIndex(index)
         self._load_interviews()
 
     def _setup_controls(self) -> None:
@@ -136,9 +157,13 @@ class InterviewPage(BasePage):
             feedback = self.feedback_input.toPlainText().strip()
             result = self.result_combo.currentText()
 
+            if application_id in (None, ""):
+                raise ValueError("Selecione uma candidatura.")
+            application_id_value = int(application_id)
+
             if self.current_interview_id is None:
                 self.interview_service.create_interview(
-                    application_id=int(application_id),
+                    application_id=application_id_value,
                     interview_date=interview_date,
                     interview_type=interview_type,
                     interviewer=interviewer,
@@ -153,7 +178,7 @@ class InterviewPage(BasePage):
             else:
                 self.interview_service.update_interview(
                     self.current_interview_id,
-                    application_id=int(application_id),
+                    application_id=application_id_value,
                     interview_date=interview_date,
                     interview_type=interview_type,
                     interviewer=interviewer,
@@ -175,22 +200,74 @@ class InterviewPage(BasePage):
 
     def _delete_interview(self) -> None:
         if self.current_interview_id is None:
+            QMessageBox.information(
+                self,
+                "Entrevista",
+                "Selecione uma entrevista para excluir.",
+            )
             return
         confirmation = QMessageBox.question(
             self, "Confirmar exclusão", "Deseja excluir esta entrevista?"
         )
         if confirmation != QMessageBox.Yes:
             return
-        self.interview_service.delete_interview(self.current_interview_id)
-        self._clear_form()
-        self._load_interviews()
+        try:
+            deleted = self.interview_service.delete_interview(
+                self.current_interview_id
+            )
+            if not deleted:
+                QMessageBox.warning(
+                    self,
+                    "Entrevista",
+                    "A entrevista não pôde ser excluída.",
+                )
+                return
+            self._clear_form()
+            self._load_interviews()
+        except IntegrityError:
+            QMessageBox.warning(
+                self,
+                'Exclus?o bloqueada',
+                'Esta entrevista possui registros vinculados. Exclua ou desassocie esses registros antes de tentar novamente.',
+            )
+        except Exception as exc:  # pragma: no cover
+            QMessageBox.critical(
+                self,
+                "Não foi possível excluir",
+                f"A entrevista possui registros vinculados ou ocorreu um erro:\n{exc}",
+            )
 
     def _on_row_selected(self) -> None:
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
             return
+
         row = selected_rows[0].row()
         self.current_interview_id = int(self.table.item(row, 0).text())
+        interview = next(
+            (
+                item
+                for item in self.interview_service.list_interviews()
+                if item.id == self.current_interview_id
+            ),
+            None,
+        )
+        if interview is None:
+            return
+
+        application_index = self.application_combo.findData(interview.application_id)
+        if application_index >= 0:
+            self.application_combo.setCurrentIndex(application_index)
+        self.datetime_input.setDateTime(interview.interview_date)
+        self.type_combo.setCurrentText(interview.interview_type or "")
+        self.interviewer_input.setText(interview.interviewer or "")
+        self.interviewer_email_input.setText(interview.interviewer_email or "")
+        self.link_input.setText(interview.meeting_link or "")
+        self.location_input.setText(interview.location or "")
+        self.duration_input.setText(str(interview.duration or ""))
+        self.notes_input.setPlainText(interview.notes or "")
+        self.feedback_input.setPlainText(interview.feedback or "")
+        self.result_combo.setCurrentText(interview.result or "")
 
     def _load_interviews(self) -> None:
         interviews = self.interview_service.list_interviews()

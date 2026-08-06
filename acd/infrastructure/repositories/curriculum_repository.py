@@ -2,34 +2,68 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
+from acd.application.structured_resume_snapshot import (
+    StructuredResumeSnapshot,
+    StructuredResumeSnapshotCodec,
+)
 from acd.database import database as database_module
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.curriculum_version import CurriculumVersion
+from acd.infrastructure.database.dependency_delete import (
+    ExtraDependency,
+    delete_with_dependencies,
+)
 
 
 class CurriculumRepository:
     """Repositório para currículos e versões."""
 
-    def create(self, curriculum: Curriculum) -> Curriculum:
+    def create(
+        self,
+        curriculum: Curriculum,
+        structured_resume: StructuredResumeSnapshot | None = None,
+    ) -> Curriculum:
+        """Persist a curriculum, optionally with a validated structured snapshot."""
+        if structured_resume is not None:
+            curriculum.structured_content_json = StructuredResumeSnapshotCodec().dumps(
+                structured_resume
+            )
         with database_module.SessionLocal() as session:
             session.add(curriculum)
             session.commit()
             session.refresh(curriculum)
             return curriculum
 
-    def update(self, curriculum: Curriculum) -> Curriculum:
+    def update(
+        self,
+        curriculum: Curriculum,
+        structured_resume: StructuredResumeSnapshot | None = None,
+    ) -> Curriculum:
+        """Update a curriculum, optionally replacing its validated snapshot."""
+        if structured_resume is not None:
+            curriculum.structured_content_json = StructuredResumeSnapshotCodec().dumps(
+                structured_resume
+            )
         with database_module.SessionLocal() as session:
             session.add(curriculum)
             session.commit()
             session.refresh(curriculum)
             return curriculum
 
-    def delete(self, curriculum_id: int) -> bool:
+    def delete(self, curriculum_id: int, *, delete_linked: bool = False) -> bool:
         with database_module.SessionLocal() as session:
-            curriculum = session.get(Curriculum, curriculum_id)
-            if curriculum is None:
+            if delete_linked:
+                return delete_with_dependencies(
+                    session,
+                    table_name="curricula",
+                    primary_key="id",
+                    value=curriculum_id,
+                    extra_dependencies=(ExtraDependency("applications", "curriculum_id"),),
+                )
+            entity = session.get(Curriculum, curriculum_id)
+            if entity is None:
                 return False
-            session.delete(curriculum)
+            session.delete(entity)
             session.commit()
             return True
 

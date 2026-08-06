@@ -13,6 +13,7 @@ from acd.application.platform.services import (
     ConfigurationService,
     HealthService,
     MetricsService,
+    RestoreService,
 )
 from acd.domain.platform import (
     BackupStatus,
@@ -288,7 +289,282 @@ class TestBackupService:
         backups = service.list_backups()
         assert len(backups) > 0
 
+    def test_create_manual_backup(self, session, tmp_path):
+        """Test manual backup creation."""
 
+        database_file = tmp_path / "acd.db"
+        database_file.write_text("database")
+
+        service = BackupService(
+            session,
+            database_path=str(database_file),
+        )
+
+        result = service.create_manual_backup(
+            backup_dir=str(tmp_path / "backups"),
+        )
+
+        assert result["backup_id"] > 0
+        assert result["name"].startswith("backup_")
+        assert result["checksum"]
+        assert result["size_mb"] >= 0
+
+    def test_get_backup_info(self, session, repository):
+        """Test retrieving backup information."""
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup_test",
+            "/tmp/backup",
+        )
+
+        service = BackupService(session)
+
+        info = service.get_backup_info(backup.id)
+
+        assert info is not None
+        assert info["id"] == backup.id
+        assert info["name"] == "backup_test"
+
+    def test_get_backup_info_returns_none(self, session):
+        """Unknown backup returns None."""
+
+        service = BackupService(session)
+
+        assert service.get_backup_info(999999) is None
+
+    def test_verify_backup_returns_false_when_backup_not_found(self, session):
+        """Unknown backup is invalid."""
+
+        service = BackupService(session)
+
+        assert service.verify_backup(999999) is False
+
+    def test_verify_backup_returns_true(self, session, tmp_path):
+        """Backup checksum validation."""
+
+        backup_dir = tmp_path / "backup"
+
+        backup_dir.mkdir()
+
+        file = backup_dir / "database.db"
+        file.write_text("content")
+
+        import hashlib
+
+        checksum = hashlib.sha256()
+        checksum.update(file.read_bytes())
+
+        repository = PlatformRepository(session)
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum=checksum.hexdigest(),
+        )
+
+        service = BackupService(session)
+
+        assert service.verify_backup(backup.id) is True
+
+    def test_verify_backup_returns_false_for_invalid_checksum(
+        self,
+        session,
+        tmp_path,
+    ):
+        """Invalid checksum."""
+
+        backup_dir = tmp_path / "backup"
+
+        backup_dir.mkdir()
+
+        file = backup_dir / "database.db"
+        file.write_text("content")
+
+        repository = PlatformRepository(session)
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum="invalid",
+        )
+
+        service = BackupService(session)
+
+        assert service.verify_backup(backup.id) is False
+
+class TestRestoreService:
+    """Test RestoreService."""
+
+    def test_restore_service_creation(self, session):
+        """Test restore service creation."""
+
+        service = RestoreService(session)
+
+        assert service is not None
+
+    def test_get_restore_point_returns_none(self, session):
+        """Unknown backup returns None."""
+
+        service = RestoreService(session)
+
+        assert service.get_restore_point(999999) is None
+
+    def test_list_restore_points_empty(self, session):
+        """No restore points available."""
+
+        service = RestoreService(session)
+
+        assert service.list_restore_points() == []
+
+    def test_restore_from_backup_not_found(self, session):
+        """Unknown backup raises ValueError."""
+
+        service = RestoreService(session)
+
+        with pytest.raises(ValueError):
+            service.restore_from_backup(999999)
+
+    def test_restore_from_backup_success(
+        self,
+        session,
+        repository,
+        tmp_path,
+    ):
+        """Restore database from a valid backup."""
+
+        backup_dir = tmp_path / "backup"
+        backup_dir.mkdir()
+
+        database_file = backup_dir / "database.db"
+        database_file.write_text("database")
+
+        import hashlib
+
+        checksum = hashlib.sha256()
+        checksum.update(database_file.read_bytes())
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum=checksum.hexdigest(),
+        )
+
+        target_database = tmp_path / "acd.db"
+
+        service = RestoreService(
+            session,
+            database_path=str(target_database),
+        )
+
+        result = service.restore_from_backup(
+            backup.id,
+        )
+
+        assert result["backup_id"] == backup.id
+        assert target_database.exists()
+
+    def test_restore_from_backup_invalid_checksum(
+        self,
+        session,
+        repository,
+        tmp_path,
+    ):
+        """Invalid backup checksum."""
+
+        backup_dir = tmp_path / "backup"
+        backup_dir.mkdir()
+
+        (backup_dir / "database.db").write_text("database")
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum="invalid",
+        )
+
+        service = RestoreService(session)
+
+        with pytest.raises(ValueError):
+            service.restore_from_backup(backup.id)
+
+    def test_get_restore_point(
+        self,
+        session,
+        repository,
+        tmp_path,
+    ):
+        """Restore point information."""
+
+        backup_dir = tmp_path / "backup"
+        backup_dir.mkdir()
+
+        database_file = backup_dir / "database.db"
+        database_file.write_text("database")
+
+        import hashlib
+
+        checksum = hashlib.sha256()
+        checksum.update(database_file.read_bytes())
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum=checksum.hexdigest(),
+        )
+
+        service = RestoreService(session)
+
+        info = service.get_restore_point(
+            backup.id,
+        )
+
+        assert info is not None
+        assert info["id"] == backup.id
+        assert info["is_valid"] is True
+
+    def test_list_restore_points(
+        self,
+        session,
+        repository,
+        tmp_path,
+    ):
+        """List restore points."""
+
+        backup_dir = tmp_path / "backup"
+        backup_dir.mkdir()
+
+        database_file = backup_dir / "database.db"
+        database_file.write_text("database")
+
+        import hashlib
+
+        checksum = hashlib.sha256()
+        checksum.update(database_file.read_bytes())
+
+        backup = repository.create_backup(
+            BackupStatus.COMPLETED.value,
+            "backup",
+            str(backup_dir),
+            checksum=checksum.hexdigest(),
+        )
+
+        repository.update_backup_status(
+            backup.id,
+            BackupStatus.COMPLETED.value,
+        )
+
+        service = RestoreService(session)
+
+        restore_points = service.list_restore_points()
+
+        assert len(restore_points) == 1
+        assert restore_points[0]["is_valid"] is True
 class TestConfigurationService:
     """Test ConfigurationService."""
 

@@ -4,18 +4,16 @@
 
 **Sprint:** 0.3D
 
-**Status:** Em andamento
+**Status:** Superseded by Sprint F namespace governance
 
 ---
 
 # Objetivo
 
-Eliminar gradualmente a arquitetura legada (`acd.domain.agent`)
-e consolidar toda a plataforma sobre a nova arquitetura
-(`acd.domain.agents`).
-
-O objetivo é manter apenas um conjunto de entidades ORM,
-repositórios, serviços e testes relacionados aos Agentes.
+Este plano histórico supunha que `acd.domain.agent` e
+`acd.domain.agents` representavam a mesma arquitetura. A Sprint F comprovou
+que são contextos ORM distintos, com tabelas e consumidores distintos.
+ADR-028 e o manifesto de 92 tabelas proíbem sua consolidação por nome.
 
 ---
 
@@ -61,94 +59,18 @@ Principais entidades:
 
 ---
 
-# Problema Atual
+# Registro histórico corrigido
 
-Durante a execução do pytest ocorre o erro:
-
-```
-sqlalchemy.exc.InvalidRequestError
-
-Table 'agent_tasks' is already defined
-```
-
-A causa é a coexistência de dois modelos ORM que registram
-a mesma tabela no mesmo Base.metadata.
-
-Exemplo:
-
-```
-acd.domain.agent.task
-
-↓
-
-__tablename__ = "agent_tasks"
-
-acd.domain.agents.task
-
-↓
-
-__tablename__ = "agent_tasks"
-```
-
-O mesmo ocorre com:
-
-```
-agent_memory
-```
+O conflito de tabela descrito por este documento não existe no Registry atual:
+os 92 nomes são únicos e ambos os contextos são carregados explicitamente.
 
 ---
 
-# Estratégia de Migração
+# Estratégia substituta
 
-A migração ocorrerá em cinco etapas.
-
-## Etapa 1
-
-Inventário completo.
-
-Status:
-
-☑ Concluído
-
----
-
-## Etapa 2
-
-Comparação funcional entre os dois modelos.
-
-Status:
-
-⬜ Em andamento
-
----
-
-## Etapa 3
-
-Migração dos testes.
-
-Status:
-
-⬜ Pendente
-
----
-
-## Etapa 4
-
-Migração dos repositórios.
-
-Status:
-
-⬜ Pendente
-
----
-
-## Etapa 5
-
-Remoção definitiva da arquitetura legada.
-
-Status:
-
-⬜ Pendente
+A migração futura deve ser schema-neutral, preservar a Registry e as
+serializações, e seguir a política em `legacy_retirement_policy.md`. O
+desacoplamento ORM/domínio continua sob ADR-028.
 
 ---
 
@@ -164,11 +86,7 @@ Durante a Sprint 0.3D:
 
 ---
 
-# Critério de Conclusão
+# Critério de reavaliação futura
 
-A Sprint será considerada concluída quando:
-
-- existir apenas uma implementação ORM para cada tabela;
-- todos os testes passarem;
-- todos os serviços utilizarem acd.domain.agents;
-- acd.domain.agent puder ser removido do projeto.
+Uma retirada só poderá ser proposta após prova de substituto para cada tabela e
+consumidor do contexto de metas e planejamento.

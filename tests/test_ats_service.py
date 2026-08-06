@@ -3,6 +3,7 @@ import tempfile
 
 import pytest
 
+from acd.domain.ats_evaluation import ATSEvaluationInput
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job_profile import JobProfile
 from acd.infrastructure.repositories.ats_repository import ATSRepository
@@ -12,6 +13,9 @@ from acd.services.ats_service import (
     GapAnalysisEngine,
     RuleBasedRecommendationStrategy,
     RuleBasedScoreEngine,
+    RuleBasedSimilarityEngine as ATSRuleBasedSimilarityEngine,
+    WeightConfiguration,
+    WeightConfigurationService,
 )
 from acd.services.knowledge_service import RuleBasedSimilarityEngine
 
@@ -65,6 +69,43 @@ def test_score_engine_uses_weighted_breakdown(ats_setup):
 
     assert score["total_score"] >= 70
     assert score["criteria"]["competencias_tecnicas"]["score"] >= 30
+
+
+def test_weight_configuration_service_returns_the_supplied_configuration() -> None:
+    configuration = WeightConfiguration(technical_skills=0.5)
+
+    assert WeightConfigurationService(configuration).get_config() is configuration
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "expected"),
+    [
+        ("Python", "python", 1.0),
+        ("SQL", "SQL Server", 0.85),
+    ],
+)
+def test_ats_similarity_engine_handles_equal_and_contained_skills(
+    left: str,
+    right: str,
+    expected: float,
+) -> None:
+    assert ATSRuleBasedSimilarityEngine().calculate(left, right) == expected
+
+
+def test_score_engine_matches_a_skill_by_existing_similarity_rule() -> None:
+    score = RuleBasedScoreEngine().calculate(
+        curriculum_skills=["SQL"],
+        job_skills=["SQL Server"],
+        curriculum_experience=2,
+        job_experience=3,
+        curriculum_languages=[],
+        job_languages=[],
+        curriculum_certifications=[],
+        job_certifications=[],
+        desired_skills=[],
+    )
+
+    assert score["matched_skills"] == ["SQL"]
 
 
 def test_gap_analysis_returns_missing_and_desired_skills(ats_setup):
@@ -126,3 +167,29 @@ def test_ats_service_persists_results_and_history(ats_setup):
     assert saved["gaps"]["missing_skills"]
     assert service.get_history()
     assert service.get_statistics()["total_scores"] >= 1
+
+
+class _WriteFailingRepository:
+    """Fail if a pure evaluation reaches persistence."""
+
+    def __getattr__(self, name: str):
+        raise AssertionError(f"Pure evaluation must not call repository.{name}")
+
+
+def test_pure_evaluation_accepts_text_and_never_persists() -> None:
+    service = ATSService(repository=_WriteFailingRepository())
+
+    result = service.evaluate(
+        ATSEvaluationInput(
+            resume_content="Python, SQL, Docker",
+            job_skills=("Python", "SQL", "Kubernetes"),
+            desired_skills=("Docker",),
+            job_languages=("English",),
+            job_certifications=("Green Belt",),
+        )
+    )
+
+    assert result.total_score > 0
+    assert result.criteria
+    assert "Kubernetes" in result.missing_skills
+    assert result.recommendations

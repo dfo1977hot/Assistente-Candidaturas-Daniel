@@ -3,15 +3,18 @@ from __future__ import annotations
 import os
 import tempfile
 
+from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtWidgets import QApplication
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import acd.database.database as database_module
-
-# Garante o registro de todos os modelos ORM antes do create_all().
-import acd.database.model_registry  # noqa: F401
+from acd.database.database import enable_sqlite_foreign_keys
+from acd.database.model_registry import load_models
 from acd.models.base import Base
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 pytest_plugins = [
     "tests.fixtures.database",
@@ -20,10 +23,32 @@ pytest_plugins = [
 
 
 @pytest.fixture(scope="session")
+def qapp() -> QApplication:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app
+
+
+@pytest.fixture(autouse=True)
+def cleanup_qt_widgets(qapp: QApplication):
+    """Dispose test-created top-level widgets before the next Qt test starts."""
+
+    yield
+
+    for widget in qapp.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    qapp.processEvents()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+
+
+@pytest.fixture(scope="session")
 def test_engine():
-    """
-    Cria um banco SQLite temporário para toda a sessão de testes.
-    """
+    load_models()
+    """Cria um banco SQLite temporário para toda a sessão de testes."""
 
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
 
@@ -31,6 +56,7 @@ def test_engine():
         f"sqlite:///{db_path}",
         future=True,
     )
+    enable_sqlite_foreign_keys(engine)
 
     Base.metadata.create_all(bind=engine)
 
@@ -48,12 +74,7 @@ def test_engine():
 
 @pytest.fixture(scope="function")
 def db_session(test_engine):
-    """
-    Cria uma sessão isolada para cada teste.
-
-    Antes de cada teste o banco é recriado para garantir
-    isolamento completo entre os casos de teste.
-    """
+    """Cria uma sessão isolada para cada teste."""
 
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
@@ -70,15 +91,15 @@ def db_session(test_engine):
     try:
         yield session
     finally:
-        session.rollback()
+        if session.is_active:
+            session.rollback()
+
         session.close()
 
 
 @pytest.fixture(autouse=True)
 def override_database(db_session, test_engine, monkeypatch):
-    """
-    Faz toda a aplicação utilizar o banco temporário durante os testes.
-    """
+    """Faz toda a aplicação utilizar o banco temporário durante os testes."""
 
     monkeypatch.setattr(
         database_module,
@@ -97,4 +118,7 @@ def override_database(db_session, test_engine, monkeypatch):
         ),
     )
 
-    yield
+    try:
+        yield
+    finally:
+        database_module.engine.dispose()

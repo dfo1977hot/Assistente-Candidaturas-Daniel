@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from acd.ui.main_window import MainWindow
+from acd.desktop_composition_root import DesktopCompositionRoot
 
 
 def _expected_widget(window, label: str):
@@ -36,7 +36,7 @@ def _expected_widget(window, label: str):
 
 
 def test_sidebar_navigates_all_items_without_exception(qapp):
-    window = MainWindow()
+    window = DesktopCompositionRoot().build_main_window()
     log_path = Path("logs/functional_validation.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
 

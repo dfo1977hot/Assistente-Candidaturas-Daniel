@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.orm import joinedload
 
 from acd.database import database as database_module
 from acd.domain.entities.job import Job
+from acd.infrastructure.database.dependency_delete import delete_with_dependencies
 
 
 class JobRepository:
@@ -31,29 +33,55 @@ class JobRepository:
                 session.rollback()
                 raise
 
-    def delete(self, job_id: int) -> bool:
+    def delete(self, job_id: int, *, delete_linked: bool = False) -> bool:
         with database_module.SessionLocal() as session:
-            try:
-                job = session.get(Job, job_id)
-
-                if job is None:
-                    return False
-
-                session.delete(job)
-                session.commit()
-                return True
-
-            except Exception:
-                session.rollback()
-                raise
+            if delete_linked:
+                return delete_with_dependencies(
+                    session,
+                    table_name="jobs",
+                    primary_key="id",
+                    value=job_id,
+                )
+            entity = session.get(Job, job_id)
+            if entity is None:
+                return False
+            session.delete(entity)
+            session.commit()
+            return True
 
     def get_by_id(self, job_id: int) -> Job | None:
         with database_module.SessionLocal() as session:
-            return session.get(Job, job_id)
+            stmt = select(Job).options(joinedload(Job.company)).where(Job.id == job_id)
+            return session.scalar(stmt)
+
+
+    def get_by_url(self, job_url: str) -> Job | None:
+        """Retorna a vaga cadastrada com a URL informada."""
+        normalized = job_url.strip()
+        if not normalized:
+            return None
+        with database_module.SessionLocal() as session:
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(Job.job_url == normalized)
+            )
+            return session.scalar(stmt)
+
+    def url_exists(self, job_url: str, *, exclude_job_id: int | None = None) -> bool:
+        """Informa se a URL já está vinculada a outra vaga."""
+        normalized = job_url.strip()
+        if not normalized:
+            return False
+        with database_module.SessionLocal() as session:
+            stmt = select(func.count(Job.id)).where(Job.job_url == normalized)
+            if exclude_job_id is not None:
+                stmt = stmt.where(Job.id != exclude_job_id)
+            return bool(session.scalar(stmt) or 0)
 
     def get_all(self) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).order_by(Job.created_at.desc())
+            stmt = select(Job).options(joinedload(Job.company)).order_by(Job.created_at.desc())
             return list(session.scalars(stmt).all())
 
     def search(self, query: str) -> list[Job]:
@@ -62,6 +90,7 @@ class JobRepository:
 
             stmt = (
                 select(Job)
+                .options(joinedload(Job.company))
                 .where(
                     or_(
                         Job.title.ilike(search_text),
@@ -84,7 +113,7 @@ class JobRepository:
         employment_type: str | None = None,
     ) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job)
+            stmt = select(Job).options(joinedload(Job.company))
 
             if company_id is not None:
                 stmt = stmt.where(Job.company_id == company_id)
@@ -104,19 +133,34 @@ class JobRepository:
 
     def list_by_company(self, company_id: int) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).where(Job.company_id == company_id).order_by(Job.created_at.desc())
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(Job.company_id == company_id)
+                .order_by(Job.created_at.desc())
+            )
 
             return list(session.scalars(stmt).all())
 
     def list_by_status(self, status: str) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).where(Job.status == status).order_by(Job.created_at.desc())
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(Job.status == status)
+                .order_by(Job.created_at.desc())
+            )
 
             return list(session.scalars(stmt).all())
 
     def list_recent(self, limit: int = 20) -> list[Job]:
         with database_module.SessionLocal() as session:
-            stmt = select(Job).order_by(Job.created_at.desc()).limit(limit)
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .order_by(Job.created_at.desc())
+                .limit(limit)
+            )
 
             return list(session.scalars(stmt).all())
 

@@ -1,4 +1,4 @@
-from pathlib import Path
+from importlib.resources import files
 
 
 class ThemeManager:
@@ -6,7 +6,7 @@ class ThemeManager:
     @staticmethod
     def load(app):
 
-        theme = Path("acd/resources/styles/dark.qss")
+        theme = files("acd").joinpath("resources", "styles", "dark.qss")
 
         if theme.exists():
 

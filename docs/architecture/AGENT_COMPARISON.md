@@ -17,12 +17,12 @@ com a arquitetura atual (`acd.domain.agents`).
 
 | Legado | Atual | Equivalência | Situação |
 |---------|-------|--------------|----------|
-| AgentGoal | — | Não existe | Implementar |
-| ExecutionPlan | AgentSession | Parcial | Revisar |
-| Task | AgentTask | Alta | Migrar |
-| ToolCall | AgentTool | Parcial | Revisar |
-| AgentMemory | AgentMemory | Alta | Migrar |
-| ReasoningStep | — | Não existe | Implementar |
+| AgentGoal | — | Contextos distintos | Preservar |
+| ExecutionPlan | AgentSession | Contextos distintos | Preservar |
+| PlanTask | AgentTask | Tabelas distintas | Preservar |
+| ToolCall | AgentTool | Contextos distintos | Preservar |
+| Memória de planejamento | AgentMemory | Modelos distintos | Preservar |
+| ReasoningStep | — | Contexto distinto | Preservar |
 
 ---
 
@@ -52,19 +52,17 @@ com a arquitetura atual (`acd.domain.agents`).
 
 ---
 
-## Conflitos
+## Resultado da comparação
 
-- agent_tasks
-- agent_memory
+- Não há `__tablename__` duplicado.
+- As tabelas de planejamento e de multi-agentes são distintas no manifesto ORM.
+- Sem uma migração schema-neutral aprovada, nenhum namespace pode ser removido
+  ou convertido em alias.
 
 ---
 
-## Objetivo Final
+## Direção futura
 
-Ao final da Sprint 0.3D deverá existir apenas:
-
-acd/domain/agents
-
-acd/infrastructure/repositories/agents
-
-acd/services/agents
+`acd.domain.agents` é o namespace canônico para novas capacidades
+multi-agentes. A retirada de `acd.domain.agent` depende de substitutos para seu
+contexto de metas e planejamento e permanece fora da Sprint F.

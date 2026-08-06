@@ -1,30 +1,22 @@
-Write-Host ""
-Write-Host "========================================="
-Write-Host "      ACD QUALITY GATE"
-Write-Host "========================================="
-Write-Host ""
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
+$python = if (Test-Path $venvPython) { $venvPython } else { "python" }
 
-Write-Host "[1/5] Black"
-black --check .
+Set-Location $projectRoot
 
-Write-Host ""
-Write-Host "[2/5] Ruff"
-ruff check .
+$checks = @(
+    @{ Name = "Ruff"; Arguments = @("-m", "ruff", "check", ".") },
+    @{ Name = "Compileall"; Arguments = @("-m", "compileall", "acd") },
+    @{ Name = "Pytest"; Arguments = @("-m", "pytest") }
+)
 
-Write-Host ""
-Write-Host "[3/5] Pytest"
-pytest
+foreach ($check in $checks) {
+    Write-Host "Executando $($check.Name)..."
+    & $python @($check.Arguments)
 
-Write-Host ""
-Write-Host "[4/5] Architecture Inventory"
-python acd/tools/architecture_inventory.py
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
 
-Write-Host ""
-Write-Host "[5/5] Inicialização do ACD"
-
-python app.py
-
-Write-Host ""
-Write-Host "========================================="
-Write-Host "QUALITY GATE FINALIZADO"
-Write-Host "========================================="
+exit 0

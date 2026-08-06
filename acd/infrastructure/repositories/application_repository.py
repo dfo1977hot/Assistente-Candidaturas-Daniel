@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from acd.database import database as database_module
 from acd.domain.entities.application import Application
 from acd.domain.entities.timeline_event import TimelineEvent
+from acd.infrastructure.database.dependency_delete import delete_with_dependencies
 
 
 class ApplicationRepository:
@@ -27,12 +28,19 @@ class ApplicationRepository:
             session.refresh(application)
             return application
 
-    def delete(self, application_id: int) -> bool:
+    def delete(self, application_id: int, *, delete_linked: bool = False) -> bool:
         with database_module.SessionLocal() as session:
-            application = session.get(Application, application_id)
-            if application is None:
+            if delete_linked:
+                return delete_with_dependencies(
+                    session,
+                    table_name="applications",
+                    primary_key="id",
+                    value=application_id,
+                )
+            entity = session.get(Application, application_id)
+            if entity is None:
                 return False
-            session.delete(application)
+            session.delete(entity)
             session.commit()
             return True
 
@@ -69,6 +77,10 @@ class ApplicationRepository:
         with database_module.SessionLocal() as session:
             stmt = (
                 select(Application)
+                .options(
+                    joinedload(Application.company),
+                    joinedload(Application.job),
+                )
                 .where(
                     Application.notes.ilike(f"%{query}%") | Application.feedback.ilike(f"%{query}%")
                 )
@@ -84,7 +96,10 @@ class ApplicationRepository:
         channel: str | None = None,
     ) -> list[Application]:
         with database_module.SessionLocal() as session:
-            stmt = select(Application)
+            stmt = select(Application).options(
+                joinedload(Application.company),
+                joinedload(Application.job),
+            )
             if status:
                 stmt = stmt.where(Application.status == status)
             if company_id is not None:
@@ -104,6 +119,28 @@ class ApplicationRepository:
             session.commit()
             session.refresh(application)
             return application
+
+    def set_selected_resume_version(
+        self, application_id: int, resume_version_id: int
+    ) -> bool:
+        """Persist only the resume version selected for an application."""
+        with database_module.SessionLocal() as session:
+            application = session.get(Application, application_id)
+            if application is None:
+                return False
+            application.selected_resume_version_id = resume_version_id
+            session.commit()
+            return True
+
+    def clear_selected_resume_version(self, application_id: int) -> bool:
+        """Clear the resume version selection without changing the base curriculum."""
+        with database_module.SessionLocal() as session:
+            application = session.get(Application, application_id)
+            if application is None:
+                return False
+            application.selected_resume_version_id = None
+            session.commit()
+            return True
 
     def get_followups(self, application_id: int) -> list[TimelineEvent]:
         with database_module.SessionLocal() as session:

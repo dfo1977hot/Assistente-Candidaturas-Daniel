@@ -17,6 +17,8 @@ class EventType(StrEnum):
     JOB = "job"
     LEARNING = "learning"
     PLANNER = "planner"
+    PIPELINE = "pipeline"
+    WORKFLOW = "workflow"
     SYSTEM = "system"
 
 

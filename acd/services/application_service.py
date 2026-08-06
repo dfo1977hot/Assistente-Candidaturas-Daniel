@@ -143,9 +143,9 @@ class ApplicationService:
         logger.info("Candidatura atualizada: %s", updated.id)
         return updated
 
-    def delete_application(self, application_id: int) -> bool:
+    def delete_application(self, application_id: int, *, delete_linked: bool = False) -> bool:
         """Remove uma candidatura."""
-        deleted = self.repository.delete(application_id)
+        deleted = self.repository.delete(application_id, delete_linked=delete_linked)
         if deleted:
             logger.info("Candidatura encerrada: %s", application_id)
         return deleted

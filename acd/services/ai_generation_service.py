@@ -90,17 +90,27 @@ class ResumeGenerationService(BaseGenerationService):
         context = self._build_context(
             curriculum=curriculum, job_profile=job_profile, language=language
         )
+        return self.generate_resume_from_context(curriculum_id=curriculum.id, context=context)
+
+    def generate_resume_from_context(
+        self, *, curriculum_id: int, context: PromptContext
+    ) -> dict[str, Any]:
+        """Generate a version from explicitly prepared context without ATS analysis."""
         prompt = self.prompt_builder.build_resume_prompt(context)
         response = self.provider.generate_text(
-            prompt=prompt, model="mock", temperature=0.2, max_tokens=400, language=language
+            prompt=prompt,
+            model="mock",
+            temperature=0.2,
+            max_tokens=400,
+            language=context.language,
         )
         self._persist_generation(
             generation_type="resume", prompt=prompt, response=response, model="mock"
         )
         version = self.repository.save_resume_version(
             ResumeVersion(
-                curriculum_id=curriculum.id,
-                version=self._next_version(curriculum.id),
+                curriculum_id=curriculum_id,
+                version=self._next_version(curriculum_id),
                 content=response,
                 explanation="Destacadas competências alinhadas à vaga e palavras-chave ATS.",
             )

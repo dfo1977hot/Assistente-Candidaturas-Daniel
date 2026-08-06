@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
+from acd.version import get_version
+
 
 @dataclass
 class Settings:
 
     app_name: str = "Assistente de Candidaturas do Daniel"
 
-    version: str = "0.1.0"
+    version: str = get_version()
