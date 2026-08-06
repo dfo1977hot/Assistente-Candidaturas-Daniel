@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from sqlalchemy.exc import IntegrityError
 
 from acd.presentation.candidate_decision_panel import CandidateDecisionPanel
 from acd.presentation.effective_application_resume_preview_panel import (
@@ -187,6 +189,12 @@ class ApplicationPage(BasePage):
             ["ID", "Empresa", "Vaga", "Status", "Aplicação", "Follow-up"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
@@ -207,10 +215,31 @@ class ApplicationPage(BasePage):
         )
 
         self._setup_controls()
+        self.company_combo.currentIndexChanged.connect(self._load_jobs)
         self._load_companies()
         self._load_applications()
 
+    def refresh_reference_data(self) -> None:
+        """Atualiza empresas, vagas e candidaturas ao entrar na página."""
+        selected_company = self.company_combo.currentData()
+        self._load_companies()
+        if selected_company not in (None, ""):
+            index = self.company_combo.findData(selected_company)
+            if index >= 0:
+                self.company_combo.setCurrentIndex(index)
+        self._load_jobs()
+        self._load_applications()
+
     def _setup_controls(self) -> None:
+        for date_input in (
+            self.application_date_input,
+            self.next_follow_up_input,
+            self.response_date_input,
+            self.interview_date_input,
+        ):
+            date_input.setCalendarPopup(True)
+            date_input.setDisplayFormat("dd/MM/yyyy")
+
         self.status_combo.addItems(
             [
                 "Rascunho",
@@ -343,10 +372,17 @@ class ApplicationPage(BasePage):
             feedback = self.feedback_input.toPlainText().strip()
             notes = self.notes_input.toPlainText().strip()
 
+            if company_id in (None, ""):
+                raise ValueError("Selecione uma empresa.")
+            if job_id in (None, ""):
+                raise ValueError("Selecione uma vaga.")
+            company_id_value = int(company_id)
+            job_id_value = int(job_id)
+
             if self.current_application_id is None:
                 self.application_service.create_application(
-                    job_id=int(job_id),
-                    company_id=int(company_id),
+                    job_id=job_id_value,
+                    company_id=company_id_value,
                     status=status,
                     application_date=application_date,
                     next_follow_up=next_follow_up,
@@ -364,8 +400,8 @@ class ApplicationPage(BasePage):
             else:
                 self.application_service.update_application(
                     self.current_application_id,
-                    job_id=int(job_id),
-                    company_id=int(company_id),
+                    job_id=job_id_value,
+                    company_id=company_id_value,
                     status=status,
                     application_date=application_date,
                     next_follow_up=next_follow_up,
@@ -390,6 +426,11 @@ class ApplicationPage(BasePage):
 
     def _delete_application(self) -> None:
         if self.current_application_id is None:
+            QMessageBox.information(
+                self,
+                "Candidatura",
+                "Selecione uma candidatura para excluir.",
+            )
             return
         confirmation = QMessageBox.question(
             self,
@@ -398,9 +439,57 @@ class ApplicationPage(BasePage):
         )
         if confirmation != QMessageBox.Yes:
             return
-        self.application_service.delete_application(self.current_application_id)
-        self._clear_form()
-        self._load_applications()
+        try:
+            deleted = self.application_service.delete_application(
+                self.current_application_id
+            )
+            if not deleted:
+                QMessageBox.warning(
+                    self,
+                    "Candidatura",
+                    "A candidatura não pôde ser excluída.",
+                )
+                return
+            self._clear_form()
+            self._load_applications()
+        except IntegrityError:
+            cascade_confirmation = QMessageBox.question(
+                self,
+                "Registros vinculados",
+                "Esta candidatura possui entrevistas, eventos e demais registros vinculados.\n\n"
+                "Deseja excluir também todos os registros vinculados? "
+                "Esta operação não poderá ser desfeita.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if cascade_confirmation != QMessageBox.Yes:
+                return
+            try:
+                deleted = self.application_service.delete_application(
+                    self.current_application_id,
+                    delete_linked=True,
+                )
+                if not deleted:
+                    QMessageBox.warning(
+                        self,
+                        "Candidatura",
+                        "O registro não pôde ser excluído.",
+                    )
+                    return
+                self._clear_form()
+                self._load_applications()
+            except Exception:
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    "Não foi possível excluir o registro e seus vínculos.",
+                )
+        except Exception as exc:  # pragma: no cover
+            QMessageBox.critical(
+                self,
+                "Não foi possível excluir",
+                f"A candidatura possui registros vinculados ou ocorreu um erro:\n{exc}",
+            )
 
     def _on_row_selected(self) -> None:
         selected_rows = self.table.selectionModel().selectedRows()
@@ -431,6 +520,39 @@ class ApplicationPage(BasePage):
             self._structured_resume_quality_validation_view_model is not None
             and not self._resume_optimization_executor.is_running
         )
+        application = self.application_service.get_application(
+            self.current_application_id
+        )
+        if application is not None:
+            company_index = self.company_combo.findData(application.company_id)
+            if company_index >= 0:
+                self.company_combo.setCurrentIndex(company_index)
+            self._load_jobs()
+            job_index = self.job_combo.findData(application.job_id)
+            if job_index >= 0:
+                self.job_combo.setCurrentIndex(job_index)
+            self.status_combo.setCurrentText(application.status or "")
+            for widget, value in (
+                (self.application_date_input, application.application_date),
+                (self.next_follow_up_input, application.next_follow_up),
+                (self.response_date_input, application.response_date),
+                (self.interview_date_input, application.interview_date),
+            ):
+                if value is not None:
+                    widget.setDate(QDate(value.year, value.month, value.day))
+            self.salary_expected_input.setText(
+                "" if application.salary_expected is None else str(application.salary_expected)
+            )
+            self.salary_offered_input.setText(
+                "" if application.salary_offered is None else str(application.salary_offered)
+            )
+            self.channel_input.setText(application.application_channel or "")
+            self.recruiter_name_input.setText(application.recruiter_name or "")
+            self.recruiter_email_input.setText(application.recruiter_email or "")
+            self.recruiter_phone_input.setText(application.recruiter_phone or "")
+            self.feedback_input.setPlainText(application.feedback or "")
+            self.notes_input.setPlainText(application.notes or "")
+
         self._load_candidate_decision()
         self._load_resume_version_review()
         self._load_effective_application_resume()
@@ -827,19 +949,24 @@ class ApplicationPage(BasePage):
 
     def _filter_applications(self) -> None:
         status = self.filter_status_combo.currentText() or None
-        company_id = self.filter_company_combo.currentData()
+        company_id_data = self.filter_company_combo.currentData()
+        company_id = (
+            int(company_id_data)
+            if company_id_data not in (None, "")
+            else None
+        )
         query = self.search_input.text().strip()
+
         if query:
             applications = self.application_service.search_applications(query)
         elif status or company_id is not None:
             applications = self.application_service.filter_applications(
                 status=status,
-                company_id=int(company_id) if company_id is not None else None,
+                company_id=company_id,
             )
         else:
             applications = self.application_service.list_applications()
         self._render_applications(applications)
-
     def _render_applications(self, applications: list) -> None:
         self.table.setRowCount(len(applications))
         for row, application in enumerate(applications):

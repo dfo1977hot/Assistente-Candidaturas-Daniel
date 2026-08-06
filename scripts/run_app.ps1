@@ -11,5 +11,5 @@ if (-not (Test-Path -LiteralPath $app)) {
     exit 1
 }
 
-& $python -m acd.desktop
+& $python $app
 exit $LASTEXITCODE

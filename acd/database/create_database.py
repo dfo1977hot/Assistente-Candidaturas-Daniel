@@ -28,6 +28,7 @@ def create_database(target_engine: Engine | None = None) -> None:
     _ensure_companies_columns(selected_engine)
     _ensure_application_resume_version_selection(selected_engine)
     _ensure_structured_resume_snapshot_columns(selected_engine)
+    _ensure_curriculum_document_columns(selected_engine)
 
 
 def _ensure_companies_columns(target_engine: Engine | None = None) -> None:
@@ -39,6 +40,15 @@ def _ensure_companies_columns(target_engine: Engine | None = None) -> None:
         "country": "TEXT NOT NULL DEFAULT ''",
         "company_size": "TEXT NOT NULL DEFAULT ''",
         "linkedin_url": "TEXT DEFAULT ''",
+        "legal_name": "TEXT NOT NULL DEFAULT ''",
+        "tax_id": "TEXT NOT NULL DEFAULT ''",
+        "registration_status": "TEXT NOT NULL DEFAULT ''",
+        "address": "TEXT NOT NULL DEFAULT ''",
+        "postal_code": "TEXT NOT NULL DEFAULT ''",
+        "phone": "TEXT NOT NULL DEFAULT ''",
+        "data_source": "TEXT NOT NULL DEFAULT ''",
+        "source_reference": "TEXT NOT NULL DEFAULT ''",
+        "data_retrieved_at": "DATETIME",
     }
 
     selected_engine = target_engine or engine
@@ -122,6 +132,71 @@ def _backup_database_before_schema_evolution(target_engine: Engine | None = None
     backup_path = database_path.with_name(f"{database_path.stem}.pre-structured-resume-{timestamp}.bak")
     shutil.copy2(database_path, backup_path)
     logger.info("Created database backup before structured resume schema evolution: %s", backup_path)
+    return backup_path
+
+
+def _ensure_curriculum_document_columns(
+    target_engine: Engine | None = None,
+) -> Path | None:
+    """Add nullable curriculum document metadata columns idempotently."""
+
+    required_columns = {
+        "file_original_name": "TEXT",
+        "file_relative_path": "TEXT",
+        "file_extension": "TEXT",
+        "file_mime_type": "TEXT",
+        "file_size_bytes": "INTEGER",
+        "file_sha256": "TEXT",
+        "file_attached_at": "DATETIME",
+    }
+    selected_engine = target_engine or engine
+    with selected_engine.connect() as connection:
+        existing = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(curricula)"
+            ).fetchall()
+        }
+    missing = [
+        (column_name, column_type)
+        for column_name, column_type in required_columns.items()
+        if column_name not in existing
+    ]
+    if not missing:
+        return None
+
+    backup_path = _backup_database_before_curriculum_document_evolution(
+        selected_engine
+    )
+    with selected_engine.begin() as connection:
+        for column_name, column_type in missing:
+            connection.exec_driver_sql(
+                f"ALTER TABLE curricula ADD COLUMN {column_name} {column_type}"
+            )
+    return backup_path
+
+
+def _backup_database_before_curriculum_document_evolution(
+    target_engine: Engine | None = None,
+) -> Path | None:
+    """Back up a file-backed SQLite database before the H.1-D migration."""
+
+    selected_engine = target_engine or engine
+    database_name = selected_engine.url.database
+    if database_name is None or database_name == ":memory:":
+        return None
+    database_path = Path(database_name)
+    if not database_path.exists():
+        return None
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    backup_path = database_path.with_name(
+        f"{database_path.stem}.pre-curriculum-documents-{timestamp}.bak"
+    )
+    shutil.copy2(database_path, backup_path)
+    logger.info(
+        "Created database backup before curriculum document schema evolution: %s",
+        backup_path,
+    )
     return backup_path
 
 

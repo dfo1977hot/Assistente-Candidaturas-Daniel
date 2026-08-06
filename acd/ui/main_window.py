@@ -73,6 +73,10 @@ class MainWindow(QMainWindow):
         )
         for text, destination in destinations:
             if text in label:
+                page = getattr(self, f"{destination}_page", None)
+                refresh = getattr(page, "refresh_reference_data", None)
+                if callable(refresh):
+                    refresh()
                 self.router.navigate(destination)
                 return
 

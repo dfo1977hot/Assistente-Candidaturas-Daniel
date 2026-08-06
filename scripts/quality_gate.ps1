@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("Fast", "Full")]
     [string]$Gate = "Fast",
     [string[]]$Tests = @()
@@ -115,7 +115,7 @@ function Update-MonotonicBaseline(
     }
 }
 
-Invoke-Check @("-m", "ruff", "check", ".")
+Invoke-Check @("-m", "ruff", "check", "acd", "tests", "scripts")
 Invoke-Check @("-m", "compileall", "acd")
 
 if ($Gate -eq "Fast") {

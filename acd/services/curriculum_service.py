@@ -7,8 +7,7 @@ from acd.domain.entities.application import Application
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.curriculum_version import CurriculumVersion
 from acd.infrastructure.repositories.curriculum_repository import CurriculumRepository
-from acd.security.external_content import ExternalFilePolicy
-from acd.security.secure_paths import AuthorizedPathPolicy
+from acd.services.curriculum_document_service import CurriculumDocumentService
 
 
 class CurriculumService:
@@ -18,6 +17,7 @@ class CurriculumService:
         self.repository = repository or CurriculumRepository()
         self.storage_root = Path("data/curriculos")
         self.storage_root.mkdir(parents=True, exist_ok=True)
+        self.document_service = CurriculumDocumentService(self.repository)
 
     def create_curriculum(
         self, *, name: str, version: str = "v1.0", language: str = "pt-BR", description: str = ""
@@ -58,15 +58,23 @@ class CurriculumService:
         logger.info("Currículo atualizado: %s", updated.id)
         return updated
 
-    def delete_curriculum(self, curriculum_id: int) -> bool:
-        """Remove um currículo."""
-        deleted = self.repository.delete(curriculum_id)
+    def delete_curriculum(self, curriculum_id: int, *, delete_linked: bool = False) -> bool:
+        """Remove um currículo e seu arquivo após a confirmação no banco."""
+        curriculum = self.repository.get_by_id(curriculum_id)
+        document_path = (
+            self.document_service.resolve_path(curriculum.file_relative_path)
+            if curriculum is not None
+            else None
+        )
+        deleted = self.repository.delete(curriculum_id, delete_linked=delete_linked)
         if deleted:
+            if document_path:
+                document_path.unlink(missing_ok=True)
             logger.info("Currículo removido: %s", curriculum_id)
         return deleted
 
     def duplicate_curriculum(self, curriculum_id: int) -> Curriculum | None:
-        """Cria uma nova versão a partir de um currículo existente."""
+        """Cria nova versão e duplica o arquivo físico quando disponível."""
         base = self.repository.get_by_id(curriculum_id)
         if base is None:
             return None
@@ -84,13 +92,25 @@ class CurriculumService:
             CurriculumVersion(
                 curriculum_id=created.id,
                 version=next_version,
-                file_name=base.name,
+                file_name=base.file_original_name or base.name,
                 file_path="",
-                file_type="",
+                file_type=(base.file_extension or "").removeprefix("."),
             ),
         )
+        if base.file_relative_path:
+            self.document_service.duplicate_document(base, created)
+            created = self.repository.get_by_id(created.id) or created
         logger.info("Versão criada: %s", created.id)
         return created
+
+    def attach_document(self, curriculum_id: int, source_path: str | Path) -> Curriculum:
+        return self.document_service.attach_document(curriculum_id, source_path)
+
+    def remove_document(self, curriculum_id: int) -> Curriculum:
+        return self.document_service.remove_document(curriculum_id)
+
+    def open_document(self, curriculum_id: int) -> None:
+        self.document_service.open_document(curriculum_id)
 
     def activate_curriculum(self, curriculum_id: int) -> Curriculum | None:
         """Marca um currículo como padrão."""
@@ -105,31 +125,6 @@ class CurriculumService:
         updated = self.repository.update(curriculum)
         logger.info("Currículo ativado: %s", updated.id)
         return updated
-
-    def import_curriculum(
-        self, *, curriculum_id: int, file_name: str, file_bytes: bytes, file_type: str
-    ) -> CurriculumVersion | None:
-        """Importa um arquivo de currículo para o sistema de arquivos local."""
-        curriculum = self.repository.get_by_id(curriculum_id)
-        if curriculum is None:
-            return None
-        validated = ExternalFilePolicy().validate(file_name, file_bytes)
-        destination = AuthorizedPathPolicy(self.storage_root).resolve_relative(
-            f"{curriculum_id}_{validated.filename}",
-            allowed_extensions=frozenset({validated.extension}),
-        )
-        destination.write_bytes(validated.content)
-        version = CurriculumVersion(
-            curriculum_id=curriculum_id,
-            version=curriculum.version,
-            file_name=validated.filename,
-            file_path=str(destination),
-            file_type=validated.extension.removeprefix("."),
-            checksum=self._checksum(validated.content),
-        )
-        created_version = self.repository.create_version(curriculum_id, version)
-        logger.info("Currículo importado: %s", created_version.id)
-        return created_version
 
     def associate_to_application(
         self, *, application_id: int, curriculum_id: int

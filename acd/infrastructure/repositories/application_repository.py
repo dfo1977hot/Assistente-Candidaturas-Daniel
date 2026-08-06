@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from acd.database import database as database_module
 from acd.domain.entities.application import Application
 from acd.domain.entities.timeline_event import TimelineEvent
+from acd.infrastructure.database.dependency_delete import delete_with_dependencies
 
 
 class ApplicationRepository:
@@ -27,12 +28,19 @@ class ApplicationRepository:
             session.refresh(application)
             return application
 
-    def delete(self, application_id: int) -> bool:
+    def delete(self, application_id: int, *, delete_linked: bool = False) -> bool:
         with database_module.SessionLocal() as session:
-            application = session.get(Application, application_id)
-            if application is None:
+            if delete_linked:
+                return delete_with_dependencies(
+                    session,
+                    table_name="applications",
+                    primary_key="id",
+                    value=application_id,
+                )
+            entity = session.get(Application, application_id)
+            if entity is None:
                 return False
-            session.delete(application)
+            session.delete(entity)
             session.commit()
             return True
 

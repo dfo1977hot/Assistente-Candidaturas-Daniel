@@ -11,17 +11,21 @@ from acd.infrastructure.repositories.job_repository import JobRepository
 class JobService:
     """Camada de serviço responsável pelas regras de negócio das vagas."""
 
-    VALID_STATUS = {
+    JOB_STATUSES = (
         "Nova",
-        "Currículo enviado",
-        "Triagem",
+        "Analisada",
+        "Currículo Enviado",
+        "Carta Enviada",
+        "Inscrição Concluída",
+        "Triagem RH",
         "Entrevista RH",
         "Entrevista Técnica",
-        "Proposta",
-        "Contratado",
-        "Rejeitado",
+        "Teste",
+        "Oferta",
+        "Rejeitada",
         "Encerrada",
-    }
+    )
+    VALID_STATUS = frozenset(JOB_STATUSES)
 
     def __init__(self, repository: JobRepository | None = None) -> None:
         self.repository = repository or JobRepository()
@@ -52,6 +56,8 @@ class JobService:
         self._validate_salary_range(salary_min, salary_max)
         self._validate_status(status)
         self._validate_url(job_url)
+        if job_url.strip() and self.repository.url_exists(job_url):
+            raise ValueError("Esta URL já está cadastrada em outra vaga.")
 
         job = Job(
             company_id=company_id,
@@ -110,6 +116,11 @@ class JobService:
         self._validate_salary_range(salary_min, salary_max)
         self._validate_status(status)
         self._validate_url(job_url)
+        if job_url.strip() and self.repository.url_exists(
+            job_url,
+            exclude_job_id=job_id,
+        ):
+            raise ValueError("Esta URL já está cadastrada em outra vaga.")
 
         job = self.repository.get_by_id(job_id)
 
@@ -144,10 +155,10 @@ class JobService:
 
         return updated
 
-    def delete_job(self, job_id: int) -> bool:
+    def delete_job(self, job_id: int, *, delete_linked: bool = False) -> bool:
         """Remove uma vaga."""
 
-        deleted = self.repository.delete(job_id)
+        deleted = self.repository.delete(job_id, delete_linked=delete_linked)
 
         if deleted:
             logger.info("DELETE_JOB | id=%s", job_id)
@@ -186,6 +197,18 @@ class JobService:
     def count_jobs(self) -> int:
         """Retorna o número de vagas cadastradas."""
         return self.repository.count()
+
+    def job_url_exists(
+        self,
+        job_url: str,
+        *,
+        exclude_job_id: int | None = None,
+    ) -> bool:
+        """Informa se uma URL já está cadastrada."""
+        return self.repository.url_exists(
+            job_url,
+            exclude_job_id=exclude_job_id,
+        )
 
     @staticmethod
     def _validate_required_fields(*, company_id: int, title: str) -> None:

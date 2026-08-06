@@ -9,6 +9,10 @@ from acd.application.structured_resume_snapshot import (
 from acd.database import database as database_module
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.curriculum_version import CurriculumVersion
+from acd.infrastructure.database.dependency_delete import (
+    ExtraDependency,
+    delete_with_dependencies,
+)
 
 
 class CurriculumRepository:
@@ -46,12 +50,20 @@ class CurriculumRepository:
             session.refresh(curriculum)
             return curriculum
 
-    def delete(self, curriculum_id: int) -> bool:
+    def delete(self, curriculum_id: int, *, delete_linked: bool = False) -> bool:
         with database_module.SessionLocal() as session:
-            curriculum = session.get(Curriculum, curriculum_id)
-            if curriculum is None:
+            if delete_linked:
+                return delete_with_dependencies(
+                    session,
+                    table_name="curricula",
+                    primary_key="id",
+                    value=curriculum_id,
+                    extra_dependencies=(ExtraDependency("applications", "curriculum_id"),),
+                )
+            entity = session.get(Curriculum, curriculum_id)
+            if entity is None:
                 return False
-            session.delete(curriculum)
+            session.delete(entity)
             session.commit()
             return True
 
