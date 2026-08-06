@@ -95,3 +95,6 @@ data/database/*.db-shm
 # ACD local runtime data
 data/documents/
 diagnostico_*/
+.coverage-*
+coverage.txt
+estrutura_projeto.txt
