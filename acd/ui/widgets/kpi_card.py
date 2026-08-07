@@ -32,6 +32,11 @@ class KPICard(QFrame):
         layout.addWidget(self.value_label)
         layout.addStretch(1)
 
+    @property
+    def valor_label(self) -> QLabel:
+        """Alias legado para compatibilidade com integrações existentes."""
+        return self.value_label
+
     def set_value(self, value: str) -> None:
         self.value_label.setText(value)
 

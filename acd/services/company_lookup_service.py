@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 import json
-import os
 import re
 import socket
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+from acd.security.secret_provider import EnvironmentSecretProvider, read_setting
 
 
 class CompanyLookupError(RuntimeError):
@@ -102,9 +103,9 @@ class OpenAIWebCompanyLookupProvider:
         timeout_seconds: float | None = None,
         client: Any | None = None,
     ) -> None:
-        self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
-        self.model = (model or os.getenv("OPENAI_COMPANY_LOOKUP_MODEL", "gpt-5-mini")).strip()
-        configured_timeout = os.getenv("OPENAI_COMPANY_LOOKUP_TIMEOUT", "120").strip()
+        self.api_key = (api_key or EnvironmentSecretProvider().get_secret("OPENAI_API_KEY") or "").strip()
+        self.model = (model or read_setting("OPENAI_COMPANY_LOOKUP_MODEL", default="gpt-5-mini")).strip()
+        configured_timeout = read_setting("OPENAI_COMPANY_LOOKUP_TIMEOUT", default="120").strip()
         self.timeout_seconds = (
             timeout_seconds
             if timeout_seconds is not None
@@ -413,7 +414,7 @@ class GooglePlacesCompanyLookupProvider:
     )
 
     def __init__(self, api_key: str | None = None, *, timeout_seconds: float = 15.0) -> None:
-        self.api_key = (api_key or os.getenv("GOOGLE_PLACES_API_KEY", "")).strip()
+        self.api_key = (api_key or read_setting("GOOGLE_PLACES_API_KEY")).strip()
         self.timeout_seconds = timeout_seconds
 
     def search(self, name: str, *, limit: int = 8) -> list[CompanyLookupResult]:
@@ -542,7 +543,6 @@ class HybridCompanyLookupProvider:
 
 
 class CompanyLookupService:
-    _cache: dict[tuple[str, str], tuple[datetime, list[CompanyLookupResult]]] = {}
 
     def __init__(
         self,
@@ -552,10 +552,11 @@ class CompanyLookupService:
         cache_ttl: timedelta = timedelta(hours=24),
     ) -> None:
         self.provider_name = _normalize_provider_name(
-            provider_name or os.getenv("COMPANY_LOOKUP_PROVIDER", "hybrid")
+            provider_name or read_setting("COMPANY_LOOKUP_PROVIDER", default="hybrid")
         )
         self.provider = provider or self._build_provider(self.provider_name)
         self.cache_ttl = cache_ttl
+        self._cache: dict[tuple[str, str], tuple[datetime, list[CompanyLookupResult]]] = {}
 
     @staticmethod
     def _build_provider(provider_name: str) -> CompanyLookupProvider:

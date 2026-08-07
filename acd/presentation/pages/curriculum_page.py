@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
 )
-from sqlalchemy.exc import IntegrityError
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.curriculum_document_service import CurriculumDocumentError
@@ -262,7 +261,14 @@ class CurriculumPage(BasePage):
                 return
             self._clear_form()
             self._load_curricula()
-        except IntegrityError:
+        except Exception as exc:
+            if not _is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    "Não foi possível concluir a exclusão.",
+                )
+                return
             cascade_confirmation = QMessageBox.question(
                 self,
                 "Registros vinculados",
@@ -294,11 +300,6 @@ class CurriculumPage(BasePage):
                     "Não foi possível excluir",
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
-        except Exception:
-            QMessageBox.critical(
-                self, "Não foi possível excluir",
-                "Não foi possível concluir a exclusão.",
-            )
 
     def _load_curricula(self) -> None:
         self._render_curricula(self.curriculum_service.repository.get_all())
@@ -340,3 +341,12 @@ class CurriculumPage(BasePage):
         if size < 1024 * 1024:
             return f"{size / 1024:.1f} KB"
         return f"{size / (1024 * 1024):.1f} MB"
+
+
+def _is_integrity_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if current.__class__.__name__ == "IntegrityError":
+            return True
+        current = current.__cause__ or current.__context__
+    return False

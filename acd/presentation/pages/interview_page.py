@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
 )
-from sqlalchemy.exc import IntegrityError
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.application_service import ApplicationService
@@ -224,17 +223,18 @@ class InterviewPage(BasePage):
                 return
             self._clear_form()
             self._load_interviews()
-        except IntegrityError:
+        except Exception as exc:
+            if not _is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    f"A entrevista possui registros vinculados ou ocorreu um erro:\n{exc}",
+                )
+                return
             QMessageBox.warning(
                 self,
                 'Exclus?o bloqueada',
                 'Esta entrevista possui registros vinculados. Exclua ou desassocie esses registros antes de tentar novamente.',
-            )
-        except Exception as exc:  # pragma: no cover
-            QMessageBox.critical(
-                self,
-                "Não foi possível excluir",
-                f"A entrevista possui registros vinculados ou ocorreu um erro:\n{exc}",
             )
 
     def _on_row_selected(self) -> None:
@@ -311,3 +311,12 @@ class InterviewPage(BasePage):
         self.notes_input.clear()
         self.feedback_input.clear()
         self.result_combo.setCurrentIndex(0)
+
+
+def _is_integrity_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if current.__class__.__name__ == "IntegrityError":
+            return True
+        current = current.__cause__ or current.__context__
+    return False

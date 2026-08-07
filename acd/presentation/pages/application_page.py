@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Protocol
 
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
@@ -22,7 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy.exc import IntegrityError
 
 from acd.presentation.candidate_decision_panel import CandidateDecisionPanel
 from acd.presentation.effective_application_resume_preview_panel import (
@@ -69,9 +69,24 @@ from acd.presentation.pages.structured_resume_quality_validation_view_model impo
     StructuredResumeQualityValidationViewModel,
 )
 from acd.presentation.resume_version_review_panel import ResumeVersionReviewPanel
-from acd.services.application_service import ApplicationService
-from acd.services.company_service import CompanyService
-from acd.services.job_service import JobService
+
+
+class _ApplicationData(Protocol):
+    def list_applications(self) -> list[object]: ...
+    def search_applications(self, query: str) -> list[object]: ...
+    def filter_applications(self, **filters: object) -> list[object]: ...
+    def get_application(self, application_id: int) -> object | None: ...
+    def create_application(self, **data: object) -> object: ...
+    def update_application(self, application_id: int, **data: object) -> object | None: ...
+    def delete_application(self, application_id: int, *, delete_linked: bool = False) -> bool: ...
+
+
+class _CompanyData(Protocol):
+    def list_companies(self) -> list[object]: ...
+
+
+class _JobData(Protocol):
+    def filter_jobs(self, **filters: object) -> list[object]: ...
 
 
 class _EmptyApplicationData:
@@ -85,6 +100,9 @@ class _EmptyApplicationData:
 
     def list_applications(self) -> list[object]:
         return []
+
+    def get_application(self, _: int) -> object | None:
+        return None
 
     def search_applications(self, _: str) -> list[object]:
         return []
@@ -108,9 +126,9 @@ class ApplicationPage(BasePage):
         structured_resume_generation_view_model: StructuredResumeGenerationViewModel | None = None,
         effective_structured_resume_docx_export_view_model: EffectiveStructuredResumeDocxExportViewModel | None = None,
         structured_resume_quality_validation_view_model: StructuredResumeQualityValidationViewModel | None = None,
-        application_service: ApplicationService | None = None,
-        company_service: CompanyService | None = None,
-        job_service: JobService | None = None,
+        application_service: _ApplicationData | None = None,
+        company_service: _CompanyData | None = None,
+        job_service: _JobData | None = None,
     ) -> None:
         super().__init__("Candidaturas")
 
@@ -452,7 +470,15 @@ class ApplicationPage(BasePage):
                 return
             self._clear_form()
             self._load_applications()
-        except IntegrityError:
+        except Exception as exc:  # pragma: no cover - defensive UI handling
+            if not self._is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    f"A candidatura possui registros vinculados ou ocorreu um erro:\n{exc}",
+                )
+                return
+
             cascade_confirmation = QMessageBox.question(
                 self,
                 "Registros vinculados",
@@ -484,12 +510,13 @@ class ApplicationPage(BasePage):
                     "Não foi possível excluir",
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
-        except Exception as exc:  # pragma: no cover
-            QMessageBox.critical(
-                self,
-                "Não foi possível excluir",
-                f"A candidatura possui registros vinculados ou ocorreu um erro:\n{exc}",
-            )
+
+    @staticmethod
+    def _is_integrity_error(error: Exception) -> bool:
+        error_type = type(error)
+        return error_type.__name__ == "IntegrityError" and error_type.__module__.startswith(
+            "sqlalchemy"
+        )
 
     def _on_row_selected(self) -> None:
         selected_rows = self.table.selectionModel().selectedRows()

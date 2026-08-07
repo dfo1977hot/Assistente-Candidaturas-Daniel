@@ -278,9 +278,6 @@ def _page(
     effective_structured_resume_docx_export_view_model: _DocxExportViewModel | None = None,
     structured_resume_quality_validation_view_model: _QualityValidationViewModel | None = None,
 ) -> ApplicationPage:
-    monkeypatch.setattr("acd.presentation.pages.application_page.ApplicationService", _ApplicationService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.CompanyService", _CompanyService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.JobService", _JobService)
     return ApplicationPage(
         view_model,
         on_action,
@@ -463,9 +460,6 @@ def test_application_page_review_selection_only_calls_injected_view_model(
 def test_application_page_evaluates_only_after_explicit_panel_click(qapp, monkeypatch) -> None:
     review_view_model = _ResumeVersionReviewViewModel()
     evaluation_view_model = _OptimizedResumeEvaluationViewModel()
-    monkeypatch.setattr("acd.presentation.pages.application_page.ApplicationService", _ApplicationService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.CompanyService", _CompanyService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.JobService", _JobService)
     monkeypatch.setattr(
         "acd.presentation.pages.application_page.LongRunningTaskExecutor",
         _SynchronousExecutor,
@@ -651,9 +645,6 @@ def test_application_page_loads_effective_resume_without_using_visual_selection(
 ) -> None:
     review = _ResumeVersionReviewViewModel()
     effective = _EffectiveApplicationResumeViewModel()
-    monkeypatch.setattr("acd.presentation.pages.application_page.ApplicationService", _ApplicationService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.CompanyService", _CompanyService)
-    monkeypatch.setattr("acd.presentation.pages.application_page.JobService", _JobService)
     page = ApplicationPage(
         _CandidateDecisionViewModel(_state()),
         resume_version_review_view_model=review,  # type: ignore[arg-type]
