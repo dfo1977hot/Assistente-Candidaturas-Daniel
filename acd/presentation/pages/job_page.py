@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import (
-    QDate,
-    QThread,
-)
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
@@ -20,10 +17,9 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
 )
-from sqlalchemy.exc import IntegrityError
 
+from acd.presentation.long_running_task_executor import LongRunningTaskExecutor
 from acd.presentation.pages.base_page import BasePage
-from acd.presentation.pages.linkedin_job_import_worker import LinkedInJobImportWorker
 from acd.services.company_name_matcher import find_company_name_candidate
 from acd.services.company_service import CompanyService
 from acd.services.job_service import JobService
@@ -37,15 +33,22 @@ from acd.services.linkedin_job_import_service import (
 class JobPage(BasePage):
     """Página de cadastro e gerenciamento de vagas."""
 
-    def __init__(self, job_service: JobService, company_service: CompanyService) -> None:
+    def __init__(
+        self,
+        job_service: JobService,
+        company_service: CompanyService,
+        job_import_service: LinkedInJobImportService | None = None,
+    ) -> None:
         super().__init__("Vagas")
 
         self.job_service = job_service
         self.company_service = company_service
         self.current_job_id: int | None = None
-        self._import_thread: QThread | None = None
-        self._import_worker: LinkedInJobImportWorker | None = None
-        self._job_import_service = LinkedInJobImportService()
+        self._import_executor = LongRunningTaskExecutor(self)
+        self._import_executor.succeeded.connect(self._on_linkedin_import_succeeded)
+        self._import_executor.failed.connect(self._on_linkedin_import_failed)
+        self._import_executor.finished.connect(self._on_linkedin_import_finished)
+        self._job_import_service = job_import_service
         self.company_combo = QComboBox()
         self.title_input = QLineEdit()
         self.location_input = QLineEdit()
@@ -215,6 +218,14 @@ class JobPage(BasePage):
             self.filter_company_combo.addItem(company.name, company.id)
 
     def _import_linkedin_job(self) -> None:
+        if self._job_import_service is None:
+            QMessageBox.warning(
+                self,
+                "Importar vaga",
+                "O serviço de importação não está disponível.",
+            )
+            return
+
         url = self.url_input.text().strip()
         try:
             normalized_url = self._job_import_service.normalize_linkedin_job_url(url)
@@ -237,19 +248,8 @@ class JobPage(BasePage):
         self.import_linkedin_button.setEnabled(False)
         self.import_status_label.setText("Importando vaga...")
 
-        thread = QThread(self)
-        worker = LinkedInJobImportWorker(self._job_import_service, normalized_url)
-        worker.moveToThread(thread)
-        thread.started.connect(worker.run)
-        worker.succeeded.connect(self._on_linkedin_import_succeeded)
-        worker.failed.connect(self._on_linkedin_import_failed)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._on_linkedin_import_finished)
-        self._import_thread = thread
-        self._import_worker = worker
-        thread.start()
+        service = self._job_import_service
+        self._import_executor.execute(lambda: service.import_from_url(normalized_url))
 
     def _on_linkedin_import_succeeded(self, result: ImportedLinkedInJob) -> None:
         if not result.title and not result.company_name and not result.description:
@@ -344,14 +344,12 @@ class JobPage(BasePage):
         self.company_combo.setCurrentIndex(candidate.index)
         return True
 
-    def _on_linkedin_import_failed(self, message: str) -> None:
+    def _on_linkedin_import_failed(self, error: object) -> None:
         self.import_status_label.setText("Falha na importação.")
-        QMessageBox.critical(self, "Não foi possível importar", message)
+        QMessageBox.critical(self, "Não foi possível importar", str(error))
 
     def _on_linkedin_import_finished(self) -> None:
         self.import_linkedin_button.setEnabled(True)
-        self._import_thread = None
-        self._import_worker = None
 
     def _save_job(self) -> None:
         try:
@@ -451,7 +449,14 @@ class JobPage(BasePage):
                 return
             self._clear_form()
             self._load_jobs()
-        except IntegrityError:
+        except Exception as exc:
+            if not _is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    f"Ocorreu um erro ao excluir a vaga:\n{exc}",
+                )
+                return
             cascade_confirmation = QMessageBox.question(
                 self,
                 "Registros vinculados",
@@ -483,12 +488,7 @@ class JobPage(BasePage):
                     "Não foi possível excluir",
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
-        except Exception as exc:  # pragma: no cover - defensive UI handling
-            QMessageBox.critical(
-                self,
-                "Não foi possível excluir",
-                f"A vaga possui registros vinculados ou ocorreu um erro:\n{exc}",
-            )
+
 
     def _on_row_selected(self) -> None:
         """Carrega todos os dados da vaga selecionada."""
@@ -641,3 +641,12 @@ class JobPage(BasePage):
         if not value.strip():
             return None
         return float(value)
+
+
+def _is_integrity_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if current.__class__.__name__ == "IntegrityError":
+            return True
+        current = current.__cause__ or current.__context__
+    return False

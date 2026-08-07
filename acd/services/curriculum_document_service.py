@@ -16,7 +16,7 @@ from acd.infrastructure.repositories.curriculum_repository import CurriculumRepo
 
 
 class CurriculumDocumentError(ValueError):
-    pass
+    """Erro funcional ao manipular documentos de currículo."""
 
 
 @dataclass(frozen=True)

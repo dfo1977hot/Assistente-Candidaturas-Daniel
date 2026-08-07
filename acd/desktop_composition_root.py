@@ -34,11 +34,13 @@ from acd.services.analytics_service import AnalyticsService
 from acd.services.application_service import ApplicationService
 from acd.services.ats_service import ATSService
 from acd.services.career_planning_service import CareerPlanningService
+from acd.services.company_lookup_service import CompanyLookupService
 from acd.services.company_service import CompanyService
 from acd.services.curriculum_service import CurriculumService
 from acd.services.gap_analysis_service import GapAnalysisService
 from acd.services.interview_service import InterviewService
 from acd.services.job_service import JobService
+from acd.services.linkedin_job_import_service import LinkedInJobImportService
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_template_service import WorkflowTemplateService
 from acd.ui.dashboard import Dashboard
@@ -67,6 +69,7 @@ class DesktopCompositionRoot:
 
         company_service = CompanyService(company_repository)
         job_service = JobService(job_repository)
+        job_import_service = LinkedInJobImportService()
         application_service = ApplicationService(application_repository)
         interview_service = InterviewService(interview_repository)
         curriculum_service = CurriculumService(curriculum_repository)
@@ -84,8 +87,11 @@ class DesktopCompositionRoot:
         router = Router()
         pages = {
             "dashboard": Dashboard(company_service, job_service, application_service, interview_service, curriculum_service),
-            "companies": CompanyPage(company_service),
-            "jobs": JobPage(job_service, company_service),
+            "companies": CompanyPage(
+                company_service,
+                lambda provider_name: CompanyLookupService(provider_name=provider_name),
+            ),
+            "jobs": JobPage(job_service, company_service, job_import_service),
             "applications": ApplicationPage(
                 candidate_decision_view_model=application_view_models["candidate_decision"],
                 on_candidate_decision_action=lambda action: self._navigate(router, action),

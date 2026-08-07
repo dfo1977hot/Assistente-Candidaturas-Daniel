@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-import os
 import re
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+from acd.security.secret_provider import EnvironmentSecretProvider, read_setting
 
 
 class LinkedInJobImportError(RuntimeError):
@@ -79,9 +80,9 @@ class LinkedInJobImportService:
         model: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self._api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
-        self._model = (model or os.getenv("OPENAI_JOB_IMPORT_MODEL", "gpt-5-mini")).strip()
-        configured_timeout = os.getenv("OPENAI_JOB_IMPORT_TIMEOUT", "120")
+        self._api_key = (api_key or EnvironmentSecretProvider().get_secret("OPENAI_API_KEY") or "").strip()
+        self._model = (model or read_setting("OPENAI_JOB_IMPORT_MODEL", default="gpt-5-mini")).strip()
+        configured_timeout = read_setting("OPENAI_JOB_IMPORT_TIMEOUT", default="120")
         self._timeout = timeout if timeout is not None else self._parse_timeout(configured_timeout)
 
     def import_from_url(self, url: str) -> ImportedLinkedInJob:

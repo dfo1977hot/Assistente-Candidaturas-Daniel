@@ -26,7 +26,8 @@ class FakeRepository:
         self.items[application.id] = application
         return application
 
-    def delete(self, application_id: int) -> bool:
+    def delete(self, application_id: int, *, delete_linked: bool = False) -> bool:
+        del delete_linked
         return self.items.pop(application_id, None) is not None
 
     def get_by_id(self, application_id: int) -> Application | None:

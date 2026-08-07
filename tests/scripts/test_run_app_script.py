@@ -56,7 +56,9 @@ def test_launcher_reports_missing_virtual_environment_from_external_directory(
     assert "Virtual environment" in result.stderr
 
 
-def test_launcher_reports_missing_app_before_invoking_python(tmp_path: Path, launcher: Path) -> None:
+def test_launcher_reports_missing_desktop_entrypoint_before_invoking_python(
+    tmp_path: Path, launcher: Path
+) -> None:
     project = tmp_path / "project"
     scripts = project / "scripts"
     python = project / ".venv" / "Scripts" / "python.exe"
@@ -74,4 +76,4 @@ def test_launcher_reports_missing_app_before_invoking_python(tmp_path: Path, lau
     )
 
     assert result.returncode != 0
-    assert "app.py" in result.stderr
+    assert "acd.desktop" in result.stderr

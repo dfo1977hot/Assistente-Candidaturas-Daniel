@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings, QThread
+from collections.abc import Callable
+
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,25 +18,30 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QTextEdit,
 )
-from sqlalchemy.exc import IntegrityError
 
+from acd.presentation.long_running_task_executor import LongRunningTaskExecutor
 from acd.presentation.pages.base_page import BasePage
 from acd.presentation.pages.company_lookup_dialog import CompanyLookupDialog
-from acd.presentation.pages.company_lookup_worker import CompanyLookupWorker
-from acd.services.company_lookup_service import CompanyLookupService
+from acd.presentation.pages.company_lookup_worker import CompanyLookupGateway
 from acd.services.company_service import CompanyService
 
 
 class CompanyPage(BasePage):
     """Página de cadastro e gerenciamento de empresas."""
 
-    def __init__(self, service: CompanyService) -> None:
+    def __init__(
+        self,
+        service: CompanyService,
+        lookup_service_factory: Callable[[str], CompanyLookupGateway] | None = None,
+    ) -> None:
         super().__init__("Empresas")
 
         self.service = service
-        self.lookup_service = CompanyLookupService()
-        self._lookup_thread: QThread | None = None
-        self._lookup_worker: CompanyLookupWorker | None = None
+        self.lookup_service_factory = lookup_service_factory
+        self._lookup_executor = LongRunningTaskExecutor(self)
+        self._lookup_executor.succeeded.connect(self._on_lookup_succeeded)
+        self._lookup_executor.failed.connect(self._on_lookup_failed)
+        self._lookup_executor.finished.connect(self._on_lookup_finished)
         self._settings = QSettings("ACD", "AssistenteCandidaturasDaniel")
         self._lookup_metadata = {}
         self.current_company_id: int | None = None
@@ -136,35 +143,40 @@ class CompanyPage(BasePage):
     def _lookup_company(self) -> None:
         name = self.name_input.text().strip()
         if len(name) < 2:
-            QMessageBox.warning(self, "Buscar dados", "Informe pelo menos dois caracteres do nome da empresa.")
+            QMessageBox.warning(
+                self,
+                "Buscar dados",
+                "Informe pelo menos dois caracteres do nome da empresa.",
+            )
             return
-        if self._lookup_thread is not None:
+        if self._lookup_executor.is_running:
+            return
+        if self.lookup_service_factory is None:
+            self.lookup_status.setText("Serviço de busca indisponível.")
+            QMessageBox.warning(
+                self,
+                "Buscar dados",
+                "O serviço de busca de empresas não está disponível.",
+            )
             return
 
         provider_name = str(self.lookup_provider.currentData())
+        force_refresh = self.force_refresh_checkbox.isChecked()
+        service_factory = self.lookup_service_factory
         self._set_lookup_running(True)
         self.lookup_status.setText("Buscando dados...")
 
-        self._lookup_thread = QThread(self)
-        self._lookup_worker = CompanyLookupWorker(
-            name=name,
-            provider_name=provider_name,
-            force_refresh=self.force_refresh_checkbox.isChecked(),
-        )
-        self._lookup_worker.moveToThread(self._lookup_thread)
-        self._lookup_thread.started.connect(self._lookup_worker.run)
-        self._lookup_worker.succeeded.connect(self._on_lookup_succeeded)
-        self._lookup_worker.failed.connect(self._on_lookup_failed)
-        self._lookup_worker.finished.connect(self._lookup_thread.quit)
-        self._lookup_worker.finished.connect(self._lookup_worker.deleteLater)
-        self._lookup_thread.finished.connect(self._lookup_thread.deleteLater)
-        self._lookup_thread.finished.connect(self._on_lookup_finished)
-        self._lookup_thread.start()
+        def lookup_task() -> object:
+            service = service_factory(provider_name)
+            return service.search(name, force_refresh=force_refresh)
+
+        self._lookup_executor.execute(lookup_task)
 
     def _cancel_lookup(self) -> None:
-        if self._lookup_worker is not None:
-            self._lookup_worker.cancel()
-            self.lookup_status.setText("Cancelamento solicitado. Aguardando a consulta encerrar...")
+        if self._lookup_executor.cancel():
+            self.lookup_status.setText(
+                "Cancelamento solicitado. Aguardando a consulta encerrar..."
+            )
             self.cancel_lookup_button.setEnabled(False)
 
     def _on_lookup_succeeded(self, results: object) -> None:
@@ -227,13 +239,11 @@ class CompanyPage(BasePage):
             "Revise todos os campos antes de salvar.",
         )
 
-    def _on_lookup_failed(self, message: str) -> None:
+    def _on_lookup_failed(self, error: object) -> None:
         self.lookup_status.setText("Falha na consulta.")
-        QMessageBox.warning(self, "Buscar dados", message)
+        QMessageBox.warning(self, "Buscar dados", str(error))
 
     def _on_lookup_finished(self) -> None:
-        self._lookup_thread = None
-        self._lookup_worker = None
         self._set_lookup_running(False)
         if self.lookup_status.text().startswith("Cancelamento"):
             self.lookup_status.setText("Consulta cancelada.")
@@ -364,7 +374,14 @@ class CompanyPage(BasePage):
                 return
             self._clear_form()
             self._load_companies()
-        except IntegrityError:
+        except Exception as exc:
+            if not _is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    f"Ocorreu um erro ao excluir a empresa:\n{exc}",
+                )
+                return
             cascade_confirmation = QMessageBox.question(
                 self,
                 "Registros vinculados",
@@ -396,12 +413,7 @@ class CompanyPage(BasePage):
                     "Não foi possível excluir",
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
-        except Exception as exc:  # pragma: no cover - defensive UI handling
-            QMessageBox.critical(
-                self,
-                "Não foi possível excluir",
-                f"A empresa possui registros vinculados ou ocorreu um erro:\n{exc}",
-            )
+
 
     def _clear_form(self) -> None:
         self.current_company_id = None
@@ -460,3 +472,12 @@ class CompanyPage(BasePage):
                 ),
             )
         self.table.resizeColumnsToContents()
+
+
+def _is_integrity_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if current.__class__.__name__ == "IntegrityError":
+            return True
+        current = current.__cause__ or current.__context__
+    return False
