@@ -1,13 +1,14 @@
 """Structured logging framework for the platform."""
 
-import logging
-import uuid
-from typing import Any
-from datetime import datetime
 from contextlib import contextmanager
+import logging
 import time
+from typing import Any
 
-from acd.domain.platform.system_log import SystemLog, LogLevel
+from acd.domain.platform.system_log import LogLevel
+from acd.observability.logging_config import log_event
+from acd.observability.operation_context import observation_context
+from acd.observability.sanitization import sanitize_mapping, sanitize_text
 
 
 class StructuredLogger:
@@ -46,10 +47,11 @@ class StructuredLogger:
         Returns:
             Context dictionary
         """
+        current = observation_context()
         return {
-            "correlation_id": self.correlation_id or str(uuid.uuid4()),
+            "correlation_id": self.correlation_id or current.correlation_id,
             "request_id": self.request_id,
-            "timestamp": datetime.now().isoformat(),
+            "operation_id": current.operation_id,
         }
 
     def _log(
@@ -63,7 +65,7 @@ class StructuredLogger:
         status_code: int | None = None,
         context: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> SystemLog:
+    ) -> dict[str, Any]:
         """Internal log method.
 
         Args:
@@ -81,13 +83,13 @@ class StructuredLogger:
             SystemLog entity
         """
         log_context = self.get_context()
-        log_context.update(context or {})
+        log_context.update(sanitize_mapping(context))
 
         log_data = {
             "level": level,
             "module": self.name,
             "operation": operation,
-            "message": message,
+            "message": sanitize_text(message),
             "duration_ms": duration_ms,
             "result": result,
             "error_type": error_type,
@@ -95,12 +97,21 @@ class StructuredLogger:
             "correlation_id": log_context.get("correlation_id"),
             "request_id": log_context.get("request_id"),
             "context": log_context,
-            "metadata": metadata or {},
+            "metadata": sanitize_mapping(metadata),
         }
 
-        # Also log to Python logger
         log_level = getattr(logging, level, logging.INFO)
-        self.logger.log(log_level, f"{operation}: {message}")
+        log_event(
+            self.logger,
+            log_level,
+            operation,
+            message,
+            status=result,
+            duration_ms=duration_ms,
+            error_type=error_type,
+            status_code=status_code,
+            metadata=sanitize_mapping(metadata),
+        )
 
         return log_data
 
@@ -271,19 +282,21 @@ class StructuredLogger:
         Yields:
             None
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         try:
             yield
-            duration_ms = (time.time() - start_time) * 1000
+            duration_ms = (time.perf_counter() - start_time) * 1000
             if level == LogLevel.DEBUG.value:
                 self.debug(operation_name, f"Completed in {duration_ms:.2f}ms")
             else:
-                self.info(operation_name, f"Completed in {duration_ms:.2f}ms", duration_ms=duration_ms)
+                self.info(
+                    operation_name, f"Completed in {duration_ms:.2f}ms", duration_ms=duration_ms
+                )
         except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
+            duration_ms = (time.perf_counter() - start_time) * 1000
             self.error(
                 operation_name,
-                f"Failed: {str(e)}",
+                "Operation failed",
                 error_type=type(e).__name__,
                 duration_ms=duration_ms,
             )

@@ -8,6 +8,6 @@ if TYPE_CHECKING:
     from acd.infrastructure.repositories.company_repository import CompanyRepository
 
 
-def list_companies(repository: "CompanyRepository") -> list[Company]:
+def list_companies(repository: CompanyRepository) -> list[Company]:
     """Retorna todas as empresas cadastradas."""
     return repository.get_all()

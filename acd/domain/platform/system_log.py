@@ -1,14 +1,15 @@
 """System log entity for structured logging."""
 
-from enum import Enum
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+from enum import StrEnum
+
 from sqlalchemy import JSON, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class LogLevel(str, Enum):
+class LogLevel(StrEnum):
     """Log levels."""
 
     DEBUG = "DEBUG"

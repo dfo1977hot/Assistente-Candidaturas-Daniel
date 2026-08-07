@@ -1,37 +1,37 @@
 from __future__ import annotations
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QVBoxLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
-    QWidget,
-    QTextEdit,
-    QPushButton,
-    QScrollArea,
-    QFrame,
-    QProgressBar,
     QListWidget,
-    QListWidgetItem,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QColor
 
 from acd.presentation.pages.base_page import BasePage
-from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
-from acd.infrastructure.agent.tool_registry import DefaultToolRegistry
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
-from acd.services.ai_execution_service import AIExecutionService, AgentMemoryService
 
 
 class AssistantPage(BasePage):
     """AI Agent Assistant page."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        orchestrator: object,
+        repository: object,
+        memory_service: object,
+        execution_service: object,
+    ) -> None:
         super().__init__("Assistente")
-        self.orchestrator = AIOrchestrator(tool_registry=DefaultToolRegistry())
-        self.repository = AgentRepository()
-        self.memory_service = AgentMemoryService(self.repository)
-        self.execution_service = AIExecutionService(self.repository)
+        self.orchestrator = orchestrator
+        self.repository = repository
+        self.memory_service = memory_service
+        self.execution_service = execution_service
 
         self._current_plan = None
         self.setup_ui()
@@ -55,7 +55,9 @@ class AssistantPage(BasePage):
     def create_chat_panel(self) -> QWidget:
         """Create chat panel."""
         widget = QFrame()
-        widget.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }")
+        widget.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -70,19 +72,25 @@ class AssistantPage(BasePage):
         self.chat_display = QTextEdit()
         self.chat_display.setReadOnly(True)
         self.chat_display.setMinimumHeight(300)
-        self.chat_display.setStyleSheet("QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }")
+        self.chat_display.setStyleSheet(
+            "QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }"
+        )
         layout.addWidget(self.chat_display)
 
         # Input field
         self.chat_input = QTextEdit()
         self.chat_input.setPlaceholderText("Digite seu objetivo ou pergunta aqui...")
         self.chat_input.setMaximumHeight(100)
-        self.chat_input.setStyleSheet("QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }")
+        self.chat_input.setStyleSheet(
+            "QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }"
+        )
         layout.addWidget(self.chat_input)
 
         # Send button
         send_btn = QPushButton("Enviar")
-        send_btn.setStyleSheet("QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }")
+        send_btn.setStyleSheet(
+            "QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }"
+        )
         send_btn.clicked.connect(self._on_send_message)
         layout.addWidget(send_btn)
 
@@ -92,7 +100,9 @@ class AssistantPage(BasePage):
     def create_plan_panel(self) -> QWidget:
         """Create plan and execution panel."""
         widget = QFrame()
-        widget.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }")
+        widget.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -107,19 +117,25 @@ class AssistantPage(BasePage):
         self.plan_details = QTextEdit()
         self.plan_details.setReadOnly(True)
         self.plan_details.setMaximumHeight(150)
-        self.plan_details.setStyleSheet("QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }")
+        self.plan_details.setStyleSheet(
+            "QTextEdit { border: 1px solid #ccc; border-radius: 4px; padding: 8px; }"
+        )
         layout.addWidget(self.plan_details)
 
         # Approve button
         self.approve_btn = QPushButton("Aprovar Plano")
-        self.approve_btn.setStyleSheet("QPushButton { background-color: #28a745; color: white; padding: 8px; border-radius: 4px; }")
+        self.approve_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; color: white; padding: 8px; border-radius: 4px; }"
+        )
         self.approve_btn.clicked.connect(self._on_approve_plan)
         self.approve_btn.setEnabled(False)
         layout.addWidget(self.approve_btn)
 
         # Execute button
         self.execute_btn = QPushButton("Executar")
-        self.execute_btn.setStyleSheet("QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }")
+        self.execute_btn.setStyleSheet(
+            "QPushButton { background-color: #0066cc; color: white; padding: 8px; border-radius: 4px; }"
+        )
         self.execute_btn.clicked.connect(self._on_execute_plan)
         self.execute_btn.setEnabled(False)
         layout.addWidget(self.execute_btn)
@@ -190,7 +206,9 @@ class AssistantPage(BasePage):
             self.approve_btn.setEnabled(True)
             self.status_label.setText(f"Plano criado: {plan_result.get('task_count')} tarefas")
         else:
-            self.chat_display.append(f"<b style='color: red;'>Erro:</b> {plan_result.get('errors', ['Unknown error'])[0]}")
+            self.chat_display.append(
+                f"<b style='color: red;'>Erro:</b> {plan_result.get('errors', ['Unknown error'])[0]}"
+            )
 
     def _display_plan(self, plan: dict) -> None:
         """Display plan details."""
@@ -245,4 +263,6 @@ class AssistantPage(BasePage):
         self.execution_log.addItem(f"Tarefas falhadas: {result.get('tasks_failed', 0)}")
 
         self.progress_bar.setValue(100)
-        self.status_label.setText(f"Execução {'bem-sucedida' if result.get('success') else 'com falhas'}")
+        self.status_label.setText(
+            f"Execução {'bem-sucedida' if result.get('success') else 'com falhas'}"
+        )

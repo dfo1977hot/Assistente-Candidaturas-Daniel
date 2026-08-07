@@ -1,8 +1,5 @@
 """Confidence calculator for assigning confidence levels to hypotheses and patterns."""
 
-from typing import Any
-from decimal import Decimal
-
 
 class ConfidenceCalculator:
     """Calculates confidence levels based on evidence quality and quantity."""
@@ -13,7 +10,9 @@ class ConfidenceCalculator:
         self.min_evidence_for_medium_confidence = 20
         self.min_evidence_for_low_confidence = 5
 
-    def calculate_from_evidence_count(self, evidence_count: int, base_confidence: float = 0.5) -> float:
+    def calculate_from_evidence_count(
+        self, evidence_count: int, base_confidence: float = 0.5
+    ) -> float:
         """Calculate confidence based on evidence count.
 
         Args:
@@ -36,10 +35,7 @@ class ConfidenceCalculator:
         return max(0.0, min(1.0, confidence))
 
     def calculate_from_consistency(
-        self, 
-        supporting_count: int, 
-        total_count: int,
-        min_threshold: float = 0.6
+        self, supporting_count: int, total_count: int, min_threshold: float = 0.6
     ) -> float:
         """Calculate confidence from consistency ratio.
 
@@ -65,7 +61,7 @@ class ConfidenceCalculator:
         evidence_count: int,
         supporting_ratio: float,
         data_recency_days: int = 0,
-        expert_adjustment: float = 0.0
+        expert_adjustment: float = 0.0,
     ) -> float:
         """Calculate confidence from multiple factors.
 
@@ -80,8 +76,7 @@ class ConfidenceCalculator:
         """
         # Base confidence from consistency
         base = self.calculate_from_consistency(
-            int(supporting_ratio * evidence_count), 
-            evidence_count
+            int(supporting_ratio * evidence_count), evidence_count
         )
 
         # Adjust for evidence count
@@ -120,9 +115,9 @@ class ConfidenceCalculator:
     def calculate_data_quality_score(
         self,
         completeness: float,  # 0-1: How complete is the data
-        accuracy: float,      # 0-1: How accurate
-        timeliness: float,    # 0-1: How recent
-        representativeness: float = 1.0  # 0-1: How representative
+        accuracy: float,  # 0-1: How accurate
+        timeliness: float,  # 0-1: How recent
+        representativeness: float = 1.0,  # 0-1: How representative
     ) -> float:
         """Calculate overall data quality score.
 
@@ -143,10 +138,10 @@ class ConfidenceCalculator:
         }
 
         quality = (
-            completeness * weights["completeness"] +
-            accuracy * weights["accuracy"] +
-            timeliness * weights["timeliness"] +
-            representativeness * weights["representativeness"]
+            completeness * weights["completeness"]
+            + accuracy * weights["accuracy"]
+            + timeliness * weights["timeliness"]
+            + representativeness * weights["representativeness"]
         )
 
         return max(0.0, min(1.0, quality))

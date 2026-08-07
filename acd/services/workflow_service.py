@@ -4,11 +4,9 @@ import json
 from typing import Any
 
 from acd.domain.entities.workflow import Workflow
-from acd.domain.entities.workflow_execution import WorkflowExecution
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
+from acd.infrastructure.workflow.workflow_event_bus import EventBus
 from acd.infrastructure.workflow.workflow_runner import WorkflowRunner
-from acd.infrastructure.workflow.event_bus import EventBus
-from acd.infrastructure.workflow.command_dispatcher import CommandDispatcher
 
 
 class WorkflowService:
@@ -24,12 +22,18 @@ class WorkflowService:
         self.event_bus = event_bus or EventBus()
         self.runner = runner or WorkflowRunner(self.repository, self.event_bus)
 
-    def create_workflow(self, name: str, description: str, steps: list[dict[str, Any]], *, version: str = "1") -> Workflow:
+    def create_workflow(
+        self, name: str, description: str, steps: list[dict[str, Any]], *, version: str = "1"
+    ) -> Workflow:
         """Create a new workflow."""
         definition = {"steps": steps}
-        return self.repository.create_workflow(name, description, json.dumps(definition), version=version)
+        return self.repository.create_workflow(
+            name, description, json.dumps(definition), version=version
+        )
 
-    def execute_workflow(self, workflow_id: int, application_id: int | None = None) -> dict[str, Any]:
+    def execute_workflow(
+        self, workflow_id: int, application_id: int | None = None
+    ) -> dict[str, Any]:
         """Execute a workflow."""
         execution = self.repository.create_execution(workflow_id, application_id)
         return self.runner.run(execution)

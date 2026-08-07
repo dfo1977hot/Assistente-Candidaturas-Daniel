@@ -1,14 +1,15 @@
 """Documentation topic entity."""
 
-from enum import Enum
 from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import JSON, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, Text, JSON
 
 from acd.models.base import Base
 
 
-class DocumentationCategory(str, Enum):
+class DocumentationCategory(StrEnum):
     """Documentation categories."""
 
     GETTING_STARTED = "getting_started"

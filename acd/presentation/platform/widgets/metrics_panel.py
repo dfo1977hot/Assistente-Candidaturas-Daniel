@@ -1,10 +1,14 @@
 """Metrics display panel widget."""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QTableWidget, QTableWidgetItem, QHeaderView
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtGui import QFont
 
 from acd.application.platform import PlatformUseCases
 
@@ -47,12 +51,8 @@ class MetricsPanel(QWidget):
         # Metrics table
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels([
-            "Metric", "Value", "Unit", "Module", "Status"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
+        self.table.setHorizontalHeaderLabels(["Metric", "Value", "Unit", "Module", "Status"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -75,7 +75,7 @@ class MetricsPanel(QWidget):
             summary: Summary data
         """
         current = summary.get("current", {})
-        averages = summary.get("averages", {})
+        summary.get("averages", {})
 
         memory = current.get("memory_mb", 0)
         cpu = current.get("cpu_percent", 0)

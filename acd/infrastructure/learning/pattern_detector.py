@@ -1,11 +1,10 @@
 """Pattern detector for identifying patterns in application outcomes."""
 
+from collections import defaultdict
 from typing import Any
-from collections import Counter, defaultdict
-from datetime import datetime, timedelta
 
-from acd.domain.learning.pattern import Pattern, PatternType
-from acd.domain.learning.outcome import Outcome, OutcomeResult
+from acd.domain.learning.outcome import Outcome
+from acd.domain.learning.pattern import PatternType
 from acd.infrastructure.learning.confidence_calculator import ConfidenceCalculator
 
 
@@ -19,9 +18,7 @@ class PatternDetector:
         self.min_success_ratio = 0.6
 
     def detect_skill_success_pattern(
-        self,
-        outcomes: list[Outcome],
-        min_skill_frequency: int = 3
+        self, outcomes: list[Outcome], min_skill_frequency: int = 3
     ) -> list[dict[str, Any]]:
         """Detect skills that correlate with success.
 
@@ -54,20 +51,22 @@ class PatternDetector:
                     supporting_ratio=success_ratio,
                 )
 
-                patterns.append({
-                    "type": PatternType.SKILL_SUCCESS.value,
-                    "name": f"Success with {skill} skill",
-                    "description": f"{skill} appears in {successful}/{len(skill_outcomes_list)} successful applications",
-                    "criteria": {
-                        "skill": skill,
-                        "success_ratio": success_ratio,
-                        "applications": len(skill_outcomes_list),
-                    },
-                    "evidence_count": len(skill_outcomes_list),
-                    "confidence": confidence,
-                    "impact": success_ratio - 0.3,  # Base success rate assumed ~30%
-                    "related_outcomes": [o.id for o in skill_outcomes_list],
-                })
+                patterns.append(
+                    {
+                        "type": PatternType.SKILL_SUCCESS.value,
+                        "name": f"Success with {skill} skill",
+                        "description": f"{skill} appears in {successful}/{len(skill_outcomes_list)} successful applications",
+                        "criteria": {
+                            "skill": skill,
+                            "success_ratio": success_ratio,
+                            "applications": len(skill_outcomes_list),
+                        },
+                        "evidence_count": len(skill_outcomes_list),
+                        "confidence": confidence,
+                        "impact": success_ratio - 0.3,  # Base success rate assumed ~30%
+                        "related_outcomes": [o.id for o in skill_outcomes_list],
+                    }
+                )
 
         return patterns
 
@@ -103,20 +102,22 @@ class PatternDetector:
                 supporting_ratio=conversion_rate,
             )
 
-            patterns.append({
-                "type": PatternType.PLATFORM_SUCCESS.value,
-                "name": f"High conversion on {platform}",
-                "description": f"{platform} has {conversion_rate*100:.1f}% success rate",
-                "criteria": {
-                    "platform": platform,
-                    "min_conversion": conversion_rate,
-                    "applications": len(platform_outcomes_list),
-                },
-                "evidence_count": len(platform_outcomes_list),
-                "confidence": confidence,
-                "impact": conversion_rate - 0.3,
-                "related_outcomes": [o.id for o in platform_outcomes_list],
-            })
+            patterns.append(
+                {
+                    "type": PatternType.PLATFORM_SUCCESS.value,
+                    "name": f"High conversion on {platform}",
+                    "description": f"{platform} has {conversion_rate*100:.1f}% success rate",
+                    "criteria": {
+                        "platform": platform,
+                        "min_conversion": conversion_rate,
+                        "applications": len(platform_outcomes_list),
+                    },
+                    "evidence_count": len(platform_outcomes_list),
+                    "confidence": confidence,
+                    "impact": conversion_rate - 0.3,
+                    "related_outcomes": [o.id for o in platform_outcomes_list],
+                }
+            )
 
         return patterns
 
@@ -152,20 +153,22 @@ class PatternDetector:
                 supporting_ratio=success_rate,
             )
 
-            patterns.append({
-                "type": PatternType.SECTOR_PATTERN.value,
-                "name": f"Strong results in {sector}",
-                "description": f"{sector} sector shows {success_rate*100:.1f}% success",
-                "criteria": {
-                    "sector": sector,
-                    "min_success_rate": success_rate,
-                    "applications": len(sector_outcomes_list),
-                },
-                "evidence_count": len(sector_outcomes_list),
-                "confidence": confidence,
-                "impact": success_rate - 0.3,
-                "related_outcomes": [o.id for o in sector_outcomes_list],
-            })
+            patterns.append(
+                {
+                    "type": PatternType.SECTOR_PATTERN.value,
+                    "name": f"Strong results in {sector}",
+                    "description": f"{sector} sector shows {success_rate*100:.1f}% success",
+                    "criteria": {
+                        "sector": sector,
+                        "min_success_rate": success_rate,
+                        "applications": len(sector_outcomes_list),
+                    },
+                    "evidence_count": len(sector_outcomes_list),
+                    "confidence": confidence,
+                    "impact": success_rate - 0.3,
+                    "related_outcomes": [o.id for o in sector_outcomes_list],
+                }
+            )
 
         return patterns
 
@@ -198,7 +201,15 @@ class PatternDetector:
             successful = sum(1 for o in day_outcomes_list if o.is_positive())
             success_rate = successful / len(day_outcomes_list)
 
-            day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            day_names = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ]
             day_name = day_names[day_of_week]
 
             confidence = self.confidence_calculator.calculate_combined(
@@ -206,20 +217,22 @@ class PatternDetector:
                 supporting_ratio=success_rate,
             )
 
-            patterns.append({
-                "type": PatternType.TIMING_PATTERN.value,
-                "name": f"Better results on {day_name}",
-                "description": f"Applications submitted on {day_name} show {success_rate*100:.1f}% success",
-                "criteria": {
-                    "day_of_week": day_of_week,
-                    "day_name": day_name,
-                    "success_rate": success_rate,
-                },
-                "evidence_count": len(day_outcomes_list),
-                "confidence": confidence,
-                "impact": success_rate - 0.3,
-                "related_outcomes": [o.id for o in day_outcomes_list],
-            })
+            patterns.append(
+                {
+                    "type": PatternType.TIMING_PATTERN.value,
+                    "name": f"Better results on {day_name}",
+                    "description": f"Applications submitted on {day_name} show {success_rate*100:.1f}% success",
+                    "criteria": {
+                        "day_of_week": day_of_week,
+                        "day_name": day_name,
+                        "success_rate": success_rate,
+                    },
+                    "evidence_count": len(day_outcomes_list),
+                    "confidence": confidence,
+                    "impact": success_rate - 0.3,
+                    "related_outcomes": [o.id for o in day_outcomes_list],
+                }
+            )
 
         return patterns
 
@@ -257,20 +270,22 @@ class PatternDetector:
                 supporting_ratio=success_rate,
             )
 
-            patterns.append({
-                "type": PatternType.RESUME_TYPE_SUCCESS.value,
-                "name": f"High-performing resume (ID: {resume_id})",
-                "description": f"Resume {resume_id} achieves {success_rate*100:.1f}% success rate",
-                "criteria": {
-                    "resume_id": resume_id,
-                    "success_rate": success_rate,
-                    "applications": len(resume_outcomes_list),
-                },
-                "evidence_count": len(resume_outcomes_list),
-                "confidence": confidence,
-                "impact": success_rate - 0.3,
-                "related_outcomes": [o.id for o in resume_outcomes_list],
-            })
+            patterns.append(
+                {
+                    "type": PatternType.RESUME_TYPE_SUCCESS.value,
+                    "name": f"High-performing resume (ID: {resume_id})",
+                    "description": f"Resume {resume_id} achieves {success_rate*100:.1f}% success rate",
+                    "criteria": {
+                        "resume_id": resume_id,
+                        "success_rate": success_rate,
+                        "applications": len(resume_outcomes_list),
+                    },
+                    "evidence_count": len(resume_outcomes_list),
+                    "confidence": confidence,
+                    "impact": success_rate - 0.3,
+                    "related_outcomes": [o.id for o in resume_outcomes_list],
+                }
+            )
 
         return patterns
 

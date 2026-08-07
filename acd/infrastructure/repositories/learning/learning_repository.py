@@ -1,16 +1,19 @@
 """Repository for learning records, insights, patterns, and hypotheses."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from datetime import datetime, timedelta
 
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc
 
-from acd.domain.learning.learning_record import LearningRecord, LearningRecordStatus, LearningSourceType
-from acd.domain.learning.outcome import Outcome, OutcomeResult
-from acd.domain.learning.pattern import Pattern
 from acd.domain.learning.hypothesis import Hypothesis, HypothesisStatus
 from acd.domain.learning.insight import Insight
+from acd.domain.learning.learning_record import (
+    LearningRecord,
+    LearningRecordStatus,
+)
+from acd.domain.learning.outcome import Outcome
+from acd.domain.learning.pattern import Pattern
 
 
 class LearningRepository:
@@ -367,12 +370,7 @@ class LearningRepository:
 
     # Outcome operations
     def create_outcome(
-        self,
-        outcome_type: str,
-        result: str,
-        company: str,
-        position_title: str,
-        **kwargs
+        self, outcome_type: str, result: str, company: str, position_title: str, **kwargs
     ) -> Outcome:
         """Create outcome.
 
@@ -391,7 +389,7 @@ class LearningRepository:
             result=result,
             company=company,
             position_title=position_title,
-            **kwargs
+            **kwargs,
         )
         self.session.add(outcome)
         self.session.commit()
@@ -413,7 +411,7 @@ class LearningRepository:
         Returns:
             List of outcomes
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days_back)
         query = self.session.query(Outcome).filter(Outcome.created_at >= cutoff_date)
 
         if result:
@@ -429,9 +427,9 @@ class LearningRepository:
         """
         return {
             "total_records": self.session.query(LearningRecord).count(),
-            "approved_records": self.session.query(LearningRecord).filter(
-                LearningRecord.status == LearningRecordStatus.APPROVED
-            ).count(),
+            "approved_records": self.session.query(LearningRecord)
+            .filter(LearningRecord.status == LearningRecordStatus.APPROVED)
+            .count(),
             "patterns": self.session.query(Pattern).count(),
             "hypotheses": self.session.query(Hypothesis).count(),
             "insights": self.session.query(Insight).count(),

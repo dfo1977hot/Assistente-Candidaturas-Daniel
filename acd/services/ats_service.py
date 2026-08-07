@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from acd.core.logger import logger
+from acd.domain.ats_evaluation import (
+    ATSEvaluationInput,
+    ATSEvaluationResult,
+    ATSEvaluator,
+)
 from acd.domain.entities.ats_score import ATSScore
 from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job_profile import JobProfile
@@ -28,8 +33,7 @@ class ScoreEngine(Protocol):
         curriculum_certifications: list[str],
         job_certifications: list[str],
         desired_skills: list[str],
-    ) -> dict[str, object]:
-        ...
+    ) -> dict[str, object]: ...
 
 
 class RecommendationStrategy(Protocol):
@@ -41,8 +45,7 @@ class RecommendationStrategy(Protocol):
         missing_skills: list[str],
         desired_skills: list[str],
         curriculum_strengths: list[str],
-    ) -> list[str]:
-        ...
+    ) -> list[str]: ...
 
 
 @dataclass
@@ -120,9 +123,15 @@ class RuleBasedScoreEngine:
         technical_ratio = len(matched_skills) / max(1, len(curriculum_skills))
         technical_score = round(min(40.0, technical_ratio * 40.0), 2)
         experience_ratio = min(1.0, curriculum_experience / max(1, job_experience))
-        language_ratio = len(set(curriculum_languages) & set(job_languages)) / max(1, len(job_languages))
-        certification_ratio = len(set(curriculum_certifications) & set(job_certifications)) / max(1, len(job_certifications))
-        desired_ratio = len(set(desired_skills) & set(curriculum_skills)) / max(1, len(desired_skills))
+        language_ratio = len(set(curriculum_languages) & set(job_languages)) / max(
+            1, len(job_languages)
+        )
+        certification_ratio = len(set(curriculum_certifications) & set(job_certifications)) / max(
+            1, len(job_certifications)
+        )
+        desired_ratio = len(set(desired_skills) & set(curriculum_skills)) / max(
+            1, len(desired_skills)
+        )
         formation_ratio = 1.0 if curriculum_skills else 0.0
         experience_score = round(experience_ratio * 20, 2)
         formation_score = round(formation_ratio * 10, 2)
@@ -145,12 +154,36 @@ class RuleBasedScoreEngine:
         return {
             "total_score": total_score,
             "criteria": {
-                "competencias_tecnicas": {"score": technical_score, "max_score": 40, "weight": self.weight_config.technical_skills},
-                "experiencia": {"score": experience_score, "max_score": 20, "weight": self.weight_config.experience},
-                "formacao": {"score": formation_score, "max_score": 10, "weight": self.weight_config.education},
-                "idiomas": {"score": language_score, "max_score": 10, "weight": self.weight_config.languages},
-                "certificacoes": {"score": certification_score, "max_score": 10, "weight": self.weight_config.certifications},
-                "desejaveis": {"score": desired_score, "max_score": 10, "weight": self.weight_config.desired_skills},
+                "competencias_tecnicas": {
+                    "score": technical_score,
+                    "max_score": 40,
+                    "weight": self.weight_config.technical_skills,
+                },
+                "experiencia": {
+                    "score": experience_score,
+                    "max_score": 20,
+                    "weight": self.weight_config.experience,
+                },
+                "formacao": {
+                    "score": formation_score,
+                    "max_score": 10,
+                    "weight": self.weight_config.education,
+                },
+                "idiomas": {
+                    "score": language_score,
+                    "max_score": 10,
+                    "weight": self.weight_config.languages,
+                },
+                "certificacoes": {
+                    "score": certification_score,
+                    "max_score": 10,
+                    "weight": self.weight_config.certifications,
+                },
+                "desejaveis": {
+                    "score": desired_score,
+                    "max_score": 10,
+                    "weight": self.weight_config.desired_skills,
+                },
             },
             "matched_skills": matched_skills,
         }
@@ -175,7 +208,9 @@ class GapAnalysisEngine:
         return {
             "missing_skills": list(dict.fromkeys(missing_skills)),
             "desired_skills": [
-                skill for skill in list(dict.fromkeys(desired_skills)) if skill and skill.casefold() not in curriculum_lookup
+                skill
+                for skill in list(dict.fromkeys(desired_skills))
+                if skill and skill.casefold() not in curriculum_lookup
             ],
         }
 
@@ -183,7 +218,9 @@ class GapAnalysisEngine:
 class ExplainabilityEngine:
     """Gera uma explicação textual e estruturada do score."""
 
-    def build(self, *, total_score: int, criteria: dict[str, dict[str, float]]) -> dict[str, object]:
+    def build(
+        self, *, total_score: int, criteria: dict[str, dict[str, float]]
+    ) -> dict[str, object]:
         details = [
             {
                 "label": "Competências Técnicas",
@@ -257,56 +294,82 @@ class ATSService:
         self.recommendation_strategy = recommendation_strategy or RuleBasedRecommendationStrategy()
         self.weight_configuration_service = WeightConfigurationService()
 
-    def compare_curriculum(self, *, curriculum: Curriculum, job_profile: JobProfile) -> dict[str, object]:
+    def compare_curriculum(
+        self, *, curriculum: Curriculum, job_profile: JobProfile
+    ) -> dict[str, object]:
         """Compara um currículo com um perfil de vaga e persiste o resultado."""
-        curriculum_skills = self._split_list(curriculum.description or "")
-        job_skills = self._collect_job_skills(job_profile)
-        job_technologies = self._split_list(job_profile.technologies or "")
-        job_methodologies = self._split_list(job_profile.methodologies or "")
-        job_languages = self._split_list(job_profile.languages or "")
-        job_certifications = self._split_list(job_profile.certifications or "")
-        desired_skills = [skill for skill in (job_technologies + job_methodologies) if skill]
-
-        scored = self.score_engine.calculate(
-            curriculum_skills=curriculum_skills,
-            job_skills=job_skills,
-            curriculum_experience=2,
-            job_experience=3,
-            curriculum_languages=job_languages,
-            job_languages=job_languages,
-            curriculum_certifications=["Green Belt"],
-            job_certifications=job_certifications,
-            desired_skills=desired_skills,
+        result = self.evaluate(self._to_evaluation_input(curriculum, job_profile))
+        explanation = self.explanation_engine.build(
+            total_score=int(result.total_score), criteria=self._criteria_mapping(result)
         )
-        gaps = self.gap_engine.analyze(
-            curriculum_skills=curriculum_skills,
-            job_skills=job_skills,
-            desired_skills=desired_skills,
-        )
-        recommendations = self.recommendation_strategy.generate(
-            missing_skills=gaps["missing_skills"],
-            desired_skills=gaps["desired_skills"],
-            curriculum_strengths=curriculum_skills,
-        )
-        explanation = self.explanation_engine.build(total_score=int(scored["total_score"]), criteria=scored["criteria"])
-
-        score_record = ATSScore(
-            curriculum_id=curriculum.id,
-            job_profile_id=job_profile.id,
-            total_score=float(scored["total_score"]),
-        )
-        saved_score = self.repository.save_score(score_record)
-
-        self._persist_details(saved_score.id, scored["criteria"])
-        self._persist_gaps(saved_score.id, gaps)
-        self._persist_recommendations(saved_score.id, recommendations)
+        saved_score = self._persist_evaluation(curriculum.id, job_profile.id, result)
 
         logger.info("Score ATS calculado: %s", saved_score.total_score)
         return {
             "total_score": saved_score.total_score,
-            "gaps": gaps,
-            "recommendations": recommendations,
+            "gaps": {
+                "missing_skills": list(result.missing_skills),
+                "desired_skills": list(result.desired_skills),
+            },
+            "recommendations": list(result.recommendations),
             "explanation": explanation,
+        }
+
+    def evaluate(self, evaluation_input: ATSEvaluationInput) -> ATSEvaluationResult:
+        """Calculate ATS information without ORM access or persistence."""
+        return ATSEvaluator(
+            self.score_engine,
+            self.gap_engine,
+            self.recommendation_strategy,
+        ).evaluate(evaluation_input)
+
+    def _to_evaluation_input(
+        self, curriculum: Curriculum, job_profile: JobProfile
+    ) -> ATSEvaluationInput:
+        job_technologies = self._split_list(job_profile.technologies or "")
+        job_methodologies = self._split_list(job_profile.methodologies or "")
+        return ATSEvaluationInput(
+            resume_content=curriculum.description or "",
+            job_skills=tuple(self._collect_job_skills(job_profile)),
+            desired_skills=tuple(job_technologies + job_methodologies),
+            job_languages=tuple(self._split_list(job_profile.languages or "")),
+            job_certifications=tuple(self._split_list(job_profile.certifications or "")),
+        )
+
+    def _persist_evaluation(
+        self,
+        curriculum_id: int,
+        job_profile_id: int,
+        result: ATSEvaluationResult,
+    ) -> ATSScore:
+        score = self.repository.save_score(
+            ATSScore(
+                curriculum_id=curriculum_id,
+                job_profile_id=job_profile_id,
+                total_score=result.total_score,
+            )
+        )
+        criteria = self._criteria_mapping(result)
+        self._persist_details(score.id, criteria)
+        self._persist_gaps(
+            score.id,
+            {
+                "missing_skills": list(result.missing_skills),
+                "desired_skills": list(result.desired_skills),
+            },
+        )
+        self._persist_recommendations(score.id, list(result.recommendations))
+        return score
+
+    @staticmethod
+    def _criteria_mapping(result: ATSEvaluationResult) -> dict[str, dict[str, float]]:
+        return {
+            criterion.name: {
+                "score": criterion.score,
+                "max_score": criterion.max_score,
+                "weight": criterion.weight,
+            }
+            for criterion in result.criteria
         }
 
     def get_history(self) -> list[ATSScore]:
@@ -345,7 +408,13 @@ class ATSService:
     def _persist_gaps(self, score_id: int, gaps: dict[str, list[str]]) -> None:
         for gap_type, skills in gaps.items():
             for skill in skills:
-                self.repository.save_gap(SkillGap(score_id=score_id, skill_name=skill, gap_type="missing" if gap_type == "missing_skills" else "desired"))
+                self.repository.save_gap(
+                    SkillGap(
+                        score_id=score_id,
+                        skill_name=skill,
+                        gap_type="missing" if gap_type == "missing_skills" else "desired",
+                    )
+                )
 
     def _persist_recommendations(self, score_id: int, recommendations: list[str]) -> None:
         for message in recommendations:

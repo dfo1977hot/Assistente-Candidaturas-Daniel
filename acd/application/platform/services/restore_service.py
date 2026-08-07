@@ -1,15 +1,17 @@
 """Service for backup restoration."""
 
+from datetime import datetime
+import hashlib
 import os
 import shutil
-import hashlib
 from typing import Any
-from datetime import datetime
+
 from sqlalchemy.orm import Session
 
+from acd.database.local_state import resolve_database_path
+from acd.domain.platform.backup import BackupStatus
 from acd.infrastructure.platform import StructuredLogger
 from acd.infrastructure.repositories.platform import PlatformRepository
-from acd.domain.platform.backup import BackupStatus
 
 
 class RestoreService:
@@ -25,7 +27,7 @@ class RestoreService:
         self.session = session
         self.repository = PlatformRepository(session)
         self.logger = StructuredLogger(__name__)
-        self.database_path = database_path or "acd.db"
+        self.database_path = database_path or str(resolve_database_path())
 
     def restore_from_backup(
         self,
@@ -92,10 +94,10 @@ class RestoreService:
 
         # Calculate checksum
         checksum = hashlib.sha256()
-        for root, dirs, files in os.walk(backup.file_path):
+        for root, _dirs, files in os.walk(backup.file_path):
             for file in sorted(files):
                 file_path = os.path.join(root, file)
-                with open(file_path, 'rb') as f:
+                with open(file_path, "rb") as f:
                     checksum.update(f.read())
 
         return checksum.hexdigest() == backup.checksum
@@ -130,17 +132,21 @@ class RestoreService:
         Returns:
             List of restore points
         """
-        completed_backups = self.repository.list_backups(status="completed")
+        completed_backups = self.repository.list_backups(
+            status=BackupStatus.COMPLETED.value,
+        )
         restore_points = []
 
         for backup in completed_backups:
-            restore_points.append({
-                "id": backup.id,
-                "name": backup.name,
-                "type": backup.backup_type,
-                "size_mb": backup.file_size_mb,
-                "created_at": backup.created_at.isoformat() if backup.created_at else None,
-                "is_valid": self._verify_backup(backup),
-            })
+            restore_points.append(
+                {
+                    "id": backup.id,
+                    "name": backup.name,
+                    "type": backup.backup_type,
+                    "size_mb": backup.file_size_mb,
+                    "created_at": backup.created_at.isoformat() if backup.created_at else None,
+                    "is_valid": self._verify_backup(backup),
+                }
+            )
 
         return restore_points

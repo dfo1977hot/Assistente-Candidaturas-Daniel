@@ -51,7 +51,12 @@ class ATSRepository:
         with database_module.SessionLocal() as session:
             scores = list(session.scalars(select(ATSScore)).all())
             if not scores:
-                return {"total_scores": 0, "highest_score": 0.0, "lowest_score": 0.0, "average_score": 0.0}
+                return {
+                    "total_scores": 0,
+                    "highest_score": 0.0,
+                    "lowest_score": 0.0,
+                    "average_score": 0.0,
+                }
             values = [score.total_score for score in scores]
             return {
                 "total_scores": len(scores),

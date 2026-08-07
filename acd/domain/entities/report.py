@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
@@ -18,4 +19,4 @@ class Report(Base):
     period: Mapped[str] = mapped_column(String(50), nullable=False, default="daily")
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     format: Mapped[str] = mapped_column(String(20), nullable=False, default="pdf")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

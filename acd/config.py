@@ -1,15 +1,21 @@
 """
 Configurações globais do sistema
 """
-from pathlib import Path
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATABASE_DIR = DATA_DIR / "database"
-DATABASE_FILE = DATABASE_DIR / "acd.db"
-LOG_DIR = DATA_DIR / "logs"
+
+from acd.config.paths import DATA_DIR, LOG_DIR, ROOT_DIR as BASE_DIR
+from acd.database.local_state import resolve_database_path
+
+__all__ = [
+    "BASE_DIR",
+    "CARTAS_DIR",
+    "CURRICULOS_DIR",
+    "DATABASE_DIR",
+    "DATABASE_FILE",
+    "DATA_DIR",
+    "LOG_DIR",
+]
+
+DATABASE_FILE = resolve_database_path()
+DATABASE_DIR = DATABASE_FILE.parent
 CURRICULOS_DIR = DATA_DIR / "curriculos"
 CARTAS_DIR = DATA_DIR / "cartas"
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-CURRICULOS_DIR.mkdir(parents=True, exist_ok=True)
-CARTAS_DIR.mkdir(parents=True, exist_ok=True)

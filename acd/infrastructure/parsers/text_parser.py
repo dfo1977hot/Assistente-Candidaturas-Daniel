@@ -7,8 +7,7 @@ from typing import Protocol
 class Parser(Protocol):
     """Interface para parsers determinísticos."""
 
-    def parse(self, text: str) -> dict[str, list[str]]:
-        ...
+    def parse(self, text: str) -> dict[str, list[str]]: ...
 
 
 class TextParser:
@@ -61,9 +60,18 @@ class TextParser:
         skills = [skill for skill in self.SKILL_CATALOG if skill.lower() in lowered]
         technologies = [skill for skill in skills if self.SKILL_CATALOG[skill] == "tecnologia"]
         methodologies = [skill for skill in skills if self.SKILL_CATALOG[skill] == "metodologia"]
-        languages = [name for name in self.LANGUAGE_PATTERNS if self.LANGUAGE_PATTERNS[name].search(text)]
-        certifications = [match.group(0).strip() for pattern in self.CERTIFICATION_PATTERNS for match in [pattern.search(text)] if match]
-        seniority = [name for name in self.SENIORITY_PATTERNS if self.SENIORITY_PATTERNS[name].search(text)]
+        languages = [
+            name for name in self.LANGUAGE_PATTERNS if self.LANGUAGE_PATTERNS[name].search(text)
+        ]
+        certifications = [
+            match.group(0).strip()
+            for pattern in self.CERTIFICATION_PATTERNS
+            for match in [pattern.search(text)]
+            if match
+        ]
+        seniority = [
+            name for name in self.SENIORITY_PATTERNS if self.SENIORITY_PATTERNS[name].search(text)
+        ]
         return {
             "skills": skills,
             "technologies": technologies,

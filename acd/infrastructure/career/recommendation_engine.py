@@ -74,13 +74,15 @@ class RecommendationRankingEngine:
     def __init__(self, rule_engine: CareerRuleEngine | None = None) -> None:
         self.rule_engine = rule_engine or CareerRuleEngine()
 
-    def generate_recommendations(self, goal_data: dict[str, Any], gaps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def generate_recommendations(
+        self, goal_data: dict[str, Any], gaps: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Generate recommendations based on goal and gaps.
-        
+
         Args:
             goal_data: Career goal data
             gaps: List of skill gaps
-            
+
         Returns:
             List of recommendations ordered by priority
         """
@@ -103,7 +105,9 @@ class RecommendationRankingEngine:
         # 2. Certification recommendations
         target_role = goal_data.get("target_role", "")
         if target_role in self.rule_engine.ROLE_COMPETENCIES:
-            certs = self.rule_engine.ROLE_COMPETENCIES[target_role].get("desired_certifications", [])
+            certs = self.rule_engine.ROLE_COMPETENCIES[target_role].get(
+                "desired_certifications", []
+            )
             for cert in certs[:3]:  # Top 3 certifications
                 rec = {
                     "title": f"Obter certificação {cert}",
@@ -157,7 +161,9 @@ class RecommendationRankingEngine:
         ranked = self.rule_engine.rank_recommendations(recommendations)
         return ranked
 
-    def get_quick_wins(self, recommendations: list[dict[str, Any]], max_effort: float = 3.0) -> list[dict[str, Any]]:
+    def get_quick_wins(
+        self, recommendations: list[dict[str, Any]], max_effort: float = 3.0
+    ) -> list[dict[str, Any]]:
         """Get quick wins: high impact, low effort recommendations."""
         return [r for r in recommendations if r["effort"] <= max_effort and r["impact"] >= 5]
 
@@ -167,11 +173,11 @@ class RecommendationRankingEngine:
         recommendations_to_implement: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Simulate impact of implementing specific recommendations.
-        
+
         Args:
             current_compatibility: Current compatibility score
             recommendations_to_implement: List of recommendations to simulate
-            
+
         Returns:
             Simulated compatibility and timeline
         """

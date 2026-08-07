@@ -7,6 +7,6 @@ from acd.services.knowledge_service import KnowledgeService
 class KnowledgePage(BasePage):
     """Página de cadastro e consulta do catálogo de competências."""
 
-    def __init__(self, service: KnowledgeService | None = None) -> None:
+    def __init__(self, service: KnowledgeService) -> None:
         super().__init__("Conhecimento")
-        self.service = service or KnowledgeService()
+        self.service = service

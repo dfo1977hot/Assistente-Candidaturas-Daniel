@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
@@ -20,4 +21,4 @@ class FieldMapping(Base):
     transformation: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     mapping_metadata: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

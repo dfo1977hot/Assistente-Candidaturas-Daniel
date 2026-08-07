@@ -1,14 +1,15 @@
 """Installed version entity."""
 
-from enum import Enum
 from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, JSON
 
 from acd.models.base import Base
 
 
-class InstallationStatus(str, Enum):
+class InstallationStatus(StrEnum):
     """Installation status."""
 
     FRESH_INSTALL = "fresh_install"

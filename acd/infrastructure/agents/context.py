@@ -1,7 +1,9 @@
 """Agent context manager."""
 
+from __future__ import annotations
+
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
 
 class AgentContext:
@@ -51,172 +53,87 @@ class AgentContext:
         self.restrictions: dict[str, Any] = {}
 
         # Timestamps
-        self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.created_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
 
-    def add_user_profile(self, profile: dict[str, Any]) -> "AgentContext":
-        """Add user profile data.
-
-        Args:
-            profile: User profile dict
-
-        Returns:
-            Self for chaining
-        """
+    def add_user_profile(self, profile: dict[str, Any]) -> AgentContext:
+        """Add user profile data."""
         self.user_profile.update(profile)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return self
 
-    def add_career_goals(self, goals: list[dict[str, Any]]) -> "AgentContext":
-        """Add career goals.
-
-        Args:
-            goals: List of career goals
-
-        Returns:
-            Self for chaining
-        """
+    def add_career_goals(self, goals: list[dict[str, Any]]) -> AgentContext:
+        """Add career goals."""
         self.career_goals = goals
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return self
 
-    def add_tools(self, tools: list[str]) -> "AgentContext":
-        """Authorize tools for agent.
-
-        Args:
-            tools: List of tool names
-
-        Returns:
-            Self for chaining
-        """
+    def add_tools(self, tools: list[str]) -> AgentContext:
+        """Authorize tools for agent."""
         self.authorized_tools = tools
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return self
 
-    def add_permissions(self, permissions: dict[str, bool]) -> "AgentContext":
-        """Add permissions.
-
-        Args:
-            permissions: Permission dict
-
-        Returns:
-            Self for chaining
-        """
+    def add_permissions(self, permissions: dict[str, bool]) -> AgentContext:
+        """Add permissions."""
         self.permissions.update(permissions)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return self
 
-    def set_constraints(self, constraints: dict[str, Any]) -> "AgentContext":
-        """Set operational constraints.
-
-        Args:
-            constraints: Constraint dict
-
-        Returns:
-            Self for chaining
-        """
+    def set_constraints(self, constraints: dict[str, Any]) -> AgentContext:
+        """Set operational constraints."""
         self.constraints = constraints
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return self
 
     def store_temporary(self, key: str, value: Any) -> None:
-        """Store data in temporary memory.
-
-        Args:
-            key: Memory key
-            value: Memory value
-        """
+        """Store data in temporary memory."""
         self.temporary_memory[key] = value
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def store_persistent(self, key: str, value: Any) -> None:
-        """Store data in persistent memory.
-
-        Args:
-            key: Memory key
-            value: Memory value
-        """
+        """Store data in persistent memory."""
         self.persistent_memory[key] = value
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
     def get_temporary(self, key: str, default: Any = None) -> Any:
-        """Get data from temporary memory.
-
-        Args:
-            key: Memory key
-            default: Default value if not found
-
-        Returns:
-            Memory value or default
-        """
+        """Get data from temporary memory."""
         return self.temporary_memory.get(key, default)
 
     def get_persistent(self, key: str, default: Any = None) -> Any:
-        """Get data from persistent memory.
-
-        Args:
-            key: Memory key
-            default: Default value if not found
-
-        Returns:
-            Memory value or default
-        """
+        """Get data from persistent memory."""
         return self.persistent_memory.get(key, default)
 
     def add_message(self, sender: str, content: str) -> None:
-        """Add to message history.
-
-        Args:
-            sender: Sender name
-            content: Message content
-        """
-        self.message_history.append({
-            "sender": sender,
-            "content": content,
-            "timestamp": datetime.utcnow(),
-        })
+        """Add message to history."""
+        self.message_history.append(
+            {
+                "sender": sender,
+                "content": content,
+                "timestamp": datetime.now(UTC),
+            }
+        )
 
     def add_decision(self, decision: str, reasoning: str) -> None:
-        """Add to decision history.
-
-        Args:
-            decision: Decision made
-            reasoning: Reasoning behind decision
-        """
-        self.decision_history.append({
-            "decision": decision,
-            "reasoning": reasoning,
-            "timestamp": datetime.utcnow(),
-        })
+        """Add decision to history."""
+        self.decision_history.append(
+            {
+                "decision": decision,
+                "reasoning": reasoning,
+                "timestamp": datetime.now(UTC),
+            }
+        )
 
     def has_permission(self, permission: str) -> bool:
-        """Check if agent has permission.
-
-        Args:
-            permission: Permission name
-
-        Returns:
-            True if permitted
-        """
+        """Check whether the agent has a permission."""
         return self.permissions.get(permission, False)
 
     def can_use_tool(self, tool_name: str) -> bool:
-        """Check if agent can use tool.
-
-        Args:
-            tool_name: Tool name
-
-        Returns:
-            True if authorized
-        """
+        """Check whether the agent can use a tool."""
         return tool_name in self.authorized_tools
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert context to dictionary.
-
-        Returns:
-            Context dictionary
-        """
+        """Convert context to dictionary."""
         return {
             "agent_id": self.agent_id,
             "agent_name": self.agent_name,
@@ -250,66 +167,41 @@ class ContextManager:
         objective: str,
         session_id: int | None = None,
     ) -> AgentContext:
-        """Create a new agent context.
+        """Create a new agent context."""
+        context = AgentContext(
+            agent_id=agent_id,
+            agent_name=agent_name,
+            objective=objective,
+            session_id=session_id,
+        )
 
-        Args:
-            agent_id: Agent ID
-            agent_name: Agent name
-            objective: Current objective
-            session_id: Optional session ID
-
-        Returns:
-            New context
-        """
-        context = AgentContext(agent_id, agent_name, objective, session_id)
         self._contexts[agent_id] = context
 
-        if session_id:
-            if session_id not in self._session_contexts:
-                self._session_contexts[session_id] = []
-            self._session_contexts[session_id].append(agent_id)
+        if session_id is not None:
+            self._session_contexts.setdefault(session_id, []).append(agent_id)
 
         return context
 
     def get_context(self, agent_id: int) -> AgentContext | None:
-        """Get agent context.
-
-        Args:
-            agent_id: Agent ID
-
-        Returns:
-            Agent context or None
-        """
+        """Get an agent context."""
         return self._contexts.get(agent_id)
 
     def get_session_contexts(self, session_id: int) -> list[AgentContext]:
-        """Get all contexts for a session.
-
-        Args:
-            session_id: Session ID
-
-        Returns:
-            List of contexts
-        """
+        """Get all contexts for a session."""
         agent_ids = self._session_contexts.get(session_id, [])
-        return [self._contexts[aid] for aid in agent_ids if aid in self._contexts]
+        return [
+            self._contexts[agent_id]
+            for agent_id in agent_ids
+            if agent_id in self._contexts
+        ]
 
     def clear_context(self, agent_id: int) -> None:
-        """Clear agent context.
-
-        Args:
-            agent_id: Agent ID
-        """
-        if agent_id in self._contexts:
-            del self._contexts[agent_id]
+        """Clear a single agent context."""
+        self._contexts.pop(agent_id, None)
 
     def clear_session_contexts(self, session_id: int) -> None:
-        """Clear all contexts for a session.
+        """Clear all contexts associated with a session."""
+        agent_ids = self._session_contexts.pop(session_id, [])
 
-        Args:
-            session_id: Session ID
-        """
-        agent_ids = self._session_contexts.get(session_id, [])
-        for aid in agent_ids:
-            self.clear_context(aid)
-        del self._session_contexts[session_id]
+        for agent_id in agent_ids:
+            self.clear_context(agent_id)

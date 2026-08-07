@@ -1,17 +1,16 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
-import json
-from datetime import datetime
 
-from acd.infrastructure.agent.tool_registry import ToolRegistry, DefaultToolRegistry
 from acd.infrastructure.agent.context_builder import ContextBuilder
 from acd.infrastructure.agent.planning_engine import PlanningEngine
+from acd.infrastructure.agent.tool_registry import DefaultToolRegistry, ToolRegistry
 
 
 class AIOrchestrator:
     """Main orchestrator coordinating all agent activities.
-    
+
     Responsibilities:
     - Understand objectives
     - Decompose problems
@@ -34,10 +33,10 @@ class AIOrchestrator:
 
     def process_goal(self, goal: dict[str, Any]) -> dict[str, Any]:
         """Process a goal and create an execution plan.
-        
+
         Args:
             goal: Goal object with title, description, objective_type
-            
+
         Returns:
             Dictionary with plan details, strategy, tasks, approval status
         """
@@ -76,17 +75,23 @@ class AIOrchestrator:
 
     def analyze_request(self, user_request: str) -> dict[str, Any]:
         """Analyze a natural language request and determine action.
-        
+
         Args:
             user_request: Natural language user request
-            
+
         Returns:
             Analysis with intent, recommended goal type, and next steps
         """
         # Intent classification (simplified - in real scenario would use LLM)
         intent_keywords = {
             "job_search": ["vaga", "aplicar", "candidatar", "job", "apply", "position"],
-            "career_planning": ["carreira", "planejamento", "desenvolvimento", "career", "planning"],
+            "career_planning": [
+                "carreira",
+                "planejamento",
+                "desenvolvimento",
+                "career",
+                "planning",
+            ],
             "skill": ["habilidade", "skill", "aprender", "aprimorar", "improve", "learn"],
             "interview": ["entrevista", "interview", "preparar", "prepare"],
             "analysis": ["analisar", "analyze", "como", "qual", "what", "which"],
@@ -111,10 +116,10 @@ class AIOrchestrator:
 
     def decompose_problem(self, goal: dict[str, Any]) -> dict[str, Any]:
         """Decompose a complex problem into manageable tasks.
-        
+
         Args:
             goal: Goal to decompose
-            
+
         Returns:
             Decomposed tasks with dependencies
         """
@@ -137,10 +142,10 @@ class AIOrchestrator:
 
     def select_tools(self, task: dict[str, Any]) -> list[str]:
         """Select appropriate tools for a task.
-        
+
         Args:
             task: Task requiring tools
-            
+
         Returns:
             List of recommended tool names
         """
@@ -164,11 +169,11 @@ class AIOrchestrator:
 
     def approve_plan(self, plan_id: str | None = None, approved: bool = True) -> dict[str, Any]:
         """Approve or reject a plan.
-        
+
         Args:
             plan_id: Plan ID (if None, uses current plan)
             approved: Whether plan is approved
-            
+
         Returns:
             Approval status
         """
@@ -177,7 +182,7 @@ class AIOrchestrator:
             return {"success": False, "error": "No plan to approve"}
 
         plan["approval_status"] = "approved" if approved else "rejected"
-        plan["approved_at"] = datetime.utcnow().isoformat()
+        plan["approved_at"] = datetime.now(UTC).isoformat()
         plan["approved_by_user"] = approved
 
         return {
@@ -189,10 +194,10 @@ class AIOrchestrator:
 
     def execute_plan(self, plan_id: str | None = None) -> dict[str, Any]:
         """Execute an approved plan.
-        
+
         Args:
             plan_id: Plan ID to execute
-            
+
         Returns:
             Execution status and results
         """
@@ -205,7 +210,7 @@ class AIOrchestrator:
 
         execution_result = {
             "plan_id": plan.get("id"),
-            "start_time": datetime.utcnow().isoformat(),
+            "start_time": datetime.now(UTC).isoformat(),
             "tasks_executed": 0,
             "tasks_failed": 0,
             "results": [],
@@ -221,7 +226,7 @@ class AIOrchestrator:
             else:
                 execution_result["tasks_failed"] += 1
 
-        execution_result["end_time"] = datetime.utcnow().isoformat()
+        execution_result["end_time"] = datetime.now(UTC).isoformat()
         execution_result["success"] = execution_result["tasks_failed"] == 0
 
         # Record in history
@@ -231,10 +236,10 @@ class AIOrchestrator:
 
     def _execute_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Execute a single task using appropriate tool.
-        
+
         Args:
             task: Task to execute
-            
+
         Returns:
             Task execution result
         """
@@ -259,10 +264,10 @@ class AIOrchestrator:
 
     def get_execution_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get execution history.
-        
+
         Args:
             limit: Number of recent executions to return
-            
+
         Returns:
             List of recent executions
         """
@@ -270,7 +275,7 @@ class AIOrchestrator:
 
     def get_agent_status(self) -> dict[str, Any]:
         """Get current agent status.
-        
+
         Returns:
             Agent status and statistics
         """
@@ -281,7 +286,9 @@ class AIOrchestrator:
             "total_executions": len(history),
             "successful_executions": len([h for h in history if h.get("success", False)]),
             "failed_executions": len([h for h in history if not h.get("success", False)]),
-            "success_rate": len([h for h in history if h.get("success")]) / len(history) if history else 0,
+            "success_rate": (
+                len([h for h in history if h.get("success")]) / len(history) if history else 0
+            ),
             "available_tools": len(self.tool_registry.get_all_tools()),
             "tool_categories": self.tool_registry.list_categories(),
         }

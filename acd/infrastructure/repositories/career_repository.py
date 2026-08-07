@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
-from sqlalchemy import select, and_
+from sqlalchemy import select
 
 from acd.database import database as database_module
 from acd.domain.career.career_goal import CareerGoal
-from acd.domain.career.development_plan import DevelopmentPlan
 from acd.domain.career.career_recommendation import CareerRecommendation
-from acd.domain.career.skill_gap import CareerSkillGap
+from acd.domain.career.development_plan import DevelopmentPlan
 from acd.domain.career.milestone import Milestone
+from acd.domain.career.skill_gap import CareerSkillGap
 
 
 class CareerRepository:
@@ -44,7 +43,7 @@ class CareerRepository:
             session.refresh(goal)
             return goal
 
-    def get_goal(self, goal_id: int) -> Optional[CareerGoal]:
+    def get_goal(self, goal_id: int) -> CareerGoal | None:
         """Retrieve a specific career goal."""
         with database_module.SessionLocal() as session:
             return session.scalar(select(CareerGoal).where(CareerGoal.id == goal_id))
@@ -52,10 +51,12 @@ class CareerRepository:
     def list_goals(self, status: str = "active") -> list[CareerGoal]:
         """List all career goals with optional status filter."""
         with database_module.SessionLocal() as session:
-            stmt = select(CareerGoal).where(CareerGoal.status == status).order_by(CareerGoal.priority)
+            stmt = (
+                select(CareerGoal).where(CareerGoal.status == status).order_by(CareerGoal.priority)
+            )
             return list(session.scalars(stmt).all())
 
-    def update_goal(self, goal_id: int, **kwargs) -> Optional[CareerGoal]:
+    def update_goal(self, goal_id: int, **kwargs) -> CareerGoal | None:
         """Update a career goal."""
         with database_module.SessionLocal() as session:
             goal = session.scalar(select(CareerGoal).where(CareerGoal.id == goal_id))
@@ -63,7 +64,7 @@ class CareerRepository:
                 for key, value in kwargs.items():
                     if hasattr(goal, key) and key != "id":
                         setattr(goal, key, value)
-                goal.updated_at = datetime.utcnow()
+                goal.updated_at = datetime.now(UTC)
                 session.commit()
                 session.refresh(goal)
             return goal
@@ -94,7 +95,7 @@ class CareerRepository:
             session.refresh(plan)
             return plan
 
-    def get_plan(self, plan_id: int) -> Optional[DevelopmentPlan]:
+    def get_plan(self, plan_id: int) -> DevelopmentPlan | None:
         """Retrieve a development plan."""
         with database_module.SessionLocal() as session:
             return session.scalar(select(DevelopmentPlan).where(DevelopmentPlan.id == plan_id))
@@ -105,13 +106,13 @@ class CareerRepository:
             stmt = select(DevelopmentPlan).where(DevelopmentPlan.goal_id == goal_id)
             return list(session.scalars(stmt).all())
 
-    def update_plan_progress(self, plan_id: int, progress: int) -> Optional[DevelopmentPlan]:
+    def update_plan_progress(self, plan_id: int, progress: int) -> DevelopmentPlan | None:
         """Update plan progress percentage."""
         with database_module.SessionLocal() as session:
             plan = session.scalar(select(DevelopmentPlan).where(DevelopmentPlan.id == plan_id))
             if plan:
                 plan.progress = min(100, max(0, progress))
-                plan.updated_at = datetime.utcnow()
+                plan.updated_at = datetime.now(UTC)
                 session.commit()
                 session.refresh(plan)
             return plan
@@ -145,7 +146,11 @@ class CareerRepository:
     def list_gaps_by_goal(self, goal_id: int) -> list[CareerSkillGap]:
         """List all skill gaps for a goal."""
         with database_module.SessionLocal() as session:
-            stmt = select(CareerSkillGap).where(CareerSkillGap.goal_id == goal_id).order_by(CareerSkillGap.priority)
+            stmt = (
+                select(CareerSkillGap)
+                .where(CareerSkillGap.goal_id == goal_id)
+                .order_by(CareerSkillGap.priority)
+            )
             return list(session.scalars(stmt).all())
 
     # Recommendations
@@ -179,9 +184,11 @@ class CareerRepository:
     def list_recommendations_by_goal(self, goal_id: int) -> list[CareerRecommendation]:
         """List all recommendations for a goal."""
         with database_module.SessionLocal() as session:
-            stmt = select(CareerRecommendation).where(
-                CareerRecommendation.goal_id == goal_id
-            ).order_by(CareerRecommendation.priority_score.desc())
+            stmt = (
+                select(CareerRecommendation)
+                .where(CareerRecommendation.goal_id == goal_id)
+                .order_by(CareerRecommendation.priority_score.desc())
+            )
             return list(session.scalars(stmt).all())
 
     # Milestones
@@ -213,16 +220,20 @@ class CareerRepository:
     def list_milestones_by_plan(self, plan_id: int) -> list[Milestone]:
         """List all milestones for a plan."""
         with database_module.SessionLocal() as session:
-            stmt = select(Milestone).where(Milestone.plan_id == plan_id).order_by(Milestone.order_index)
+            stmt = (
+                select(Milestone)
+                .where(Milestone.plan_id == plan_id)
+                .order_by(Milestone.order_index)
+            )
             return list(session.scalars(stmt).all())
 
-    def mark_milestone_complete(self, milestone_id: int) -> Optional[Milestone]:
+    def mark_milestone_complete(self, milestone_id: int) -> Milestone | None:
         """Mark a milestone as completed."""
         with database_module.SessionLocal() as session:
             milestone = session.scalar(select(Milestone).where(Milestone.id == milestone_id))
             if milestone:
                 milestone.completed = True
-                milestone.completed_date = datetime.utcnow()
+                milestone.completed_date = datetime.now(UTC)
                 session.commit()
                 session.refresh(milestone)
             return milestone

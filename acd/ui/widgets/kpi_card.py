@@ -1,38 +1,45 @@
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 
 class KPICard(QFrame):
-    def __init__(self, titulo: str, valor: str) -> None:
+    """Card compacto para exibição de um indicador do Dashboard."""
+
+    def __init__(self, title: str, value: str = "0") -> None:
         super().__init__()
+        self.setObjectName("kpiCard")
+        self.setMinimumSize(190, 120)
+        self.setMaximumHeight(145)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        self.setStyleSheet(
-            """
-            QFrame{
-                background:white;
-                border:1px solid #d1d5db;
-                border-radius:10px;
-                padding:10px;
-            }
-            """
-        )
+        self.title_label = QLabel(title)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setWordWrap(True)
 
-        layout = QVBoxLayout()
+        self.value_label = QLabel(value)
+        self.value_label.setAlignment(Qt.AlignCenter)
+        self.value_label.setObjectName("kpiValue")
 
-        self.titulo_label = QLabel(titulo)
-        self.titulo_label.setStyleSheet("font-size:12px;color:#6b7280;")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(10)
+        layout.addWidget(self.title_label)
+        layout.addStretch(1)
+        layout.addWidget(self.value_label)
+        layout.addStretch(1)
 
-        self.valor_label = QLabel(valor)
-        self.valor_label.setStyleSheet(
-            """
-            font-size:24px;
-            font-weight:bold;
-            """
-        )
+    @property
+    def valor_label(self) -> QLabel:
+        """Alias legado para compatibilidade com integrações existentes."""
+        return self.value_label
 
-        layout.addWidget(self.titulo_label)
-        layout.addWidget(self.valor_label)
+    def set_value(self, value: str) -> None:
+        self.value_label.setText(value)
 
-        self.setLayout(layout)
-
-    def set_value(self, valor: str) -> None:
-        self.valor_label.setText(valor)
+    def set_history(self, values: Sequence[int | float]) -> None:
+        """Mantém compatibilidade com chamadas antigas, sem renderizar gráfico."""
+        del values

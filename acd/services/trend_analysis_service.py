@@ -9,7 +9,11 @@ from acd.services.metrics_engine import MetricsEngine
 class TrendAnalysisService:
     """Analyzes trends and patterns in metrics."""
 
-    def __init__(self, repository: AnalyticsRepository | None = None, metrics_engine: MetricsEngine | None = None) -> None:
+    def __init__(
+        self,
+        repository: AnalyticsRepository | None = None,
+        metrics_engine: MetricsEngine | None = None,
+    ) -> None:
         self.repository = repository or AnalyticsRepository()
         self.metrics_engine = metrics_engine or MetricsEngine()
 
@@ -51,12 +55,16 @@ class TrendAnalysisService:
         values = [t.value for t in trends[-7:]]
         return {
             "trend": "stable" if len(values) < 2 else ("up" if values[-1] > values[0] else "down"),
-            "direction": "stable" if len(values) < 2 else ("up" if values[-1] > values[0] else "down"),
+            "direction": (
+                "stable" if len(values) < 2 else ("up" if values[-1] > values[0] else "down")
+            ),
             "data_points": len(values),
             "current_value": values[-1] if values else 0,
         }
 
-    def record_metric_trend(self, metric_name: str, value: float, period: str = "daily", *, dimension: str = "global") -> None:
+    def record_metric_trend(
+        self, metric_name: str, value: float, period: str = "daily", *, dimension: str = "global"
+    ) -> None:
         """Record a metric value for trend tracking."""
         self.repository.create_trend(metric_name, value, period, dimension=dimension)
 

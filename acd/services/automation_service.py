@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +52,12 @@ class AutomationService:
 
         logs: list[ExecutionLog] = []
         logs.append(ExecutionLog(event="started", details="Iniciando execução"))
-        logs.append(ExecutionLog(event="browser", details=f"Browser {browser_context['browser']} headless={browser_context['headless']}"))
+        logs.append(
+            ExecutionLog(
+                event="browser",
+                details=f"Browser {browser_context['browser']} headless={browser_context['headless']}",
+            )
+        )
 
         connector.login()
         logs.append(ExecutionLog(event="login", details="Login realizado"))
@@ -74,12 +79,17 @@ class AutomationService:
         logger.info("Aplicação automatizada concluída para %s", context.platform)
         return {
             "status": "success",
-            "result": ApplicationResult(status="success", message="Aplicação concluída", screenshot_path=screenshot_path),
+            "result": ApplicationResult(
+                status="success", message="Aplicação concluída", screenshot_path=screenshot_path
+            ),
             "logs": [{"event": log.event, "details": log.details} for log in logs],
         }
 
     def _save_screenshot(self, context: AutomationContext) -> str:
-        path = Path("data/automation/screenshots") / f"{context.platform}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.png"
+        path = (
+            Path("data/automation/screenshots")
+            / f"{context.platform}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}.png"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"placeholder")
         return str(path)

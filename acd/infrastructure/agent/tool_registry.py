@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol
-from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Any, Protocol
 
 
 class Tool(Protocol):
@@ -9,7 +9,7 @@ class Tool(Protocol):
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """Execute tool with given parameters.
-        
+
         Returns:
             Dictionary with result data
         """
@@ -55,7 +55,7 @@ class ToolRegistry:
 
     def register(self, tool_def: ToolDefinition) -> None:
         """Register a new tool.
-        
+
         Args:
             tool_def: Tool definition
         """
@@ -84,11 +84,11 @@ class ToolRegistry:
 
     def execute_tool(self, tool_name: str, **kwargs: Any) -> dict[str, Any]:
         """Execute a tool.
-        
+
         Args:
             tool_name: Name of tool to execute
             **kwargs: Tool parameters
-            
+
         Returns:
             Tool execution result
         """

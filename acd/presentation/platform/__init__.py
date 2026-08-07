@@ -2,11 +2,11 @@
 
 from acd.presentation.platform.pages import SystemPage
 from acd.presentation.platform.widgets import (
-    HealthCard,
-    MetricsPanel,
     BackupPanel,
-    SettingsPanel,
+    HealthCard,
     LogViewer,
+    MetricsPanel,
+    SettingsPanel,
 )
 
 __all__ = [

@@ -1,16 +1,17 @@
 """Repository for platform entities."""
 
-from typing import Any
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from typing import Any
 
-from acd.domain.platform.health_report import HealthReport
-from acd.domain.platform.system_status import SystemStatus
-from acd.domain.platform.system_log import SystemLog
-from acd.domain.platform.system_metrics import SystemMetrics
+from sqlalchemy import and_, desc
+from sqlalchemy.orm import Session
+
 from acd.domain.platform.backup import Backup
 from acd.domain.platform.configuration import Configuration
+from acd.domain.platform.health_report import HealthReport
+from acd.domain.platform.system_log import SystemLog
+from acd.domain.platform.system_metrics import SystemMetrics
+from acd.domain.platform.system_status import SystemStatus
 
 
 class PlatformRepository:
@@ -93,11 +94,7 @@ class PlatformRepository:
             self.session.commit()
         return status
 
-    def update_status(
-        self,
-        overall_status: str,
-        **kwargs
-    ) -> SystemStatus:
+    def update_status(self, overall_status: str, **kwargs) -> SystemStatus:
         """Update system status.
 
         Args:
@@ -120,12 +117,7 @@ class PlatformRepository:
 
     # System Log operations
     def create_log(
-        self,
-        level: str,
-        module: str,
-        operation: str,
-        message: str,
-        **kwargs
+        self, level: str, module: str, operation: str, message: str, **kwargs
     ) -> SystemLog:
         """Create system log entry.
 
@@ -139,13 +131,7 @@ class PlatformRepository:
         Returns:
             Created log entry
         """
-        log = SystemLog(
-            level=level,
-            module=module,
-            operation=operation,
-            message=message,
-            **kwargs
-        )
+        log = SystemLog(level=level, module=module, operation=operation, message=message, **kwargs)
         self.session.add(log)
         self.session.commit()
         return log
@@ -188,12 +174,11 @@ class PlatformRepository:
             Error count
         """
         cutoff = datetime.now() - timedelta(hours=hours)
-        return self.session.query(SystemLog).filter(
-            and_(
-                SystemLog.timestamp >= cutoff,
-                SystemLog.level.in_(["ERROR", "CRITICAL"])
-            )
-        ).count()
+        return (
+            self.session.query(SystemLog)
+            .filter(and_(SystemLog.timestamp >= cutoff, SystemLog.level.in_(["ERROR", "CRITICAL"])))
+            .count()
+        )
 
     # System Metrics operations
     def record_metric(
@@ -203,7 +188,7 @@ class PlatformRepository:
         unit: str = "",
         module: str = "system",
         category: str = "performance",
-        **kwargs
+        **kwargs,
     ) -> SystemMetrics:
         """Record system metric.
 
@@ -224,7 +209,7 @@ class PlatformRepository:
             unit=unit,
             module=module,
             category=category,
-            **kwargs
+            **kwargs,
         )
         self.session.add(metric)
         self.session.commit()
@@ -259,13 +244,7 @@ class PlatformRepository:
         return query.order_by(desc(SystemMetrics.timestamp)).limit(limit).all()
 
     # Backup operations
-    def create_backup(
-        self,
-        backup_type: str,
-        name: str,
-        file_path: str,
-        **kwargs
-    ) -> Backup:
+    def create_backup(self, backup_type: str, name: str, file_path: str, **kwargs) -> Backup:
         """Create backup record.
 
         Args:
@@ -278,22 +257,13 @@ class PlatformRepository:
             Created backup
         """
         backup = Backup(
-            backup_type=backup_type,
-            status="pending",
-            name=name,
-            file_path=file_path,
-            **kwargs
+            backup_type=backup_type, status="pending", name=name, file_path=file_path, **kwargs
         )
         self.session.add(backup)
         self.session.commit()
         return backup
 
-    def update_backup_status(
-        self,
-        backup_id: int,
-        status: str,
-        **kwargs
-    ) -> Backup | None:
+    def update_backup_status(self, backup_id: int, status: str, **kwargs) -> Backup | None:
         """Update backup status.
 
         Args:
@@ -341,12 +311,7 @@ class PlatformRepository:
 
     # Configuration operations
     def set_config(
-        self,
-        key: str,
-        value: str,
-        config_type: str = "string",
-        category: str = "system",
-        **kwargs
+        self, key: str, value: str, config_type: str = "string", category: str = "system", **kwargs
     ) -> Configuration:
         """Set configuration value.
 
@@ -363,11 +328,7 @@ class PlatformRepository:
         config = self.session.query(Configuration).filter(Configuration.key == key).first()
         if not config:
             config = Configuration(
-                key=key,
-                value=value,
-                config_type=config_type,
-                category=category,
-                **kwargs
+                key=key, value=value, config_type=config_type, category=category, **kwargs
             )
             self.session.add(config)
         else:

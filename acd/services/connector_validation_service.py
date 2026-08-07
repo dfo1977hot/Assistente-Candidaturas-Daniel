@@ -11,7 +11,9 @@ class ValidationService:
         errors: list[str] = []
         if not payload.get("required"):
             errors.append("required")
-        if payload.get("email") and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", str(payload["email"])):
+        if payload.get("email") and not re.match(
+            r"^[^@\s]+@[^@\s]+\.[^@\s]+$", str(payload["email"])
+        ):
             errors.append("email")
         if payload.get("phone") and not re.match(r"^\+?\d[\d\s().-]{6,}$", str(payload["phone"])):
             errors.append("phone")

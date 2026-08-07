@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from acd.core.logger import logger
 from acd.domain.entities.job_profile import JobProfile
 from acd.infrastructure.parsers.text_parser import TextParser
@@ -11,11 +9,11 @@ from acd.infrastructure.repositories.job_profile_repository import JobProfileRep
 class JobAnalysisService:
     """Serviço para parser e estruturação de descrições de vagas."""
 
-    def __init__(self, repository: Optional[JobProfileRepository] = None) -> None:
+    def __init__(self, repository: JobProfileRepository | None = None) -> None:
         self.repository = repository or JobProfileRepository()
         self.parser = TextParser()
 
-    def analyze_job(self, *, job_id: int, raw_description: str) -> Optional[JobProfile]:
+    def analyze_job(self, *, job_id: int, raw_description: str) -> JobProfile | None:
         """Analisa uma descrição de vaga e persiste o perfil estruturado."""
         parsed = self.parser.parse(raw_description)
         profile = JobProfile(
@@ -31,7 +29,11 @@ class JobAnalysisService:
             methodologies=",".join(parsed.get("methodologies", [])),
             languages=",".join(parsed.get("languages", [])),
             certifications=",".join(parsed.get("certifications", [])),
-            keywords=",".join(parsed.get("skills", []) + parsed.get("technologies", []) + parsed.get("methodologies", [])),
+            keywords=",".join(
+                parsed.get("skills", [])
+                + parsed.get("technologies", [])
+                + parsed.get("methodologies", [])
+            ),
         )
         created = self.repository.create(profile)
         logger.info("Vaga analisada: %s", created.id)

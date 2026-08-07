@@ -1,11 +1,11 @@
 """Learning policy engine for configuring learning behaviors."""
 
+from dataclasses import asdict, dataclass, field
+from enum import StrEnum
 from typing import Any
-from enum import Enum
-from dataclasses import dataclass, field, asdict
 
 
-class ApprovalRequirement(str, Enum):
+class ApprovalRequirement(StrEnum):
     """Approval requirements for learning."""
 
     AUTOMATIC = "automatic"
@@ -13,7 +13,7 @@ class ApprovalRequirement(str, Enum):
     CONDITIONAL = "conditional"  # Requires approval if confidence < threshold
 
 
-class LearningEventType(str, Enum):
+class LearningEventType(StrEnum):
     """Types of learning events."""
 
     OUTCOME_RECORDED = "outcome_recorded"
@@ -65,9 +65,9 @@ class LearningPolicy:
             True if can auto-apply
         """
         return (
-            self.auto_apply and
-            confidence >= self.confidence_threshold and
-            evidence_count >= self.evidence_threshold
+            self.auto_apply
+            and confidence >= self.confidence_threshold
+            and evidence_count >= self.evidence_threshold
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -214,10 +214,7 @@ class LearningPolicyEngine:
         Returns:
             All policies
         """
-        return {
-            event_type: policy.to_dict()
-            for event_type, policy in self.policies.items()
-        }
+        return {event_type: policy.to_dict() for event_type, policy in self.policies.items()}
 
     def configure_auto_approval_mode(self, enabled: bool) -> None:
         """Configure automatic approval mode.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-import json
 
 
 class PlanningEngine:
@@ -17,11 +16,11 @@ class PlanningEngine:
 
     def create_plan(self, goal: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """Create execution plan for a goal.
-        
+
         Args:
             goal: Goal object with title, description, objective_type
             context: Context from ContextBuilder
-            
+
         Returns:
             Plan with strategy, tasks, dependencies, and timeline
         """
@@ -89,7 +88,9 @@ class PlanningEngine:
             "requires_human_approval": False,
         }
 
-    def _plan_career_development(self, goal: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    def _plan_career_development(
+        self, goal: dict[str, Any], context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Plan for career development goal."""
         tasks = [
             {
@@ -129,7 +130,9 @@ class PlanningEngine:
             "requires_human_approval": False,
         }
 
-    def _plan_skill_improvement(self, goal: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    def _plan_skill_improvement(
+        self, goal: dict[str, Any], context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Plan for skill improvement goal."""
         tasks = [
             {
@@ -204,11 +207,11 @@ class PlanningEngine:
 
     def decompose_task(self, task: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
         """Decompose a complex task into subtasks.
-        
+
         Args:
             task: Task to decompose
             context: Execution context
-            
+
         Returns:
             List of subtasks
         """
@@ -223,7 +226,9 @@ class PlanningEngine:
 
         return [task]
 
-    def _decompose_search(self, task: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
+    def _decompose_search(
+        self, task: dict[str, Any], context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Decompose job search task."""
         return [
             {"type": "search_by_role", "description": "Search by target roles"},
@@ -232,7 +237,9 @@ class PlanningEngine:
             {"type": "consolidate", "description": "Consolidate and deduplicate results"},
         ]
 
-    def _decompose_apply(self, task: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
+    def _decompose_apply(
+        self, task: dict[str, Any], context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Decompose application task."""
         return [
             {"type": "select_cv", "description": "Select appropriate curriculum"},
@@ -242,7 +249,9 @@ class PlanningEngine:
             {"type": "register_crm", "description": "Register in CRM"},
         ]
 
-    def _decompose_analyze(self, task: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
+    def _decompose_analyze(
+        self, task: dict[str, Any], context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Decompose analysis task."""
         return [
             {"type": "load_profile", "description": "Load user profile"},
@@ -253,7 +262,7 @@ class PlanningEngine:
 
     def validate_plan(self, plan: dict[str, Any]) -> tuple[bool, list[str]]:
         """Validate if plan is executable.
-        
+
         Returns:
             (is_valid, list_of_errors)
         """

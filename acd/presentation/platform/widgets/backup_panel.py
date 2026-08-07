@@ -1,8 +1,14 @@
 """Backup management panel widget."""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
+    QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from acd.application.platform import PlatformUseCases
@@ -44,12 +50,10 @@ class BackupPanel(QWidget):
         # Backups table
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels([
-            "Name", "Type", "Status", "Size (MB)", "Created", "Actions"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.table.setHorizontalHeaderLabels(
+            ["Name", "Type", "Status", "Size (MB)", "Created", "Actions"]
         )
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -69,7 +73,7 @@ class BackupPanel(QWidget):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Backup created: {result['name']}\nSize: {result['size_mb']:.2f}MB"
+                f"Backup created: {result['name']}\nSize: {result['size_mb']:.2f}MB",
             )
             self.refresh()
         except Exception as e:
@@ -109,7 +113,9 @@ class BackupPanel(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                result = self.use_cases.restore_from_backup(backup_id)
+                self.use_cases.restore_from_backup(
+                    backup_id
+                )
                 QMessageBox.information(self, "Success", "Backup restored successfully")
                 self.refresh()
             except Exception as e:

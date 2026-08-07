@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QWidget,
-    QScrollArea,
     QFrame,
     QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 
 from acd.presentation.pages.base_page import BasePage
 from acd.services.analytics_service import AnalyticsService
@@ -69,7 +68,9 @@ class FunnelStage(QFrame):
         layout.addWidget(count_label)
 
         self.setLayout(layout)
-        self.setStyleSheet("QFrame { border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }")
+        self.setStyleSheet(
+            "QFrame { border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }"
+        )
 
 
 class RecommendationItem(QFrame):
@@ -92,7 +93,9 @@ class RecommendationItem(QFrame):
         priority_label = QLabel(f"Prioridade: {priority.upper()}")
         priority_label.setFont(QFont("Arial", 9))
 
-        priority_color = "#dc3545" if priority == "high" else "#ffc107" if priority == "medium" else "#28a745"
+        priority_color = (
+            "#dc3545" if priority == "high" else "#ffc107" if priority == "medium" else "#28a745"
+        )
         priority_label.setStyleSheet(f"color: {priority_color};")
 
         layout.addWidget(title_label)
@@ -101,16 +104,20 @@ class RecommendationItem(QFrame):
 
         self.setLayout(layout)
 
-        bg_color = "#ffe6e6" if priority == "high" else "#fff9e6" if priority == "medium" else "#e6f9e6"
-        self.setStyleSheet(f"QFrame {{ border: 1px solid #ddd; border-radius: 4px; background-color: {bg_color}; }}")
+        bg_color = (
+            "#ffe6e6" if priority == "high" else "#fff9e6" if priority == "medium" else "#e6f9e6"
+        )
+        self.setStyleSheet(
+            f"QFrame {{ border: 1px solid #ddd; border-radius: 4px; background-color: {bg_color}; }}"
+        )
 
 
 class AnalyticsPage(BasePage):
     """Analytics dashboard page showing metrics, KPIs, and recommendations."""
 
-    def __init__(self) -> None:
+    def __init__(self, analytics_service: AnalyticsService) -> None:
         super().__init__("Analytics Dashboard")
-        self.analytics_service = AnalyticsService()
+        self.analytics_service = analytics_service
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -164,7 +171,11 @@ class AnalyticsPage(BasePage):
 
         # Create KPI cards
         cards = [
-            ("Conversão → Entrevista", kpis.get("conversion_to_interview", "0%"), "Taxa de sucesso"),
+            (
+                "Conversão → Entrevista",
+                kpis.get("conversion_to_interview", "0%"),
+                "Taxa de sucesso",
+            ),
             ("ATS Médio", kpis.get("average_ats", "0"), "Score de similaridade"),
             ("Melhor Plataforma", kpis.get("best_platform", "N/A"), "Maior taxa de sucesso"),
             ("Candidaturas", str(kpis.get("total_applications", 0)), "Total enviadas"),
@@ -184,7 +195,9 @@ class AnalyticsPage(BasePage):
     def create_funnel_section(self) -> QWidget:
         """Create conversion funnel section."""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        container.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -211,7 +224,9 @@ class AnalyticsPage(BasePage):
     def create_trends_section(self) -> QWidget:
         """Create trends analysis section."""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        container.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -232,7 +247,11 @@ class AnalyticsPage(BasePage):
         ats_trend = trends.get("ats", {})
         ats_label = QLabel(f"ATS: {ats_trend.get('trend', 'estável').upper()}")
         ats_label.setFont(QFont("Arial", 11))
-        ats_color = "#28a745" if ats_trend.get("trend") == "up" else "#dc3545" if ats_trend.get("trend") == "down" else "#666"
+        ats_color = (
+            "#28a745"
+            if ats_trend.get("trend") == "up"
+            else "#dc3545" if ats_trend.get("trend") == "down" else "#666"
+        )
         ats_label.setStyleSheet(f"color: {ats_color}; font-weight: bold;")
         trends_grid.addWidget(ats_label, 0, 0)
 
@@ -240,7 +259,11 @@ class AnalyticsPage(BasePage):
         conv_trend = trends.get("conversion", {})
         conv_label = QLabel(f"Conversão: {conv_trend.get('trend', 'estável').upper()}")
         conv_label.setFont(QFont("Arial", 11))
-        conv_color = "#28a745" if conv_trend.get("trend") == "up" else "#dc3545" if conv_trend.get("trend") == "down" else "#666"
+        conv_color = (
+            "#28a745"
+            if conv_trend.get("trend") == "up"
+            else "#dc3545" if conv_trend.get("trend") == "down" else "#666"
+        )
         conv_label.setStyleSheet(f"color: {conv_color}; font-weight: bold;")
         trends_grid.addWidget(conv_label, 0, 1)
 
@@ -251,7 +274,9 @@ class AnalyticsPage(BasePage):
     def create_recommendations_section(self) -> QWidget:
         """Create recommendations section."""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }")
+        container.setStyleSheet(
+            "QFrame { border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; padding: 16px; }"
+        )
 
         layout = QVBoxLayout()
         layout.setSpacing(12)
@@ -265,7 +290,9 @@ class AnalyticsPage(BasePage):
 
         if recommendations:
             for rec in recommendations:
-                item = RecommendationItem(rec["title"], rec["description"], rec.get("priority", "medium"))
+                item = RecommendationItem(
+                    rec["title"], rec["description"], rec.get("priority", "medium")
+                )
                 layout.addWidget(item)
         else:
             no_rec_label = QLabel("Nenhuma recomendação no momento.")

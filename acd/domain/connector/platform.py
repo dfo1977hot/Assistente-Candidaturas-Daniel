@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
@@ -17,4 +18,4 @@ class Platform(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     version: Mapped[str] = mapped_column(String(50), nullable=False, default="1")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

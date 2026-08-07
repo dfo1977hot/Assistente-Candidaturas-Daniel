@@ -1,12 +1,16 @@
 """Health status card widget."""
 
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QColor, QFont, QIcon
-from datetime import datetime
 
 from acd.application.platform import PlatformUseCases
 
@@ -45,12 +49,10 @@ class HealthCard(QWidget):
         # Results table
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels([
-            "Check Type", "Status", "Message", "Response Time (ms)"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.table.setHorizontalHeaderLabels(
+            ["Check Type", "Status", "Message", "Response Time (ms)"]
         )
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
@@ -101,7 +103,7 @@ class HealthCard(QWidget):
 
         for row, (check_name, result) in enumerate(checks.items()):
             self.table.setItem(row, 0, QTableWidgetItem(check_name))
-            
+
             status_item = QTableWidgetItem(result.get("status", "Unknown"))
             status = result.get("status", "Unknown")
             if status == "healthy":

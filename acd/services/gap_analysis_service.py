@@ -2,24 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from acd.infrastructure.repositories.career_repository import CareerRepository
 from acd.infrastructure.career.rule_engine import CareerRuleEngine
+from acd.infrastructure.repositories.career_repository import CareerRepository
 
 
 class GapAnalysisService:
     """Service for analyzing skill gaps between current and target roles."""
 
-    def __init__(self, repository: CareerRepository | None = None, rule_engine: CareerRuleEngine | None = None) -> None:
+    def __init__(
+        self,
+        repository: CareerRepository | None = None,
+        rule_engine: CareerRuleEngine | None = None,
+    ) -> None:
         self.repository = repository or CareerRepository()
         self.rule_engine = rule_engine or CareerRuleEngine()
 
     def analyze_goal(self, goal_id: int, current_profile: dict[str, Any]) -> dict[str, Any]:
         """Analyze gaps for a specific goal.
-        
+
         Args:
             goal_id: Career goal ID
             current_profile: Current profile data
-            
+
         Returns:
             Comprehensive gap analysis
         """
@@ -37,7 +41,9 @@ class GapAnalysisService:
                 current_level=gap["current"],
                 required_level=gap["required"],
                 gap_severity=gap["severity"],
-                estimated_hours=self.rule_engine._estimate_learning_hours(gap["required"] - gap["current"]),
+                estimated_hours=self.rule_engine._estimate_learning_hours(
+                    gap["required"] - gap["current"]
+                ),
             )
 
         return {
@@ -81,7 +87,7 @@ class GapAnalysisService:
 
     def get_learning_path(self, goal_id: int) -> list[dict[str, Any]]:
         """Get ordered learning path for goal.
-        
+
         Returns steps in recommended order based on severity and dependencies.
         """
         gaps = self.repository.list_gaps_by_goal(goal_id)
@@ -100,7 +106,7 @@ class GapAnalysisService:
 
     def estimate_timeline(self, goal_id: int) -> dict[str, Any]:
         """Estimate timeline to close all gaps.
-        
+
         Returns timeline estimate based on hours and daily learning capacity.
         """
         gaps = self.repository.list_gaps_by_goal(goal_id)

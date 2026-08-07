@@ -1,13 +1,13 @@
 """Installation service for initial setup."""
 
+from datetime import UTC, datetime
+from pathlib import Path
 import platform
 import sys
-from datetime import datetime
-from pathlib import Path
 
 from acd.infrastructure.platform import StructuredLogger
-from acd.infrastructure.repositories.release import ReleaseRepository
 from acd.infrastructure.release import VersionManager
+from acd.infrastructure.repositories.release import ReleaseRepository
 
 
 class InstallationService:
@@ -15,7 +15,7 @@ class InstallationService:
 
     def __init__(self, session, installation_path: str = "./"):
         """Initialize installation service.
-        
+
         Args:
             session: SQLAlchemy database session
             installation_path: Path where application is installed
@@ -32,11 +32,11 @@ class InstallationService:
         include_default_configs: bool = True,
     ) -> dict:
         """Perform fresh installation.
-        
+
         Returns:
             Installation result {success, message, installation_id, duration_seconds}
         """
-        start_time = datetime.now()
+        start_time = datetime.now(UTC)
         log_entry = None
 
         try:
@@ -55,9 +55,11 @@ class InstallationService:
             with self.logger.operation("fresh_install"):
                 # Verify version format
                 try:
-                    parsed_version = VersionManager.parse_version(app_version)
-                except ValueError:
-                    raise ValueError(f"Invalid version format: {app_version}")
+                    VersionManager.parse_version(app_version)
+                except ValueError as err:
+                    raise ValueError(
+                        f"Invalid version format: {app_version}"
+                    ) from err
 
                 # Create installation directory
                 install_dir = Path(installation_path)
@@ -74,13 +76,13 @@ class InstallationService:
                         dir_path.mkdir(parents=True, exist_ok=True)
 
                 # Create or update installed version record
-                from acd.domain.release import InstalledVersion, InstallationStatus
+                from acd.domain.release import InstallationStatus
 
                 installed = self.repository.get_or_create_installed_version(app_version)
                 installed.installation_path = str(install_dir.absolute())
                 installed.installation_type = InstallationStatus.FRESH_INSTALL.value
                 installed.status = InstallationStatus.ACTIVE.value
-                installed.installation_date = datetime.now()
+                installed.installation_date = datetime.now(UTC)
                 installed.system_info = {
                     "os": platform.system(),
                     "os_version": platform.release(),
@@ -90,7 +92,7 @@ class InstallationService:
                 self.session.commit()
 
                 # Calculate duration
-                duration = (datetime.now() - start_time).total_seconds()
+                duration = (datetime.now(UTC) - start_time).total_seconds()
 
                 # Update log
                 self.repository.update_installation_log(
@@ -113,7 +115,7 @@ class InstallationService:
                 }
 
         except Exception as e:
-            duration = (datetime.now() - start_time).total_seconds()
+            duration = (datetime.now(UTC) - start_time).total_seconds()
 
             # Update log with error
             if log_entry:
@@ -139,7 +141,7 @@ class InstallationService:
 
     def check_dependencies(self) -> dict:
         """Check if all dependencies are met.
-        
+
         Returns:
             {
                 "all_met": bool,
@@ -175,7 +177,7 @@ class InstallationService:
 
     def verify_installation(self) -> dict:
         """Verify installation integrity.
-        
+
         Returns:
             {
                 "is_valid": bool,

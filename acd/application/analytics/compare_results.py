@@ -1,25 +1,29 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
-from datetime import datetime
 
 from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
 
+logger = logging.getLogger(__name__)
 
-def compare_results(repository: AnalyticsRepository | None = None, *, period1: str = "daily", period2: str = "daily") -> dict[str, Any]:
+
+def compare_results(
+    repository: AnalyticsRepository | None = None, *, period1: str = "daily", period2: str = "daily"
+) -> dict[str, Any]:
     """Compare analytics results between two periods.
-    
+
     Args:
         repository: AnalyticsRepository instance
         period1: First period identifier
         period2: Second period identifier
-        
+
     Returns:
         Dictionary containing comparison results
     """
     if repository is None:
         repository = AnalyticsRepository()
-    
+
     # Get snapshots for comparison
     snapshots = []
     try:
@@ -27,8 +31,8 @@ def compare_results(repository: AnalyticsRepository | None = None, *, period1: s
         if latest:
             snapshots.append(latest)
     except Exception:
-        pass
-    
+        logger.exception("Unable to retrieve latest analytics snapshot.")
+
     return {
         "period1": period1,
         "period2": period2,

@@ -1,8 +1,7 @@
 """Evidence aggregator for consolidating evidence from multiple sources."""
 
-from typing import Any
-from datetime import datetime, timedelta
 from collections import defaultdict
+from typing import Any
 
 
 class EvidenceAggregator:
@@ -47,16 +46,22 @@ class EvidenceAggregator:
 
         aggregated = {
             "total_outcomes": len(outcomes),
-            "successful_outcomes": sum(1 for o in outcomes if hasattr(o, "is_positive") and o.is_positive()),
-            "failed_outcomes": sum(1 for o in outcomes if hasattr(o, "is_positive") and o.is_negative()),
+            "successful_outcomes": sum(
+                1 for o in outcomes if hasattr(o, "is_positive") and o.is_positive()
+            ),
+            "failed_outcomes": sum(
+                1 for o in outcomes if hasattr(o, "is_positive") and o.is_negative()
+            ),
             "success_rate": 0.0,
             "evidence_by_field": defaultdict(dict),
             "time_range": self._get_time_range(outcomes),
-            "details": {}
+            "details": {},
         }
 
         if aggregated["total_outcomes"] > 0:
-            aggregated["success_rate"] = aggregated["successful_outcomes"] / aggregated["total_outcomes"]
+            aggregated["success_rate"] = (
+                aggregated["successful_outcomes"] / aggregated["total_outcomes"]
+            )
 
         # Analyze specific fields
         for field in analysis_fields:

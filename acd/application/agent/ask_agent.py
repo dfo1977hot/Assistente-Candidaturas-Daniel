@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
 from acd.infrastructure.agent.tool_registry import DefaultToolRegistry
+from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.services.ai_execution_service import AgentMemoryService
 
 
@@ -16,13 +16,13 @@ def ask_agent(
     orchestrator: AIOrchestrator | None = None,
 ) -> dict[str, Any]:
     """Ask the agent a question.
-    
+
     Args:
         user_question: User's question or request
         repository: Agent repository
         memory_service: Memory service
         orchestrator: AI orchestrator
-        
+
     Returns:
         Agent analysis and response
     """

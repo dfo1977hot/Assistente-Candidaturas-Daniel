@@ -3,10 +3,10 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import acd.database.database as db_module
+from acd.infrastructure.repositories.company_repository import CompanyRepository
 from acd.models.base import Base
 from acd.models.company import Company
-from acd.infrastructure.repositories.company_repository import CompanyRepository
-import acd.database.database as db_module
 
 
 def _setup_temp_db(tmp_path: Path):

@@ -1,8 +1,9 @@
 """Configuration entity for system settings."""
 
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+
 from sqlalchemy import JSON, DateTime
+from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
@@ -42,6 +43,7 @@ class Configuration(Base):
             return int(self.value)
         elif self.config_type == "json":
             import json
+
             return json.loads(self.value)
         return self.value
 

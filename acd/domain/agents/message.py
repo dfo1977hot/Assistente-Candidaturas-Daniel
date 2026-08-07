@@ -1,16 +1,19 @@
 """Agent message entity."""
 
+from __future__ import annotations
+
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import String, Integer, DateTime, JSON, Enum as SQLEnum, ForeignKey, Text
+from sqlalchemy import JSON, DateTime, Enum as SQLEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     """Message types in multi-agent communication."""
 
     TASK_CREATED = "task_created"
@@ -31,31 +34,72 @@ class AgentMessage(Base):
     __tablename__ = "agent_messages"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    session_id: Mapped[int | None] = mapped_column(ForeignKey("agent_sessions.id"), nullable=True)
-    
+
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_sessions.id"),
+        nullable=True,
+    )
+
     # Message metadata
-    message_type: Mapped[str] = mapped_column(SQLEnum(MessageType), index=True)
-    sender_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
-    receiver_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
-    
+    message_type: Mapped[str] = mapped_column(
+        SQLEnum(MessageType),
+        index=True,
+    )
+
+    sender_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agents.id"),
+        nullable=True,
+    )
+
+    receiver_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agents.id"),
+        nullable=True,
+    )
+
     # Message content
     subject: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    
+
     # Tracking
     is_read: Mapped[bool] = mapped_column(default=False)
     response_required: Mapped[bool] = mapped_column(default=False)
-    response_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    
+    response_deadline: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
     # Relationships
-    task_id: Mapped[int | None] = mapped_column(ForeignKey("agent_tasks.id"), nullable=True)
-    parent_message_id: Mapped[int | None] = mapped_column(ForeignKey("agent_messages.id"), nullable=True)
-    
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("multi_agent_tasks.id"),
+        nullable=True,
+    )
+
+    parent_message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agent_messages.id"),
+        nullable=True,
+    )
+
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+    )
+
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
+    responded_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
 
     def __repr__(self) -> str:
-        return f"<AgentMessage(id={self.id}, type={self.message_type}, sender_id={self.sender_id})>"
+        return (
+            f"<AgentMessage("
+            f"id={self.id}, "
+            f"type={self.message_type}, "
+            f"sender_id={self.sender_id})>"
+        )

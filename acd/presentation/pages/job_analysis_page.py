@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QApplication, QFormLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from acd.services.job_analysis_service import JobAnalysisService
 
@@ -8,9 +18,9 @@ from acd.services.job_analysis_service import JobAnalysisService
 class JobAnalysisPage(QWidget):
     """Página simples para analisar descrições de vagas."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, service: JobAnalysisService, parent=None) -> None:
         super().__init__(parent)
-        self.service = JobAnalysisService()
+        self.service = service
         self._build_ui()
 
     def _build_ui(self) -> None:

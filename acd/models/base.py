@@ -1,3 +1,9 @@
+from __future__ import annotations
+
 from sqlalchemy.orm import DeclarativeBase
+
+
 class Base(DeclarativeBase):
-    pass
+    """Base declarativa para todos os modelos ORM do ACD."""
+
+    ...

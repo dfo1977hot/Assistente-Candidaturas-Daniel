@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from acd.infrastructure.repositories.career_repository import CareerRepository
-from acd.infrastructure.career.rule_engine import CareerRuleEngine
 from acd.infrastructure.career.recommendation_engine import RecommendationRankingEngine
+from acd.infrastructure.career.rule_engine import CareerRuleEngine
+from acd.infrastructure.repositories.career_repository import CareerRepository
 
 
 class CareerPlanningService:
@@ -19,7 +19,9 @@ class CareerPlanningService:
     ) -> None:
         self.repository = repository or CareerRepository()
         self.rule_engine = rule_engine or CareerRuleEngine()
-        self.recommendation_engine = recommendation_engine or RecommendationRankingEngine(self.rule_engine)
+        self.recommendation_engine = recommendation_engine or RecommendationRankingEngine(
+            self.rule_engine
+        )
 
     def create_career_goal(
         self,
@@ -33,7 +35,7 @@ class CareerPlanningService:
         priority: int = 1,
     ) -> dict[str, Any]:
         """Create a new career goal.
-        
+
         Args:
             target_role: Target position title
             target_industry: Target industry
@@ -42,11 +44,11 @@ class CareerPlanningService:
             target_salary: Target salary
             target_work_model: Work arrangement (onsite, hybrid, remote)
             priority: Goal priority (1-10)
-            
+
         Returns:
             Created goal data
         """
-        deadline = datetime.utcnow() + timedelta(days=deadline_months * 30)
+        deadline = datetime.now(UTC) + timedelta(days=deadline_months * 30)
 
         goal = self.repository.create_goal(
             target_role=target_role,
@@ -100,13 +102,15 @@ class CareerPlanningService:
             for g in goals
         ]
 
-    def generate_development_plan(self, goal_id: int, current_profile: dict[str, Any]) -> dict[str, Any]:
+    def generate_development_plan(
+        self, goal_id: int, current_profile: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate development plan for a goal.
-        
+
         Args:
             goal_id: Career goal ID
             current_profile: Current skills, certifications, languages
-            
+
         Returns:
             Generated development plan
         """
@@ -130,7 +134,7 @@ class CareerPlanningService:
         )
 
         # Create development plan
-        now = datetime.utcnow()
+        now = datetime.now(UTC) 
         plan = self.repository.create_plan(
             goal_id=goal_id,
             title=f"Plano para {goal.target_role}",
@@ -180,7 +184,8 @@ class CareerPlanningService:
 
         return {
             "active_goals": len(goals),
-            "average_compatibility": sum(float(g.current_compatibility) for g in goals) / len(goals),
+            "average_compatibility": sum(float(g.current_compatibility) for g in goals)
+            / len(goals),
             "goals_by_priority": {
                 "high": len([g for g in goals if g.priority <= 3]),
                 "medium": len([g for g in goals if 3 < g.priority <= 6]),

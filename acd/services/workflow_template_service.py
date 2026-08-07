@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
@@ -49,7 +48,11 @@ class WorkflowTemplateService:
         },
     ]
 
-    def __init__(self, workflow_service: WorkflowService | None = None, repository: WorkflowRepository | None = None) -> None:
+    def __init__(
+        self,
+        workflow_service: WorkflowService | None = None,
+        repository: WorkflowRepository | None = None,
+    ) -> None:
         self.workflow_service = workflow_service or WorkflowService()
         self.repository = repository or WorkflowRepository()
 

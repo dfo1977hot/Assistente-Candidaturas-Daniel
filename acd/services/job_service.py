@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional
+from datetime import date
+from urllib.parse import urlparse
 
 from acd.core.logger import logger
 from acd.domain.entities.job import Job
@@ -8,9 +9,25 @@ from acd.infrastructure.repositories.job_repository import JobRepository
 
 
 class JobService:
-    """Camada de serviço para regras de negócio das vagas."""
+    """Camada de serviço responsável pelas regras de negócio das vagas."""
 
-    def __init__(self, repository: Optional[JobRepository] = None) -> None:
+    JOB_STATUSES = (
+        "Nova",
+        "Analisada",
+        "Currículo Enviado",
+        "Carta Enviada",
+        "Inscrição Concluída",
+        "Triagem RH",
+        "Entrevista RH",
+        "Entrevista Técnica",
+        "Teste",
+        "Oferta",
+        "Rejeitada",
+        "Encerrada",
+    )
+    VALID_STATUS = frozenset(JOB_STATUSES)
+
+    def __init__(self, repository: JobRepository | None = None) -> None:
         self.repository = repository or JobRepository()
 
     def create_job(
@@ -21,20 +38,27 @@ class JobService:
         location: str = "",
         work_model: str = "",
         employment_type: str = "",
-        salary_min: Optional[float] = None,
-        salary_max: Optional[float] = None,
+        salary_min: float | None = None,
+        salary_max: float | None = None,
         currency: str = "",
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
         recruiter: str = "",
-        application_deadline: Optional[str] = None,
-        application_date: Optional[str] = None,
+        application_deadline: str | None = None,
+        application_date: str | None = None,
         priority: int = 0,
         notes: str = "",
     ) -> Job:
-        """Valida e cria uma vaga."""
+        """Valida e cria uma nova vaga."""
+
         self._validate_required_fields(company_id=company_id, title=title)
+        self._validate_salary_range(salary_min, salary_max)
+        self._validate_status(status)
+        self._validate_url(job_url)
+        if job_url.strip() and self.repository.url_exists(job_url):
+            raise ValueError("Esta URL já está cadastrada em outra vaga.")
+
         job = Job(
             company_id=company_id,
             title=title.strip(),
@@ -53,8 +77,16 @@ class JobService:
             priority=priority,
             notes=notes.strip(),
         )
+
         created = self.repository.create(job)
-        logger.info("Nova vaga criada: %s", created.title)
+
+        logger.info(
+            "CREATE_JOB | id=%s | company=%s | title=%s",
+            created.id,
+            created.company_id,
+            created.title,
+        )
+
         return created
 
     def update_job(
@@ -66,21 +98,32 @@ class JobService:
         location: str = "",
         work_model: str = "",
         employment_type: str = "",
-        salary_min: Optional[float] = None,
-        salary_max: Optional[float] = None,
+        salary_min: float | None = None,
+        salary_max: float | None = None,
         currency: str = "",
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
         recruiter: str = "",
-        application_deadline: Optional[str] = None,
-        application_date: Optional[str] = None,
+        application_deadline: str | None = None,
+        application_date: str | None = None,
         priority: int = 0,
         notes: str = "",
-    ) -> Optional[Job]:
+    ) -> Job | None:
         """Atualiza uma vaga existente."""
+
         self._validate_required_fields(company_id=company_id, title=title)
+        self._validate_salary_range(salary_min, salary_max)
+        self._validate_status(status)
+        self._validate_url(job_url)
+        if job_url.strip() and self.repository.url_exists(
+            job_url,
+            exclude_job_id=job_id,
+        ):
+            raise ValueError("Esta URL já está cadastrada em outra vaga.")
+
         job = self.repository.get_by_id(job_id)
+
         if job is None:
             return None
 
@@ -100,27 +143,50 @@ class JobService:
         job.application_date = self._parse_optional_date(application_date)
         job.priority = priority
         job.notes = notes.strip()
+
         updated = self.repository.update(job)
-        logger.info("Vaga atualizada: %s", updated.title)
+
+        logger.info(
+            "UPDATE_JOB | id=%s | company=%s | title=%s",
+            updated.id,
+            updated.company_id,
+            updated.title,
+        )
+
         return updated
 
-    def delete_job(self, job_id: int) -> bool:
+    def delete_job(self, job_id: int, *, delete_linked: bool = False) -> bool:
         """Remove uma vaga."""
-        deleted = self.repository.delete(job_id)
+
+        deleted = self.repository.delete(job_id, delete_linked=delete_linked)
+
         if deleted:
-            logger.info("Vaga removida: %s", job_id)
+            logger.info("DELETE_JOB | id=%s", job_id)
+
         return deleted
 
+    def get_job(self, job_id: int) -> Job | None:
+        """Retorna uma vaga pelo ID."""
+        return self.repository.get_by_id(job_id)
+
     def list_jobs(self) -> list[Job]:
-        """Retorna todas as vagas."""
+        """Retorna todas as vagas cadastradas."""
         return self.repository.get_all()
 
     def search_jobs(self, query: str) -> list[Job]:
-        """Busca vagas por cargo."""
+        """Pesquisa vagas."""
         return self.repository.search(query)
 
-    def filter_jobs(self, *, company_id: Optional[int] = None, status: Optional[str] = None, work_model: Optional[str] = None, employment_type: Optional[str] = None) -> list[Job]:
-        """Filtra vagas por empresa, status e modalidade."""
+    def filter_jobs(
+        self,
+        *,
+        company_id: int | None = None,
+        status: str | None = None,
+        work_model: str | None = None,
+        employment_type: str | None = None,
+    ) -> list[Job]:
+        """Filtra vagas."""
+
         return self.repository.filter(
             company_id=company_id,
             status=status,
@@ -129,18 +195,66 @@ class JobService:
         )
 
     def count_jobs(self) -> int:
-        """Retorna o total de vagas."""
+        """Retorna o número de vagas cadastradas."""
         return self.repository.count()
 
-    def _validate_required_fields(self, *, company_id: int, title: str) -> None:
+    def job_url_exists(
+        self,
+        job_url: str,
+        *,
+        exclude_job_id: int | None = None,
+    ) -> bool:
+        """Informa se uma URL já está cadastrada."""
+        return self.repository.url_exists(
+            job_url,
+            exclude_job_id=exclude_job_id,
+        )
+
+    @staticmethod
+    def _validate_required_fields(*, company_id: int, title: str) -> None:
+        """Valida os campos obrigatórios."""
+
         if company_id <= 0:
             raise ValueError("Empresa é obrigatória.")
+
         if not title or not title.strip():
             raise ValueError("Cargo é obrigatório.")
 
-    def _parse_optional_date(self, value: Optional[str]) -> Optional[object]:
+    @staticmethod
+    def _validate_salary_range(
+        salary_min: float | None,
+        salary_max: float | None,
+    ) -> None:
+        """Valida a faixa salarial."""
+
+        if salary_min is not None and salary_max is not None and salary_min > salary_max:
+            raise ValueError("O salário mínimo não pode ser maior que o salário máximo.")
+
+    def _validate_status(self, status: str) -> None:
+        """Valida o status informado."""
+
+        status = status.strip() or "Nova"
+
+        if status not in self.VALID_STATUS:
+            raise ValueError(f"Status inválido: '{status}'.")
+
+    @staticmethod
+    def _validate_url(url: str) -> None:
+        """Valida a URL da vaga."""
+
+        if not url:
+            return
+
+        parsed = urlparse(url)
+
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("A URL da vaga deve iniciar com http:// ou https://.")
+
+    @staticmethod
+    def _parse_optional_date(value: str | None) -> date | None:
+        """Converte uma data ISO para datetime.date."""
+
         if not value:
             return None
-        from datetime import date
 
         return date.fromisoformat(value)

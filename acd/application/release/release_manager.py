@@ -1,20 +1,19 @@
 """Release manager for coordinating release operations."""
 
-from datetime import datetime
-
+from acd.application.release.services import (
+    DocumentationService,
+    InstallationService,
+    MigrationService,
+    UpdateService,
+)
 from acd.infrastructure.platform import StructuredLogger
-from acd.infrastructure.repositories.release import ReleaseRepository
 from acd.infrastructure.release import (
-    VersionManager,
     FeatureFlagService,
+    VersionManager,
     get_plugin_loader,
 )
-from acd.application.release.services import (
-    InstallationService,
-    UpdateService,
-    MigrationService,
-    DocumentationService,
-)
+from acd.infrastructure.repositories.release import ReleaseRepository
+from acd.version import get_version
 
 
 class ReleaseManager:
@@ -22,7 +21,7 @@ class ReleaseManager:
 
     def __init__(self, session, database_path: str | None = None):
         """Initialize release manager.
-        
+
         Args:
             session: SQLAlchemy database session
             database_path: Path to database for backups
@@ -59,10 +58,14 @@ class ReleaseManager:
             updates_available = False
             latest_available_version = None
 
-            if latest_stable and VersionManager.compare_versions(
-                installed.current_version,
-                latest_stable.version,
-            ) < 0:
+            if (
+                latest_stable
+                and VersionManager.compare_versions(
+                    installed.current_version,
+                    latest_stable.version,
+                )
+                < 0
+            ):
                 updates_available = True
                 latest_available_version = latest_stable.version
 
@@ -232,8 +235,7 @@ class ReleaseManager:
         # Set context for plugins
         installed = self.repository.get_installed_version()
         context = {
-            "app_version": installed.current_version if installed else "0.4.0",
-            "session": self.session,
+            "app_version": installed.current_version if installed else get_version(),
         }
         self.plugin_loader.set_context(context)
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
@@ -17,4 +18,4 @@ class WorkflowTemplate(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from typing import Any
 
 from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
@@ -51,7 +50,11 @@ class MetricsEngine:
             "platforms": {
                 "linkedin": {"applications": 25, "success_rate": 0.24, "avg_response_time": 5.2},
                 "workday": {"applications": 12, "success_rate": 0.33, "avg_response_time": 7.1},
-                "smartrecruiters": {"applications": 8, "success_rate": 0.125, "avg_response_time": 6.5},
+                "smartrecruiters": {
+                    "applications": 8,
+                    "success_rate": 0.125,
+                    "avg_response_time": 6.5,
+                },
             },
             "best_platform": "workday",
         }

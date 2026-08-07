@@ -4,6 +4,10 @@ from typing import Any
 
 from sqlalchemy import select
 
+from acd.application.structured_resume_snapshot import (
+    StructuredResumeSnapshot,
+    StructuredResumeSnapshotCodec,
+)
 from acd.database import database as database_module
 from acd.domain.entities.ai_generation import AIGeneration
 from acd.domain.entities.ai_prompt import AIPrompt
@@ -30,7 +34,16 @@ class PromptRepository:
             session.refresh(generation)
             return generation
 
-    def save_resume_version(self, version: ResumeVersion) -> ResumeVersion:
+    def save_resume_version(
+        self,
+        version: ResumeVersion,
+        structured_resume: StructuredResumeSnapshot | None = None,
+    ) -> ResumeVersion:
+        """Persist a text version and an optional validated structured snapshot."""
+        if structured_resume is not None:
+            version.structured_content_json = StructuredResumeSnapshotCodec().dumps(
+                structured_resume
+            )
         with database_module.SessionLocal() as session:
             session.add(version)
             session.commit()
@@ -60,12 +73,20 @@ class PromptRepository:
 
     def get_resume_versions(self, curriculum_id: int) -> list[ResumeVersion]:
         with database_module.SessionLocal() as session:
-            stmt = select(ResumeVersion).where(ResumeVersion.curriculum_id == curriculum_id).order_by(ResumeVersion.created_at.desc())
+            stmt = (
+                select(ResumeVersion)
+                .where(ResumeVersion.curriculum_id == curriculum_id)
+                .order_by(ResumeVersion.created_at.desc())
+            )
             return list(session.scalars(stmt).all())
 
     def get_cover_letter_versions(self, curriculum_id: int) -> list[CoverLetterVersion]:
         with database_module.SessionLocal() as session:
-            stmt = select(CoverLetterVersion).where(CoverLetterVersion.curriculum_id == curriculum_id).order_by(CoverLetterVersion.created_at.desc())
+            stmt = (
+                select(CoverLetterVersion)
+                .where(CoverLetterVersion.curriculum_id == curriculum_id)
+                .order_by(CoverLetterVersion.created_at.desc())
+            )
             return list(session.scalars(stmt).all())
 
     def get_statistics(self) -> dict[str, Any]:

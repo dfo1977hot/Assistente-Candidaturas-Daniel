@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 from acd.core.logger import logger
 from acd.domain.entities.interview import Interview
@@ -15,7 +14,7 @@ class InterviewService:
     VALID_INTERVIEW_TYPES = {"RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"}
     VALID_RESULTS = {"Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"}
 
-    def __init__(self, repository: Optional[InterviewRepository] = None) -> None:
+    def __init__(self, repository: InterviewRepository | None = None) -> None:
         self.repository = repository or InterviewRepository()
         self.application_service = ApplicationService()
 
@@ -36,7 +35,9 @@ class InterviewService:
     ) -> Interview:
         """Cria uma entrevista e registra a timeline da candidatura."""
         parsed_date = self._parse_datetime(interview_date)
-        self._validate_required_fields(application_id=application_id, interview_date=parsed_date, interview_type=interview_type)
+        self._validate_required_fields(
+            application_id=application_id, interview_date=parsed_date, interview_type=interview_type
+        )
         self._validate_type(interview_type)
         self._validate_result(result)
         interview = Interview(
@@ -53,7 +54,9 @@ class InterviewService:
             result=result,
         )
         created = self.repository.create(interview)
-        self.application_service.repository.add_event(application_id, "interview_scheduled", f"Entrevista agendada ({interview_type})")
+        self.application_service.repository.add_event(
+            application_id, "interview_scheduled", f"Entrevista agendada ({interview_type})"
+        )
         logger.info("Entrevista criada: %s", created.id)
         return created
 
@@ -72,10 +75,12 @@ class InterviewService:
         notes: str = "",
         feedback: str = "",
         result: str = "Agendada",
-    ) -> Optional[Interview]:
+    ) -> Interview | None:
         """Atualiza uma entrevista existente."""
         parsed_date = self._parse_datetime(interview_date)
-        self._validate_required_fields(application_id=application_id, interview_date=parsed_date, interview_type=interview_type)
+        self._validate_required_fields(
+            application_id=application_id, interview_date=parsed_date, interview_type=interview_type
+        )
         interview = self.repository.get_by_id(interview_id)
         if interview is None:
             return None
@@ -91,7 +96,9 @@ class InterviewService:
         interview.feedback = feedback.strip()
         interview.result = result
         updated = self.repository.update(interview)
-        self.application_service.repository.add_event(application_id, "interview_updated", f"Entrevista atualizada ({interview_type})")
+        self.application_service.repository.add_event(
+            application_id, "interview_updated", f"Entrevista atualizada ({interview_type})"
+        )
         logger.info("Entrevista atualizada: %s", updated.id)
         return updated
 
@@ -110,7 +117,14 @@ class InterviewService:
         """Pesquisa entrevistas."""
         return self.repository.search(query)
 
-    def filter_interviews(self, *, interview_type: Optional[str] = None, result: Optional[str] = None, period_start: Optional[datetime] = None, period_end: Optional[datetime] = None) -> list[Interview]:
+    def filter_interviews(
+        self,
+        *,
+        interview_type: str | None = None,
+        result: str | None = None,
+        period_start: datetime | None = None,
+        period_end: datetime | None = None,
+    ) -> list[Interview]:
         """Filtra entrevistas."""
         return self.repository.filter(
             interview_type=interview_type,
@@ -135,9 +149,16 @@ class InterviewService:
         """Retorna entrevistas próximas em um horizonte de tempo."""
         threshold = datetime.now() + timedelta(hours=hours)
         interviews = self.repository.get_all()
-        return [interview for interview in interviews if datetime.now() <= interview.interview_date <= threshold and interview.result == "Agendada"]
+        return [
+            interview
+            for interview in interviews
+            if datetime.now() <= interview.interview_date <= threshold
+            and interview.result == "Agendada"
+        ]
 
-    def _validate_required_fields(self, *, application_id: int, interview_date: datetime, interview_type: str) -> None:
+    def _validate_required_fields(
+        self, *, application_id: int, interview_date: datetime, interview_type: str
+    ) -> None:
         if application_id <= 0:
             raise ValueError("Candidatura é obrigatória.")
         if interview_date is None:

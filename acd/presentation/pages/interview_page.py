@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -26,15 +25,19 @@ from acd.services.interview_service import InterviewService
 class InterviewPage(BasePage):
     """Página de cadastro e gerenciamento de entrevistas."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, interview_service: InterviewService, application_service: ApplicationService
+    ) -> None:
         super().__init__("Entrevistas")
 
-        self.interview_service = InterviewService()
-        self.application_service = ApplicationService()
-        self.current_interview_id: Optional[int] = None
+        self.interview_service = interview_service
+        self.application_service = application_service
+        self.current_interview_id: int | None = None
 
         self.application_combo = QComboBox()
         self.datetime_input = QDateTimeEdit()
+        self.datetime_input.setCalendarPopup(True)
+        self.datetime_input.setDisplayFormat("dd/MM/yyyy HH:mm")
         self.type_combo = QComboBox()
         self.interviewer_input = QLineEdit()
         self.interviewer_email_input = QLineEdit()
@@ -51,8 +54,16 @@ class InterviewPage(BasePage):
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["ID", "Candidatura", "Tipo", "Data", "Resultado", "Entrevistador"])
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Candidatura", "Tipo", "Data", "Resultado", "Entrevistador"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().hide()
+        self.table.setCornerButtonEnabled(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
@@ -61,11 +72,29 @@ class InterviewPage(BasePage):
         self._load_applications()
         self._load_interviews()
 
+    def refresh_reference_data(self) -> None:
+        """Atualiza candidaturas e entrevistas ao entrar na página."""
+        selected_application = self.application_combo.currentData()
+        self._load_applications()
+        if selected_application not in (None, ""):
+            index = self.application_combo.findData(selected_application)
+            if index >= 0:
+                self.application_combo.setCurrentIndex(index)
+        self._load_interviews()
+
     def _setup_controls(self) -> None:
-        self.type_combo.addItems(["RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"])
-        self.result_combo.addItems(["Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"])
-        self.filter_type_combo.addItems(["", "RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"])
-        self.filter_result_combo.addItems(["", "Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"])
+        self.type_combo.addItems(
+            ["RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"]
+        )
+        self.result_combo.addItems(
+            ["Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"]
+        )
+        self.filter_type_combo.addItems(
+            ["", "RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"]
+        )
+        self.filter_result_combo.addItems(
+            ["", "Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"]
+        )
 
         form = QFormLayout()
         form.addRow(QLabel("Candidatura"), self.application_combo)
@@ -127,9 +156,13 @@ class InterviewPage(BasePage):
             feedback = self.feedback_input.toPlainText().strip()
             result = self.result_combo.currentText()
 
+            if application_id in (None, ""):
+                raise ValueError("Selecione uma candidatura.")
+            application_id_value = int(application_id)
+
             if self.current_interview_id is None:
                 self.interview_service.create_interview(
-                    application_id=int(application_id),
+                    application_id=application_id_value,
                     interview_date=interview_date,
                     interview_type=interview_type,
                     interviewer=interviewer,
@@ -144,7 +177,7 @@ class InterviewPage(BasePage):
             else:
                 self.interview_service.update_interview(
                     self.current_interview_id,
-                    application_id=int(application_id),
+                    application_id=application_id_value,
                     interview_date=interview_date,
                     interview_type=interview_type,
                     interviewer=interviewer,
@@ -166,20 +199,75 @@ class InterviewPage(BasePage):
 
     def _delete_interview(self) -> None:
         if self.current_interview_id is None:
+            QMessageBox.information(
+                self,
+                "Entrevista",
+                "Selecione uma entrevista para excluir.",
+            )
             return
-        confirmation = QMessageBox.question(self, "Confirmar exclusão", "Deseja excluir esta entrevista?")
+        confirmation = QMessageBox.question(
+            self, "Confirmar exclusão", "Deseja excluir esta entrevista?"
+        )
         if confirmation != QMessageBox.Yes:
             return
-        self.interview_service.delete_interview(self.current_interview_id)
-        self._clear_form()
-        self._load_interviews()
+        try:
+            deleted = self.interview_service.delete_interview(
+                self.current_interview_id
+            )
+            if not deleted:
+                QMessageBox.warning(
+                    self,
+                    "Entrevista",
+                    "A entrevista não pôde ser excluída.",
+                )
+                return
+            self._clear_form()
+            self._load_interviews()
+        except Exception as exc:
+            if not _is_integrity_error(exc):
+                QMessageBox.critical(
+                    self,
+                    "Não foi possível excluir",
+                    f"A entrevista possui registros vinculados ou ocorreu um erro:\n{exc}",
+                )
+                return
+            QMessageBox.warning(
+                self,
+                'Exclus?o bloqueada',
+                'Esta entrevista possui registros vinculados. Exclua ou desassocie esses registros antes de tentar novamente.',
+            )
 
     def _on_row_selected(self) -> None:
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
             return
+
         row = selected_rows[0].row()
         self.current_interview_id = int(self.table.item(row, 0).text())
+        interview = next(
+            (
+                item
+                for item in self.interview_service.list_interviews()
+                if item.id == self.current_interview_id
+            ),
+            None,
+        )
+        if interview is None:
+            return
+
+        application_index = self.application_combo.findData(interview.application_id)
+        if application_index >= 0:
+            self.application_combo.setCurrentIndex(application_index)
+        self.datetime_input.setDateTime(interview.interview_date)
+        self.type_combo.setCurrentText(interview.interview_type or "")
+        self.interviewer_input.setText(interview.interviewer or "")
+        self.interviewer_email_input.setText(interview.interviewer_email or "")
+        self.link_input.setText(interview.meeting_link or "")
+        self.location_input.setText(interview.location or "")
+        self.duration_input.setText(str(interview.duration or ""))
+        self.notes_input.setPlainText(interview.notes or "")
+        self.feedback_input.setPlainText(interview.feedback or "")
+        self.result_combo.setCurrentText(interview.result or "")
 
     def _load_interviews(self) -> None:
         interviews = self.interview_service.list_interviews()
@@ -192,7 +280,9 @@ class InterviewPage(BasePage):
         if query:
             interviews = self.interview_service.search_interviews(query)
         else:
-            interviews = self.interview_service.filter_interviews(interview_type=interview_type, result=result)
+            interviews = self.interview_service.filter_interviews(
+                interview_type=interview_type, result=result
+            )
         self._render_interviews(interviews)
 
     def _render_interviews(self, interviews: list) -> None:
@@ -201,7 +291,9 @@ class InterviewPage(BasePage):
             self.table.setItem(row, 0, QTableWidgetItem(str(interview.id)))
             self.table.setItem(row, 1, QTableWidgetItem(f"#{interview.application_id}"))
             self.table.setItem(row, 2, QTableWidgetItem(interview.interview_type))
-            self.table.setItem(row, 3, QTableWidgetItem(interview.interview_date.strftime("%d/%m/%Y %H:%M")))
+            self.table.setItem(
+                row, 3, QTableWidgetItem(interview.interview_date.strftime("%d/%m/%Y %H:%M"))
+            )
             self.table.setItem(row, 4, QTableWidgetItem(interview.result))
             self.table.setItem(row, 5, QTableWidgetItem(interview.interviewer))
         self.table.resizeColumnsToContents()
@@ -219,3 +311,12 @@ class InterviewPage(BasePage):
         self.notes_input.clear()
         self.feedback_input.clear()
         self.result_combo.setCurrentIndex(0)
+
+
+def _is_integrity_error(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if current.__class__.__name__ == "IntegrityError":
+            return True
+        current = current.__cause__ or current.__context__
+    return False

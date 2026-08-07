@@ -56,7 +56,9 @@ def curriculum_setup(monkeypatch):
 def test_curriculum_service_creates_and_activates_default(curriculum_setup):
     curriculum_service, _ = curriculum_setup
 
-    created = curriculum_service.create_curriculum(name="Currículo Geral", version="v1.0", language="pt-BR")
+    created = curriculum_service.create_curriculum(
+        name="Currículo Geral", version="v1.0", language="pt-BR"
+    )
     assert created.id is not None
     activated = curriculum_service.activate_curriculum(created.id)
     assert activated is not None
@@ -66,11 +68,15 @@ def test_curriculum_service_creates_and_activates_default(curriculum_setup):
 def test_curriculum_service_duplicates_and_associates(curriculum_setup):
     curriculum_service, application_id = curriculum_setup
 
-    base = curriculum_service.create_curriculum(name="Currículo Geral", version="v1.0", language="pt-BR")
+    base = curriculum_service.create_curriculum(
+        name="Currículo Geral", version="v1.0", language="pt-BR"
+    )
     duplicate = curriculum_service.duplicate_curriculum(base.id)
 
     assert duplicate.id is not None
     assert duplicate.version == "v1.1"
 
-    associated = curriculum_service.associate_to_application(application_id=application_id, curriculum_id=duplicate.id)
+    associated = curriculum_service.associate_to_application(
+        application_id=application_id, curriculum_id=duplicate.id
+    )
     assert associated is not None

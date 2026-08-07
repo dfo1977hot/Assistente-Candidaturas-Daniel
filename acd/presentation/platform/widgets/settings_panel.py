@@ -1,9 +1,14 @@
 """Settings editor panel widget."""
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QLineEdit, QMessageBox, QDialog, QLabel
+    QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from acd.application.platform import PlatformUseCases
@@ -45,12 +50,8 @@ class SettingsPanel(QWidget):
         # Settings table
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels([
-            "Key", "Value", "Type", "Category"
-        ])
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
+        self.table.setHorizontalHeaderLabels(["Key", "Value", "Type", "Category"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
         self.table.itemChanged.connect(self.on_item_changed)
         layout.addWidget(self.table)
@@ -82,11 +83,11 @@ class SettingsPanel(QWidget):
 
         for row, (key, config) in enumerate(configs.items()):
             self.table.setItem(row, 0, QTableWidgetItem(key))
-            
+
             value_item = QTableWidgetItem(str(config.get("value", "")))
             value_item.setData(256, key)  # Store key for identification
             self.table.setItem(row, 1, value_item)
-            
+
             self.table.setItem(row, 2, QTableWidgetItem(config.get("type", "")))
             self.table.setItem(row, 3, QTableWidgetItem(config.get("category", "")))
 
@@ -111,11 +112,7 @@ class SettingsPanel(QWidget):
             for key, value in self.current_changes.items():
                 self.use_cases.set_config(key, value)
 
-            QMessageBox.information(
-                self,
-                "Success",
-                f"Saved {len(self.current_changes)} changes"
-            )
+            QMessageBox.information(self, "Success", f"Saved {len(self.current_changes)} changes")
             self.refresh()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")
@@ -124,10 +121,6 @@ class SettingsPanel(QWidget):
         """Export configuration."""
         try:
             configs = self.use_cases.export_configuration()
-            QMessageBox.information(
-                self,
-                "Success",
-                f"Exported {len(configs)} configuration items"
-            )
+            QMessageBox.information(self, "Success", f"Exported {len(configs)} configuration items")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to export: {str(e)}")

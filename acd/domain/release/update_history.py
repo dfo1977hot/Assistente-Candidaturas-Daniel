@@ -1,14 +1,15 @@
 """Update history and installation logs entities."""
 
-from enum import Enum
 from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, JSON, Text
 
 from acd.models.base import Base
 
 
-class UpdateStatus(str, Enum):
+class UpdateStatus(StrEnum):
     """Update status."""
 
     PENDING = "pending"

@@ -12,12 +12,12 @@ def update_progress(
     service: CareerPlanningService | None = None,
 ) -> dict[str, Any]:
     """Update progress on a career goal.
-    
+
     Args:
         goal_id: Career goal ID
         progress_percentage: Progress percentage (0-100)
         service: CareerPlanningService instance
-        
+
     Returns:
         Updated progress data
     """

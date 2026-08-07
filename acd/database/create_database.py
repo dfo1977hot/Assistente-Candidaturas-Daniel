@@ -1,112 +1,205 @@
+"""Database initialization."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+import logging
+from pathlib import Path
+import shutil
+
+from sqlalchemy import Engine
+
 from acd.database.database import engine
-from acd.models.base import Base
+from acd.database.database_bootstrap import DatabaseBootstrap
+from acd.database.local_state import prepare_database_directory
 
-# importa os models
-import acd.models.company
-import acd.domain.entities.skill
-import acd.domain.entities.certification
-import acd.domain.entities.job
-import acd.domain.entities.job_profile
-import acd.domain.entities.curriculum
-import acd.domain.entities.curriculum_version
-import acd.domain.entities.application
-import acd.domain.entities.ats_score
-import acd.domain.entities.skill_gap
-import acd.domain.entities.recommendation
-import acd.domain.entities.score_detail
-import acd.domain.entities.ai_prompt
-import acd.domain.entities.ai_generation
-import acd.domain.entities.resume_version
-import acd.domain.entities.cover_letter_version
-import acd.domain.entities.generation_log
-import acd.domain.entities.prompt_template
-import acd.domain.entities.automation_session
-import acd.domain.entities.automation_log
-import acd.domain.entities.automation_result
-import acd.domain.entities.connector_setting
-import acd.domain.entities.browser_profile
-import acd.domain.entities.profile
-import acd.domain.entities.experience
-import acd.domain.entities.education
-import acd.domain.entities.language
-import acd.domain.entities.certification
-import acd.domain.entities.project
-import acd.domain.entities.publication
-import acd.domain.entities.social_link
-import acd.domain.entities.answer_template
-import acd.domain.entities.profile_version
-import acd.domain.connector.platform
-import acd.domain.connector.schema
-import acd.domain.connector.field_mapping
-import acd.domain.connector.connector_profile
-import acd.domain.connector.connector_rule
-import acd.domain.connector.field_history
-import acd.domain.entities.workflow
-import acd.domain.entities.workflow_step
-import acd.domain.entities.workflow_execution
-import acd.domain.entities.workflow_event
-import acd.domain.entities.workflow_log
-import acd.domain.entities.workflow_template
-import acd.domain.entities.metric
-import acd.domain.entities.analytics_snapshot
-import acd.domain.entities.report
-import acd.domain.entities.analytics_recommendation
-import acd.domain.entities.trend
-import acd.domain.agent.agent_goal
-import acd.domain.agent.execution_plan
-import acd.domain.agent.reasoning_step
-import acd.domain.agent.tool_call
-import acd.domain.agents.agent
-import acd.domain.agents.task
-import acd.domain.agents.message
-import acd.domain.agents.capability
-import acd.domain.agents.tool
-import acd.domain.agents.session
-import acd.domain.agents.memory
-import acd.domain.learning.learning_record
-import acd.domain.learning.outcome
-import acd.domain.learning.insight
-import acd.domain.learning.pattern
-import acd.domain.learning.hypothesis
-import acd.domain.platform.health_report
-import acd.domain.platform.system_status
-import acd.domain.platform.system_log
-import acd.domain.platform.system_metrics
-import acd.domain.platform.backup
-import acd.domain.platform.configuration
-import acd.domain.release.release
-import acd.domain.release.installed_version
-import acd.domain.release.update_history
-import acd.domain.release.migration_history
-import acd.domain.release.documentation
+# Importa todos os modelos ORM para registrá-los no Base.metadata
+
+logger = logging.getLogger(__name__)
 
 
-def create_database():
-    Base.metadata.create_all(engine)
-    _ensure_companies_columns()
+def create_database(target_engine: Engine | None = None) -> None:
+    """Create the database schema if it does not already exist."""
+    selected_engine = target_engine or engine
+    database_name = selected_engine.url.database
+    if database_name and database_name != ":memory:":
+        prepare_database_directory(Path(database_name).resolve())
+    DatabaseBootstrap().initialize(selected_engine)
+    _ensure_companies_columns(selected_engine)
+    _ensure_application_resume_version_selection(selected_engine)
+    _ensure_structured_resume_snapshot_columns(selected_engine)
+    _ensure_curriculum_document_columns(selected_engine)
 
 
-def _ensure_companies_columns() -> None:
+def _ensure_companies_columns(target_engine: Engine | None = None) -> None:
+    """Ensure the companies table contains all required columns."""
+
     required_columns = {
         "segment": "TEXT NOT NULL DEFAULT ''",
         "state": "TEXT NOT NULL DEFAULT ''",
         "country": "TEXT NOT NULL DEFAULT ''",
         "company_size": "TEXT NOT NULL DEFAULT ''",
         "linkedin_url": "TEXT DEFAULT ''",
+        "legal_name": "TEXT NOT NULL DEFAULT ''",
+        "tax_id": "TEXT NOT NULL DEFAULT ''",
+        "registration_status": "TEXT NOT NULL DEFAULT ''",
+        "address": "TEXT NOT NULL DEFAULT ''",
+        "postal_code": "TEXT NOT NULL DEFAULT ''",
+        "phone": "TEXT NOT NULL DEFAULT ''",
+        "data_source": "TEXT NOT NULL DEFAULT ''",
+        "source_reference": "TEXT NOT NULL DEFAULT ''",
+        "data_retrieved_at": "DATETIME",
     }
 
-    with engine.begin() as connection:
-        existing_rows = connection.exec_driver_sql("PRAGMA table_info(companies)").fetchall()
+    selected_engine = target_engine or engine
+    with selected_engine.begin() as connection:
+        existing_rows = connection.exec_driver_sql(
+            "PRAGMA table_info(companies)"
+        ).fetchall()
+
         existing_columns = {row[1] for row in existing_rows}
 
         for column_name, column_type in required_columns.items():
             if column_name in existing_columns:
                 continue
+
             connection.exec_driver_sql(
-                f"ALTER TABLE companies ADD COLUMN {column_name} {column_type}"
+                f"ALTER TABLE companies "
+                f"ADD COLUMN {column_name} {column_type}"
             )
+
+
+def _ensure_application_resume_version_selection(target_engine: Engine | None = None) -> None:
+    """Add the nullable selected resume version column to legacy databases."""
+
+    selected_engine = target_engine or engine
+    with selected_engine.begin() as connection:
+        existing_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(applications)").fetchall()
+        }
+        if "selected_resume_version_id" not in existing_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE applications "
+                "ADD COLUMN selected_resume_version_id INTEGER "
+                "REFERENCES resume_versions(id) ON DELETE RESTRICT"
+            )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_applications_selected_resume_version_id "
+            "ON applications(selected_resume_version_id)"
+        )
+
+
+def _ensure_structured_resume_snapshot_columns(target_engine: Engine | None = None) -> Path | None:
+    """Add nullable structured snapshot columns to existing SQLite databases."""
+
+    required_columns = {
+        "curricula": "structured_content_json",
+        "resume_versions": "structured_content_json",
+    }
+    selected_engine = target_engine or engine
+    with selected_engine.connect() as connection:
+        missing = [
+            (table, column)
+            for table, column in required_columns.items()
+            if column
+            not in {
+                row[1]
+                for row in connection.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            }
+        ]
+    if not missing:
+        return None
+
+    backup_path = _backup_database_before_schema_evolution(selected_engine)
+    with selected_engine.begin() as connection:
+        for table, column in missing:
+            connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+    return backup_path
+
+
+def _backup_database_before_schema_evolution(target_engine: Engine | None = None) -> Path | None:
+    """Create a timestamped copy before changing a file-backed SQLite schema."""
+
+    selected_engine = target_engine or engine
+    database_name = selected_engine.url.database
+    if database_name is None or database_name == ":memory:":
+        return None
+    database_path = Path(database_name)
+    if not database_path.exists():
+        return None
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    backup_path = database_path.with_name(f"{database_path.stem}.pre-structured-resume-{timestamp}.bak")
+    shutil.copy2(database_path, backup_path)
+    logger.info("Created database backup before structured resume schema evolution: %s", backup_path)
+    return backup_path
+
+
+def _ensure_curriculum_document_columns(
+    target_engine: Engine | None = None,
+) -> Path | None:
+    """Add nullable curriculum document metadata columns idempotently."""
+
+    required_columns = {
+        "file_original_name": "TEXT",
+        "file_relative_path": "TEXT",
+        "file_extension": "TEXT",
+        "file_mime_type": "TEXT",
+        "file_size_bytes": "INTEGER",
+        "file_sha256": "TEXT",
+        "file_attached_at": "DATETIME",
+    }
+    selected_engine = target_engine or engine
+    with selected_engine.connect() as connection:
+        existing = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(curricula)"
+            ).fetchall()
+        }
+    missing = [
+        (column_name, column_type)
+        for column_name, column_type in required_columns.items()
+        if column_name not in existing
+    ]
+    if not missing:
+        return None
+
+    backup_path = _backup_database_before_curriculum_document_evolution(
+        selected_engine
+    )
+    with selected_engine.begin() as connection:
+        for column_name, column_type in missing:
+            connection.exec_driver_sql(
+                f"ALTER TABLE curricula ADD COLUMN {column_name} {column_type}"
+            )
+    return backup_path
+
+
+def _backup_database_before_curriculum_document_evolution(
+    target_engine: Engine | None = None,
+) -> Path | None:
+    """Back up a file-backed SQLite database before the H.1-D migration."""
+
+    selected_engine = target_engine or engine
+    database_name = selected_engine.url.database
+    if database_name is None or database_name == ":memory:":
+        return None
+    database_path = Path(database_name)
+    if not database_path.exists():
+        return None
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    backup_path = database_path.with_name(
+        f"{database_path.stem}.pre-curriculum-documents-{timestamp}.bak"
+    )
+    shutil.copy2(database_path, backup_path)
+    logger.info(
+        "Created database backup before curriculum document schema evolution: %s",
+        backup_path,
+    )
+    return backup_path
 
 
 if __name__ == "__main__":
     create_database()
-    print("Banco criado com sucesso.")
+    logger.info("Database schema created successfully.")

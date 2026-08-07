@@ -45,13 +45,15 @@ class CareerRuleEngine:
         },
     }
 
-    def analyze_compatibility(self, current_profile: dict[str, Any], target_role: str) -> dict[str, Any]:
+    def analyze_compatibility(
+        self, current_profile: dict[str, Any], target_role: str
+    ) -> dict[str, Any]:
         """Analyze compatibility between current profile and target role.
-        
+
         Args:
             current_profile: Dictionary with current skills, certifications, languages
             target_role: Target position title
-            
+
         Returns:
             Dictionary with compatibility score and gap analysis
         """
@@ -73,18 +75,28 @@ class CareerRuleEngine:
             achieved_skill_points += min(current_level, required_level)
 
             if current_level < required_level:
-                severity = "critical" if required_level - current_level > 5 else "high" if required_level - current_level > 3 else "medium"
-                gaps.append({
-                    "skill": skill_name,
-                    "current": current_level,
-                    "required": required_level,
-                    "severity": severity,
-                })
+                severity = (
+                    "critical"
+                    if required_level - current_level > 5
+                    else "high" if required_level - current_level > 3 else "medium"
+                )
+                gaps.append(
+                    {
+                        "skill": skill_name,
+                        "current": current_level,
+                        "required": required_level,
+                        "severity": severity,
+                    }
+                )
 
-        skill_compatibility = (achieved_skill_points / total_skill_points * 100) if total_skill_points > 0 else 0
+        skill_compatibility = (
+            (achieved_skill_points / total_skill_points * 100) if total_skill_points > 0 else 0
+        )
 
         # Certificate bonus
-        cert_bonus = len([c for c in current_certs if c in requirements["desired_certifications"]]) * 5
+        cert_bonus = (
+            len([c for c in current_certs if c in requirements["desired_certifications"]]) * 5
+        )
         cert_bonus = min(cert_bonus, 15)
 
         # Language bonus
@@ -100,10 +112,14 @@ class CareerRuleEngine:
             "skill_compatibility": round(skill_compatibility, 1),
             "gaps": gaps,
             "strengths": self._identify_strengths(current_skills, requirements["required_skills"]),
-            "certificates_missing": [c for c in requirements["desired_certifications"] if c not in current_certs],
+            "certificates_missing": [
+                c for c in requirements["desired_certifications"] if c not in current_certs
+            ],
         }
 
-    def _identify_strengths(self, current_skills: dict[str, Any], required: list[tuple[str, int]]) -> list[str]:
+    def _identify_strengths(
+        self, current_skills: dict[str, Any], required: list[tuple[str, int]]
+    ) -> list[str]:
         """Identify current strengths compared to requirements."""
         strengths = []
         for skill_name, required_level in required:
@@ -112,16 +128,18 @@ class CareerRuleEngine:
                 strengths.append(skill_name)
         return strengths
 
-    def calculate_priority_score(self, impact: float, effort: float, alignment: float = 1.0) -> float:
+    def calculate_priority_score(
+        self, impact: float, effort: float, alignment: float = 1.0
+    ) -> float:
         """Calculate priority score for recommendations.
-        
+
         Priority = (Impact * Alignment) / Effort
-        
+
         Args:
             impact: Expected impact (1-10)
             effort: Estimated effort (1-10)
             alignment: Goal alignment factor (0-1)
-            
+
         Returns:
             Priority score for ranking
         """
@@ -146,7 +164,7 @@ class CareerRuleEngine:
 
     def generate_development_path(self, gaps: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Generate ordered development path based on gaps.
-        
+
         Orders gaps by severity and dependencies.
         """
         # Sort by severity (critical → high → medium)
@@ -155,14 +173,18 @@ class CareerRuleEngine:
 
         path = []
         for idx, gap in enumerate(sorted_gaps, 1):
-            path.append({
-                "step": idx,
-                "skill": gap["skill"],
-                "current": gap["current"],
-                "target": gap["required"],
-                "severity": gap["severity"],
-                "estimated_hours": self._estimate_learning_hours(gap["required"] - gap["current"]),
-            })
+            path.append(
+                {
+                    "step": idx,
+                    "skill": gap["skill"],
+                    "current": gap["current"],
+                    "target": gap["required"],
+                    "severity": gap["severity"],
+                    "estimated_hours": self._estimate_learning_hours(
+                        gap["required"] - gap["current"]
+                    ),
+                }
+            )
 
         return path
 
@@ -171,13 +193,15 @@ class CareerRuleEngine:
         # Rough estimation: 40 hours per skill level
         return int(level_gap * 40)
 
-    def simulate_improvement(self, current_compatibility: float, improvements: dict[str, float]) -> dict[str, Any]:
+    def simulate_improvement(
+        self, current_compatibility: float, improvements: dict[str, float]
+    ) -> dict[str, Any]:
         """Simulate improvement in compatibility with given actions.
-        
+
         Args:
             current_compatibility: Current compatibility percentage
             improvements: Dictionary with improvement percentages
-            
+
         Returns:
             Simulated compatibility and impact
         """

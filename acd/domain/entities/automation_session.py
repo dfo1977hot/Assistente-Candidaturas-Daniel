@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from acd.core.datetime_utils import utc_now
 from acd.models.base import Base
 
 
@@ -19,7 +20,7 @@ class AutomationSession(Base):
     browser: Mapped[str] = mapped_column(String(100), nullable=False, default="chromium")
     mode: Mapped[str] = mapped_column(String(50), nullable=False, default="headless")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="started")
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     execution_time: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
     screenshot_path: Mapped[str] = mapped_column(Text, nullable=False, default="")

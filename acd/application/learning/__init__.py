@@ -1,9 +1,9 @@
 """Learning application layer."""
 
 from acd.application.learning.learning_use_cases import (
+    ApproveRecordRequest,
     LearningUseCases,
     RegisterOutcomeRequest,
-    ApproveRecordRequest,
     RejectRecordRequest,
 )
 

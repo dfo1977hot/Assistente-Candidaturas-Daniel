@@ -1,12 +1,10 @@
-from pathlib import Path
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import acd.database.database as db_module
 from acd.models.base import Base
 from acd.services.company_service import CompanyService
-import acd.database.database as db_module
 
 
 @pytest.fixture

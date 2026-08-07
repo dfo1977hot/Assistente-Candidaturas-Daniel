@@ -1,14 +1,15 @@
 """Release entity for version management."""
 
-from enum import Enum
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column
+from enum import StrEnum
+
 from sqlalchemy import JSON, DateTime, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from acd.models.base import Base
 
 
-class ReleaseStatus(str, Enum):
+class ReleaseStatus(StrEnum):
     """Release status enumeration."""
 
     DRAFT = "draft"

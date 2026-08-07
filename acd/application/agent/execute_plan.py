@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.infrastructure.agent.ai_orchestrator import AIOrchestrator
 from acd.infrastructure.agent.tool_registry import DefaultToolRegistry
+from acd.infrastructure.repositories.agent.agent_repository import AgentRepository
 from acd.services.ai_execution_service import AIExecutionService
 
 
@@ -17,14 +17,14 @@ def execute_plan(
     execution_service: AIExecutionService | None = None,
 ) -> dict[str, Any]:
     """Execute an approved plan.
-    
+
     Args:
         plan_id: ID of plan to execute
         approved: Whether plan is approved by user
         repository: Agent repository
         orchestrator: AI orchestrator
         execution_service: Execution service
-        
+
     Returns:
         Execution results
     """
@@ -72,12 +72,12 @@ def approve_plan(
     repository: AgentRepository | None = None,
 ) -> dict[str, Any]:
     """Approve or reject a plan.
-    
+
     Args:
         plan_id: ID of plan to approve
         approved: True to approve, False to reject
         repository: Agent repository
-        
+
     Returns:
         Approval result
     """
@@ -102,11 +102,11 @@ def get_execution_status(
     execution_service: AIExecutionService | None = None,
 ) -> dict[str, Any]:
     """Get execution status of a plan.
-    
+
     Args:
         plan_id: ID of plan
         execution_service: Execution service
-        
+
     Returns:
         Execution status
     """

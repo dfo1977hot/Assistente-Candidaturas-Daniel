@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
 from sqlalchemy import select
 
 from acd.database import database as database_module
@@ -10,8 +12,8 @@ from acd.domain.agent.reasoning_step import ReasoningStep
 from acd.domain.agent.tool_call import ToolCall
 
 if TYPE_CHECKING:
-    from acd.domain.agent.task import Task
-    from acd.domain.agent.agent_memory import AgentMemory
+    from acd.domain.agent.plan_task import PlanTask
+    from acd.domain.agents.memory import AgentMemory
 
 
 class AgentRepository:
@@ -111,13 +113,12 @@ class AgentRepository:
 
     def approve_plan(self, plan_id: int, approved: bool = True) -> ExecutionPlan | None:
         """Approve or reject plan."""
-        from datetime import datetime
 
         return self.update_plan(
             plan_id,
             approval_status="approved" if approved else "rejected",
             approved_by_user=approved,
-            approved_at=datetime.utcnow() if approved else None,
+            approved_at=datetime.now(UTC) if approved else None,
         )
 
     # Tasks
@@ -129,45 +130,45 @@ class AgentRepository:
         tool_name: str,
         order_index: int,
         **kwargs: Any,
-    ) -> Task:
+    ) -> PlanTask:
         """Create a task in a plan."""
-        from acd.domain.agent.task import Task
+        from acd.domain.agent.plan_task import PlanTask
 
         with database_module.SessionLocal() as session:
-            task = Task(
+            task = PlanTask(
                 plan_id=plan_id,
                 task_type=task_type,
                 description=description,
                 tool_name=tool_name,
                 order_index=order_index,
-                **{k: v for k, v in kwargs.items() if hasattr(Task, k)},
+                **{k: v for k, v in kwargs.items() if hasattr(PlanTask, k)},
             )
             session.add(task)
             session.commit()
             session.refresh(task)
             return task
 
-    def get_task(self, task_id: int) -> Task | None:
+    def get_task(self, task_id: int) -> PlanTask | None:
         """Get task by ID."""
-        from acd.domain.agent.task import Task
+        from acd.domain.agent.plan_task import PlanTask
 
         with database_module.SessionLocal() as session:
-            return session.get(Task, task_id)
+            return session.get(PlanTask, task_id)
 
-    def list_tasks_by_plan(self, plan_id: int) -> list[Task]:
+    def list_tasks_by_plan(self, plan_id: int) -> list[PlanTask]:
         """List all tasks in a plan."""
-        from acd.domain.agent.task import Task
+        from acd.domain.agent.plan_task import PlanTask
 
         with database_module.SessionLocal() as session:
-            stmt = select(Task).where(Task.plan_id == plan_id).order_by(Task.order_index)
+            stmt = select(PlanTask).where(PlanTask.plan_id == plan_id).order_by(PlanTask.order_index)
             return list(session.scalars(stmt).all())
 
-    def update_task(self, task_id: int, **kwargs: Any) -> Task | None:
+    def update_task(self, task_id: int, **kwargs: Any) -> PlanTask | None:
         """Update task."""
-        from acd.domain.agent.task import Task
+        from acd.domain.agent.plan_task import PlanTask
 
         with database_module.SessionLocal() as session:
-            task = session.get(Task, task_id)
+            task = session.get(PlanTask, task_id)
             if task:
                 for key, value in kwargs.items():
                     if hasattr(task, key):
@@ -187,7 +188,7 @@ class AgentRepository:
         importance: int = 1,
     ) -> AgentMemory:
         """Save to agent memory."""
-        from acd.domain.agent.agent_memory import AgentMemory
+        from acd.domain.agents.memory import AgentMemory
 
         with database_module.SessionLocal() as session:
             memory = AgentMemory(
@@ -204,7 +205,7 @@ class AgentRepository:
 
     def get_memory(self, key: str) -> AgentMemory | None:
         """Retrieve memory by key."""
-        from acd.domain.agent.agent_memory import AgentMemory
+        from acd.domain.agents.memory import AgentMemory
 
         with database_module.SessionLocal() as session:
             stmt = select(AgentMemory).where(AgentMemory.key == key)
@@ -212,7 +213,7 @@ class AgentRepository:
 
     def list_memory_by_type(self, memory_type: str, limit: int = 50) -> list[AgentMemory]:
         """List memory entries by type."""
-        from acd.domain.agent.agent_memory import AgentMemory
+        from acd.domain.agents.memory import AgentMemory
 
         with database_module.SessionLocal() as session:
             stmt = (
@@ -286,9 +287,5 @@ class AgentRepository:
     def get_tool_calls(self, plan_id: int) -> list[ToolCall]:
         """Get all tool calls in a plan."""
         with database_module.SessionLocal() as session:
-            stmt = (
-                select(ToolCall)
-                .where(ToolCall.plan_id == plan_id)
-                .order_by(ToolCall.created_at)
-            )
+            stmt = select(ToolCall).where(ToolCall.plan_id == plan_id).order_by(ToolCall.created_at)
             return list(session.scalars(stmt).all())
