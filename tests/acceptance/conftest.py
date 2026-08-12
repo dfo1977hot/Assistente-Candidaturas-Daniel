@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QWidget
 import pytest
+from shiboken6 import isValid
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -15,6 +16,7 @@ from acd.database.create_database import create_database
 from acd.database.database import enable_sqlite_foreign_keys
 from acd.database.local_state import ensure_non_productive_database_path, sqlite_url
 from acd.infrastructure.database.sqlite_lifecycle import SQLiteDatabaseLifecycle
+from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
 from acd.infrastructure.repositories.curriculum_repository import CurriculumRepository
 from acd.presentation.pages.application_page import ApplicationPage
 from acd.presentation.pages.base_page import BasePage
@@ -22,6 +24,7 @@ from acd.presentation.pages.company_page import CompanyPage
 from acd.presentation.pages.curriculum_page import CurriculumPage
 from acd.presentation.pages.interview_page import InterviewPage
 from acd.presentation.pages.job_page import JobPage
+from acd.services.analytics_service import AnalyticsService
 from acd.services.application_service import ApplicationService
 from acd.services.company_service import CompanyService
 from acd.services.curriculum_service import CurriculumService
@@ -58,8 +61,8 @@ class AcceptanceRuntime:
     lifecycle: SQLiteDatabaseLifecycle
 
     def close(self) -> None:
-        self.window.close()
-        self.window.deleteLater()
+        if isValid(self.window):
+            self.window.close()
         self.engine.dispose()
 
 
@@ -126,13 +129,7 @@ def build_acceptance_runtime(
     curriculum_service.storage_root = attachments_dir / "curriculos"
     curriculum_service.storage_root.mkdir(parents=True, exist_ok=True)
 
-    dashboard = Dashboard(
-        company_service,
-        job_service,
-        application_service,
-        interview_service,
-        curriculum_service,
-    )
+    dashboard = Dashboard(AnalyticsService(AnalyticsRepository()))
     company_page = CompanyPage(company_service)
     job_page = JobPage(job_service, company_service)
     application_page = ApplicationPage(

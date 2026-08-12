@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from acd.infrastructure.workflow.workflow_event_bus import EventBus
 from acd.services.workflow_service import WorkflowService
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,13 @@ class WorkflowTriggerDispatcher:
         "application.status_changed": "Mudança de status",
     }
 
-    def __init__(self, workflow_service: WorkflowService) -> None:
+    def __init__(
+        self,
+        workflow_service: WorkflowService,
+        event_bus: EventBus | None = None,
+    ) -> None:
         self.workflow_service = workflow_service
+        self.event_bus = event_bus
 
     def dispatch(self, event_type: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         trigger = self.EVENT_TRIGGERS.get(event_type)
@@ -61,4 +67,6 @@ class WorkflowTriggerDispatcher:
                     event_type,
                     entity_id,
                 )
+        if self.event_bus is not None:
+            self.event_bus.publish(event_type, dict(payload))
         return results

@@ -8,6 +8,7 @@ from acd.infrastructure.application_automation.playwright_application_browser im
     PlaywrightApplicationBrowser,
 )
 from acd.infrastructure.linkedin.linkedin_saved_jobs_browser import LinkedInSavedJobsBrowser
+from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
 from acd.infrastructure.repositories.ats_repository import ATSRepository
 from acd.infrastructure.repositories.company_repository import CompanyRepository
@@ -17,7 +18,6 @@ from acd.infrastructure.repositories.interview_repository import InterviewReposi
 from acd.infrastructure.repositories.job_profile_repository import JobProfileRepository
 from acd.infrastructure.repositories.job_repository import JobRepository
 from acd.presentation.pages.agent_console_page import AgentConsolePage
-from acd.presentation.pages.analytics_page import AnalyticsPage
 from acd.presentation.pages.application_page import ApplicationPage
 from acd.presentation.pages.assistant_page import AssistantPage
 from acd.presentation.pages.ats_page import ATSPage
@@ -114,7 +114,7 @@ class DesktopCompositionRoot:
             curriculum_service,
             settings_service,
         )
-        analytics_service = AnalyticsService()
+        analytics_service = AnalyticsService(AnalyticsRepository())
         career_service = CareerPlanningService()
         gap_service = GapAnalysisService()
         ats_service = ATSService(ats_repository)
@@ -135,7 +135,9 @@ class DesktopCompositionRoot:
             ),
         )
         workflow_service = WorkflowService(step_registry=workflow_handlers.registry())
-        workflow_trigger_dispatcher = WorkflowTriggerDispatcher(workflow_service)
+        workflow_trigger_dispatcher = WorkflowTriggerDispatcher(
+            workflow_service, workflow_service.event_bus
+        )
         workflow_scheduler_service = WorkflowSchedulerService(workflow_service)
         job_service.set_event_dispatcher(workflow_trigger_dispatcher.dispatch)
         application_service.set_event_dispatcher(workflow_trigger_dispatcher.dispatch)
@@ -173,7 +175,7 @@ class DesktopCompositionRoot:
             assisted_application_service=assisted_application_service,
         )
         pages = {
-            "dashboard": Dashboard(company_service, job_service, application_service, interview_service, curriculum_service),
+            "dashboard": Dashboard(analytics_service, workflow_service.event_bus),
             "companies": CompanyPage(
                 company_service,
                 lambda provider_name: CompanyLookupService(
@@ -203,7 +205,7 @@ class DesktopCompositionRoot:
                 curriculum_service,
                 workflow_scheduler_service,
             ),
-            "analytics": AnalyticsPage(analytics_service),
+            "analytics": Dashboard(analytics_service, workflow_service.event_bus),
             "career": CareerPage(career_service, gap_service),
             "assistant": self._build_assistant_page(),
             "agent_console": self._build_agent_console_page(),

@@ -9,13 +9,73 @@ from acd.domain.entities.analytics_recommendation import (
 from acd.domain.entities.analytics_snapshot import (
     AnalyticsSnapshot,
 )
+from acd.domain.entities.application import Application
+from acd.domain.entities.cover_letter_version import CoverLetterVersion
+from acd.domain.entities.job import Job
 from acd.domain.entities.metric import Metric
 from acd.domain.entities.report import Report
+from acd.domain.entities.resume_version import ResumeVersion
 from acd.domain.entities.trend import Trend
+from acd.domain.entities.workflow import Workflow
+from acd.domain.entities.workflow_execution import WorkflowExecution
+from acd.models.company import Company
 
 
 class AnalyticsRepository:
     """Repository for analytics data persistence."""
+
+    def load_operational_data(self) -> dict[str, list[dict[str, object]]]:
+        """Load compact real-data projections used by the operational dashboard."""
+        with database_module.SessionLocal() as session:
+            queries = {
+                "companies": select(Company.id, Company.name),
+                "jobs": select(
+                    Job.id,
+                    Job.company_id,
+                    Job.title,
+                    Job.status,
+                    Job.source,
+                    Job.created_at,
+                    Job.updated_at,
+                ),
+                "applications": select(
+                    Application.id,
+                    Application.job_id,
+                    Application.company_id,
+                    Application.status,
+                    Application.application_channel,
+                    Application.created_at,
+                    Application.updated_at,
+                    Application.last_update,
+                ),
+                "workflows": select(
+                    Workflow.id,
+                    Workflow.name,
+                    Workflow.active,
+                    Workflow.definition,
+                ),
+                "workflow_executions": select(
+                    WorkflowExecution.id,
+                    WorkflowExecution.workflow_id,
+                    WorkflowExecution.status,
+                    WorkflowExecution.started_at,
+                    WorkflowExecution.finished_at,
+                    WorkflowExecution.created_at,
+                    WorkflowExecution.result,
+                ),
+                "cover_letters": select(
+                    CoverLetterVersion.id,
+                    CoverLetterVersion.created_at,
+                ),
+                "resume_versions": select(
+                    ResumeVersion.id,
+                    ResumeVersion.created_at,
+                ),
+            }
+            return {
+                name: [dict(row) for row in session.execute(query).mappings().all()]
+                for name, query in queries.items()
+            }
 
     def create_metric(
         self,

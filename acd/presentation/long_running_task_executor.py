@@ -165,6 +165,15 @@ class LongRunningTaskExecutor(QObject):
         )
         return True
 
+    def wait_for_finished(self, timeout_ms: int = 5000) -> bool:
+        """Wait only during owner shutdown so Qt never destroys an active thread."""
+        thread = self._thread
+        if thread is None:
+            return True
+        if timeout_ms < 0:
+            raise ValueError("Shutdown timeout cannot be negative")
+        return thread.wait(timeout_ms)
+
     @Slot()
     def _request_timeout(self) -> None:
         if not self.is_running:

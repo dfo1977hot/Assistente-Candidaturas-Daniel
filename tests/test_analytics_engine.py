@@ -140,7 +140,9 @@ class TestAnalyticsService:
 
     def test_get_conversion_funnel(self):
         funnel = AnalyticsService().get_conversion_funnel()
-        assert len(funnel) == 5
+        from acd.services.application_service import ApplicationService
+
+        assert {item["stage"] for item in funnel} == ApplicationService.VALID_STATUSES
         assert all("stage" in s for s in funnel)
         assert all("count" in s for s in funnel)
 

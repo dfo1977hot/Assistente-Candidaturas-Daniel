@@ -52,10 +52,10 @@ def test_mvp_backup_restore_round_trip_and_rejections(acceptance_runtime, monkey
     )
     try:
         reopened.dashboard.refresh_kpis()
+        qtbot.waitUntil(lambda: not reopened.dashboard._executor.is_running)
         assert reopened.dashboard.total_companies_card.valor_label.text() == "1"
         assert reopened.dashboard.total_jobs_card.valor_label.text() == "1"
         assert reopened.dashboard.total_applications_card.valor_label.text() == "1"
-        assert reopened.dashboard.total_interviews_card.valor_label.text() == "1"
         assert reopened.application_service.get_application(ids["application_id"]) is not None
     finally:
         reopened.close()

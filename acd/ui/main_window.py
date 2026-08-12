@@ -83,6 +83,12 @@ class MainWindow(QMainWindow):
         if callable(start_scheduler):
             start_scheduler()
 
+    def closeEvent(self, event: object) -> None:
+        shutdown_dashboard = getattr(self.dashboard, "shutdown", None)
+        if callable(shutdown_dashboard):
+            shutdown_dashboard()
+        super().closeEvent(event)
+
     def _on_sidebar_item_clicked(self, item: object) -> None:
         label = item.text()
         destinations = (

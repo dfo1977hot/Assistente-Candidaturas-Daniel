@@ -35,7 +35,7 @@ def _expected_widget(window, label: str):
     return None
 
 
-def test_sidebar_navigates_all_items_without_exception(qapp):
+def test_sidebar_navigates_all_items_without_exception(qapp, qtbot):
     window = DesktopCompositionRoot().build_main_window()
     log_path = Path("logs/functional_validation.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,6 +54,9 @@ def test_sidebar_navigates_all_items_without_exception(qapp):
             assert current is expected, f"Navigation mismatch for {label}"
         except Exception as exc:  # defensive logging for sprint evidence
             errors.append(f"[{label}] {type(exc).__name__}: {exc}")
+
+    if window.dashboard._executor.is_running:
+        qtbot.waitUntil(lambda: not window.dashboard._executor.is_running)
 
     if errors:
         with log_path.open("a", encoding="utf-8") as handle:
