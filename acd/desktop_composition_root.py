@@ -4,43 +4,56 @@ from __future__ import annotations
 
 from acd.core.router import Router
 from acd.database.create_database import create_database
+from acd.infrastructure.application_automation.playwright_application_browser import (
+    PlaywrightApplicationBrowser,
+)
+from acd.infrastructure.linkedin.linkedin_saved_jobs_browser import LinkedInSavedJobsBrowser
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
 from acd.infrastructure.repositories.ats_repository import ATSRepository
 from acd.infrastructure.repositories.company_repository import CompanyRepository
+from acd.infrastructure.repositories.cover_letter_repository import CoverLetterRepository
 from acd.infrastructure.repositories.curriculum_repository import CurriculumRepository
 from acd.infrastructure.repositories.interview_repository import InterviewRepository
 from acd.infrastructure.repositories.job_profile_repository import JobProfileRepository
 from acd.infrastructure.repositories.job_repository import JobRepository
 from acd.presentation.pages.agent_console_page import AgentConsolePage
-from acd.presentation.pages.ai_resume_page import AIResumePage
 from acd.presentation.pages.analytics_page import AnalyticsPage
 from acd.presentation.pages.application_page import ApplicationPage
 from acd.presentation.pages.assistant_page import AssistantPage
 from acd.presentation.pages.ats_page import ATSPage
-from acd.presentation.pages.base_page import BasePage
 from acd.presentation.pages.candidate_decision_view_model import CandidateDecisionViewModel
 from acd.presentation.pages.career_page import CareerPage
 from acd.presentation.pages.company_page import CompanyPage
 from acd.presentation.pages.curriculum_page import CurriculumPage
 from acd.presentation.pages.interview_page import InterviewPage
 from acd.presentation.pages.job_page import JobPage
+from acd.presentation.pages.letter_page import LetterPage
 from acd.presentation.pages.optimized_resume_evaluation_view_model import (
     OptimizedResumeEvaluationViewModel,
 )
 from acd.presentation.pages.resume_optimization_view_model import ResumeOptimizationViewModel
 from acd.presentation.pages.resume_version_review_view_model import ResumeVersionReviewViewModel
+from acd.presentation.pages.settings_page import SettingsPage
 from acd.presentation.pages.workflow_page import WorkflowPage
 from acd.services.analytics_service import AnalyticsService
 from acd.services.application_service import ApplicationService
+from acd.services.assisted_application_service import AssistedApplicationService
 from acd.services.ats_service import ATSService
 from acd.services.career_planning_service import CareerPlanningService
+from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
 from acd.services.company_lookup_service import CompanyLookupService
 from acd.services.company_service import CompanyService
+from acd.services.cover_letter_service import CoverLetterService
 from acd.services.curriculum_service import CurriculumService
 from acd.services.gap_analysis_service import GapAnalysisService
 from acd.services.interview_service import InterviewService
 from acd.services.job_service import JobService
 from acd.services.linkedin_job_import_service import LinkedInJobImportService
+from acd.services.linkedin_saved_jobs_import_service import LinkedInSavedJobsImportService
+from acd.services.recruiter_email_research_service import RecruiterEmailResearchService
+from acd.services.resume_match_service import ResumeMatchService
+from acd.services.salary_research_service import SalaryResearchService
+from acd.services.settings_service import SettingsService
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_template_service import WorkflowTemplateService
 from acd.ui.dashboard import Dashboard
@@ -66,54 +79,114 @@ class DesktopCompositionRoot:
         interview_repository = InterviewRepository()
         curriculum_repository = CurriculumRepository()
         ats_repository = ATSRepository()
+        cover_letter_repository = CoverLetterRepository()
 
         company_service = CompanyService(company_repository)
         job_service = JobService(job_repository)
-        job_import_service = LinkedInJobImportService()
+        closed_jobs_registry = ClosedLinkedInJobsRegistry()
+        job_import_service = LinkedInJobImportService(
+            closed_jobs_registry=closed_jobs_registry
+        )
+        settings_service = SettingsService()
+        salary_research_service = SalaryResearchService(settings_service=settings_service)
+        recruiter_email_research_service = RecruiterEmailResearchService(
+            settings_service=settings_service
+        )
+        saved_jobs_import_service = LinkedInSavedJobsImportService(
+            LinkedInSavedJobsBrowser(headless=settings_service.browser_headless),
+            job_import_service,
+            job_service,
+            company_service,
+            job_repository,
+            salary_research_service,
+            recruiter_email_research_service,
+            closed_jobs_registry,
+        )
         application_service = ApplicationService(application_repository)
         interview_service = InterviewService(interview_repository)
         curriculum_service = CurriculumService(curriculum_repository)
+        cover_letter_service = CoverLetterService(
+            cover_letter_repository,
+            job_service,
+            curriculum_service,
+            settings_service,
+        )
         analytics_service = AnalyticsService()
         career_service = CareerPlanningService()
         gap_service = GapAnalysisService()
         workflow_service = WorkflowService()
         workflow_template_service = WorkflowTemplateService(workflow_service)
         ats_service = ATSService(ats_repository)
+        resume_match_service = ResumeMatchService()
+        assisted_application_service = AssistedApplicationService(
+            PlaywrightApplicationBrowser(
+                linkedin_headless=settings_service.browser_headless,
+            )
+        )
 
         application_view_models = self._build_application_view_models(
             application_repository, curriculum_repository, company_repository,
             job_repository, ats_repository, interview_repository,
         )
         router = Router()
+        curriculum_page = CurriculumPage(curriculum_service)
+
+        def open_optimized_curriculum(curriculum_id: int) -> None:
+            router.navigate("curricula")
+            curriculum_page.open_curriculum(curriculum_id)
+
+        application_page = ApplicationPage(
+            candidate_decision_view_model=application_view_models["candidate_decision"],
+            on_candidate_decision_action=lambda action: self._navigate(router, action),
+            on_optimized_curriculum_created=open_optimized_curriculum,
+            resume_optimization_view_model=application_view_models["resume_optimization"],
+            resume_version_review_view_model=application_view_models["resume_review"],
+            optimized_resume_evaluation_view_model=application_view_models["optimized_evaluation"],
+            application_service=application_service,
+            company_service=company_service,
+            job_service=job_service,
+            curriculum_service=curriculum_service,
+            resume_match_service=resume_match_service,
+            ats_service=ats_service,
+            assisted_application_service=assisted_application_service,
+        )
         pages = {
             "dashboard": Dashboard(company_service, job_service, application_service, interview_service, curriculum_service),
             "companies": CompanyPage(
                 company_service,
-                lambda provider_name: CompanyLookupService(provider_name=provider_name),
+                lambda provider_name: CompanyLookupService(
+                    provider_name=provider_name,
+                    settings_service=settings_service,
+                ),
             ),
-            "jobs": JobPage(job_service, company_service, job_import_service),
-            "applications": ApplicationPage(
-                candidate_decision_view_model=application_view_models["candidate_decision"],
-                on_candidate_decision_action=lambda action: self._navigate(router, action),
-                resume_optimization_view_model=application_view_models["resume_optimization"],
-                resume_version_review_view_model=application_view_models["resume_review"],
-                optimized_resume_evaluation_view_model=application_view_models["optimized_evaluation"],
-                application_service=application_service,
-                company_service=company_service,
-                job_service=job_service,
+            "jobs": JobPage(
+                job_service,
+                company_service,
+                job_import_service,
+                saved_jobs_import_service,
+                salary_research_service,
+                recruiter_email_research_service,
+                PlaywrightApplicationBrowser(
+                    linkedin_headless=settings_service.browser_headless,
+                ),
             ),
+            "applications": application_page,
             "interviews": InterviewPage(interview_service, application_service),
-            "curricula": CurriculumPage(curriculum_service),
+            "curricula": curriculum_page,
             "workflows": WorkflowPage(workflow_template_service, workflow_service),
             "analytics": AnalyticsPage(analytics_service),
             "career": CareerPage(career_service, gap_service),
             "assistant": self._build_assistant_page(),
             "agent_console": self._build_agent_console_page(),
-            "cover_letters": AIResumePage(),
+            "cover_letters": LetterPage(
+                cover_letter_service,
+                job_service,
+                curriculum_service,
+            ),
             "crm": ATSPage(ats_service),
-            "settings": BasePage("Configuracoes"),
+            "settings": SettingsPage(settings_service),
         }
-        return MainWindow(sidebar=Sidebar(), router=router, pages=pages)
+        return MainWindow(sidebar=Sidebar(), router=router, pages=pages, settings_service=settings_service)
 
     @staticmethod
     def _build_application_view_models(

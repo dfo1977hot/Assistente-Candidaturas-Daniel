@@ -36,3 +36,6 @@ def main() -> int:
     finally:
         log_event(logger, logging.INFO, "application.shutdown", "Application shutdown", status="completed")
         close_logging()
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -77,6 +78,7 @@ class CompanyPage(BasePage):
         self.website_input = QLineEdit()
         self.linkedin_input = QLineEdit()
         self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(90)
         self.search_input = QLineEdit()
         self.search_button = QPushButton("Pesquisar")
         self.save_button = QPushButton("Salvar")
@@ -96,34 +98,45 @@ class CompanyPage(BasePage):
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
 
-        form = QFormLayout()
+        form_columns = QHBoxLayout()
+
+        first_column = QFormLayout()
         name_row = QHBoxLayout()
         name_row.addWidget(self.name_input)
         name_row.addWidget(self.lookup_button)
         name_row.addWidget(self.cancel_lookup_button)
-        form.addRow(QLabel("Nome"), name_row)
-        form.addRow(QLabel("Fonte da busca"), self.lookup_provider)
-        form.addRow(QLabel("Consulta"), self.force_refresh_checkbox)
-        form.addRow(QLabel("Status"), self.lookup_status)
-        form.addRow(QLabel("Razão social"), self.legal_name_input)
-        form.addRow(QLabel("CNPJ"), self.tax_id_input)
-        form.addRow(QLabel("Situação"), self.registration_status_input)
-        form.addRow(QLabel("Segmento"), self.segment_input)
-        form.addRow(QLabel("Endereço"), self.address_input)
-        form.addRow(QLabel("Cidade"), self.city_input)
-        form.addRow(QLabel("Estado"), self.state_input)
-        form.addRow(QLabel("CEP"), self.postal_code_input)
-        form.addRow(QLabel("Pais"), self.country_input)
-        form.addRow(QLabel("Telefone"), self.phone_input)
-        form.addRow(QLabel("Porte"), self.company_size_input)
-        form.addRow(QLabel("Website"), self.website_input)
-        form.addRow(QLabel("LinkedIn"), self.linkedin_input)
-        form.addRow(QLabel("Observações"), self.notes_input)
+        first_column.addRow(QLabel("Nome"), name_row)
+        first_column.addRow(QLabel("Fonte da busca"), self.lookup_provider)
+        first_column.addRow(QLabel("Consulta"), self.force_refresh_checkbox)
+        first_column.addRow(QLabel("Status"), self.lookup_status)
+        first_column.addRow(QLabel("Razão social"), self.legal_name_input)
+        first_column.addRow(QLabel("CNPJ"), self.tax_id_input)
 
-        actions = QHBoxLayout()
-        actions.addWidget(self.save_button)
-        actions.addWidget(self.delete_button)
-        actions.addStretch()
+        second_column = QFormLayout()
+        second_column.addRow(QLabel("Situação"), self.registration_status_input)
+        second_column.addRow(QLabel("Segmento"), self.segment_input)
+        second_column.addRow(QLabel("Endereço"), self.address_input)
+        second_column.addRow(QLabel("Cidade"), self.city_input)
+        second_column.addRow(QLabel("Estado"), self.state_input)
+        second_column.addRow(QLabel("CEP"), self.postal_code_input)
+
+        third_column = QFormLayout()
+        third_column.addRow(QLabel("País"), self.country_input)
+        third_column.addRow(QLabel("Telefone"), self.phone_input)
+        third_column.addRow(QLabel("Porte"), self.company_size_input)
+        third_column.addRow(QLabel("Website"), self.website_input)
+        third_column.addRow(QLabel("LinkedIn"), self.linkedin_input)
+
+        form_columns.addLayout(first_column, 1)
+        form_columns.addLayout(second_column, 1)
+        form_columns.addLayout(third_column, 1)
+
+        full_width_fields = QFormLayout()
+        full_width_fields.addRow(QLabel("Observações"), self.notes_input)
+
+        actions = QGridLayout()
+        for index, button in enumerate((self.save_button, self.delete_button)):
+            actions.addWidget(button, index // 3, index % 3)
         self.save_button.clicked.connect(self._save_company)
         self.delete_button.clicked.connect(self._delete_company)
 
@@ -133,10 +146,11 @@ class CompanyPage(BasePage):
         search_layout.addWidget(self.search_button)
         self.search_button.clicked.connect(self._search_companies)
 
-        self.layout.addLayout(form)
-        self.layout.addLayout(actions)
         self.layout.addLayout(search_layout)
         self.layout.addWidget(self.table)
+        self.layout.addLayout(form_columns)
+        self.layout.addLayout(full_width_fields)
+        self.layout.addLayout(actions)
 
         self._load_companies()
 
@@ -212,6 +226,7 @@ class CompanyPage(BasePage):
             if answer != QMessageBox.Yes:
                 return
         self._apply_lookup_result(result)
+        self._select_company_row_by_id(self.current_company_id)
 
     def _apply_lookup_result(self, result) -> None:
         self.name_input.setText(result.name)
@@ -271,7 +286,7 @@ class CompanyPage(BasePage):
             notes = self.notes_input.toPlainText().strip()
 
             if self.current_company_id is None:
-                self.service.create_company(
+                saved_company = self.service.create_company(
                     name=name,
                     segment=segment,
                     city=city,
@@ -292,7 +307,7 @@ class CompanyPage(BasePage):
                     data_retrieved_at=self._lookup_metadata.get("data_retrieved_at"),
                 )
             else:
-                self.service.update_company(
+                saved_company = self.service.update_company(
                     self.current_company_id,
                     name=name,
                     segment=segment,
@@ -314,8 +329,12 @@ class CompanyPage(BasePage):
                     data_retrieved_at=self._lookup_metadata.get("data_retrieved_at"),
                 )
 
-            self._clear_form()
+            if saved_company is None:
+                raise ValueError("A empresa não pôde ser salva.")
+            self.current_company_id = int(saved_company.id)
+            selected_company_id = self.current_company_id
             self._load_companies()
+            self._select_company_row_by_id(selected_company_id)
         except ValueError as exc:
             QMessageBox.warning(self, "Dados inválidos", str(exc))
         except Exception as exc:  # pragma: no cover - defensive UI handling
@@ -414,6 +433,17 @@ class CompanyPage(BasePage):
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
 
+
+    def _select_company_row_by_id(self, company_id: int | None) -> None:
+        """Mantém a empresa atual selecionada após buscar ou salvar dados."""
+        if company_id is None:
+            return
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None and item.text() == str(company_id):
+                self.table.selectRow(row)
+                self.table.scrollToItem(item)
+                return
 
     def _clear_form(self) -> None:
         self.current_company_id = None

@@ -42,6 +42,26 @@ class ATSRepository:
             session.refresh(recommendation)
             return recommendation
 
+
+    def get_latest_for_match(
+        self,
+        *,
+        application_id: int,
+        curriculum_id: int,
+    ) -> ATSScore | None:
+        """Return the latest ATS score for one application/curriculum pair."""
+        with database_module.SessionLocal() as session:
+            stmt = (
+                select(ATSScore)
+                .where(
+                    ATSScore.application_id == application_id,
+                    ATSScore.curriculum_id == curriculum_id,
+                )
+                .order_by(ATSScore.calculated_at.desc(), ATSScore.id.desc())
+                .limit(1)
+            )
+            return session.scalars(stmt).first()
+
     def get_history(self) -> list[ATSScore]:
         with database_module.SessionLocal() as session:
             stmt = select(ATSScore).order_by(ATSScore.calculated_at.desc())

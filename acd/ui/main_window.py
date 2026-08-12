@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QListWidget,
@@ -14,15 +15,30 @@ from PySide6.QtWidgets import (
 )
 
 from acd.core.router import Router
+from acd.services.settings_service import SettingsService
 
 
 class MainWindow(QMainWindow):
     """Organize pre-built Presentation objects without creating application dependencies."""
 
-    def __init__(self, *, sidebar: QListWidget, router: Router, pages: Mapping[str, QWidget]) -> None:
+    def __init__(
+        self,
+        *,
+        sidebar: QListWidget,
+        router: Router,
+        pages: Mapping[str, QWidget],
+        settings_service: SettingsService,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Assistente de Candidaturas do Daniel")
         self.resize(1400, 800)
+        self._settings_service = settings_service
+        startup_method = (
+            self.showMinimized
+            if self._settings_service.startup_mode() == "minimized"
+            else self.showMaximized
+        )
+        QTimer.singleShot(0, startup_method)
 
         self.sidebar = sidebar
         self.stack = QStackedWidget()

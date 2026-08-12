@@ -38,6 +38,16 @@ class InterviewRepository:
         with database_module.SessionLocal() as session:
             return session.get(Interview, interview_id)
 
+    def get_for_application(self, application_id: int) -> list[Interview]:
+        """Lista as entrevistas vinculadas a uma candidatura em ordem cronológica."""
+        with database_module.SessionLocal() as session:
+            stmt = (
+                select(Interview)
+                .where(Interview.application_id == application_id)
+                .order_by(Interview.interview_date.asc())
+            )
+            return list(session.scalars(stmt).all())
+
     def get_all(self) -> list[Interview]:
         with database_module.SessionLocal() as session:
             stmt = select(Interview).order_by(Interview.interview_date.asc())

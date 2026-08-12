@@ -103,8 +103,20 @@ class Job(Base):
         default="",
     )
 
+    application_url: Mapped[str] = mapped_column(
+        String(1000),
+        nullable=True,
+        default="",
+    )
+
     recruiter: Mapped[str] = mapped_column(
         String(200),
+        nullable=True,
+        default="",
+    )
+
+    recruiter_email: Mapped[str] = mapped_column(
+        String(320),
         nullable=True,
         default="",
     )

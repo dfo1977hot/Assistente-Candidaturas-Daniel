@@ -27,6 +27,7 @@ from acd.services.company_service import CompanyService
 from acd.services.curriculum_service import CurriculumService
 from acd.services.interview_service import InterviewService
 from acd.services.job_service import JobService
+from acd.services.settings_service import SettingsService
 from acd.ui.dashboard import Dashboard
 from acd.ui.main_window import MainWindow
 from acd.ui.sidebar import Sidebar
@@ -158,7 +159,13 @@ def build_acceptance_runtime(
         "crm": BasePage("CRM"),
         "settings": BasePage("Configuracoes"),
     }
-    window = MainWindow(sidebar=Sidebar(), router=Router(), pages=pages)
+    settings_service = SettingsService(workspace / "settings.json")
+    window = MainWindow(
+        sidebar=Sidebar(),
+        router=Router(),
+        pages=pages,
+        settings_service=settings_service,
+    )
     qtbot.addWidget(window)
 
     lifecycle = SQLiteDatabaseLifecycle()

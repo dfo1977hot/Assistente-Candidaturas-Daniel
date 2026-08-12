@@ -68,11 +68,16 @@ class FakeRepository:
         self,
         application_id: int,
         status: str,
+        *,
+        clear_application_dates: bool = False,
     ) -> Application | None:
         app = self.items.get(application_id)
 
         if app is not None:
             app.status = status
+            if clear_application_dates:
+                app.application_date = None
+                app.next_follow_up = None
 
         return app
 
@@ -628,3 +633,33 @@ def test_parse_optional_date_empty() -> None:
     service = create_service()
 
     assert service._parse_optional_date("") is None
+
+def test_update_application_preserves_interview_date_when_omitted() -> None:
+    service = create_service()
+    application = service.create_application(
+        job_id=1,
+        company_id=1,
+        interview_date="2026-08-20",
+    )
+
+    updated = service.update_application(
+        application.id,
+        job_id=1,
+        company_id=1,
+    )
+
+    assert updated is not None
+    assert updated.interview_date == date(2026, 8, 20)
+
+
+def test_set_interview_date_updates_and_clears_date() -> None:
+    service = create_service()
+    application = service.create_application(job_id=1, company_id=1)
+
+    updated = service.set_interview_date(application.id, date(2026, 9, 5))
+    assert updated is not None
+    assert updated.interview_date == date(2026, 9, 5)
+
+    cleared = service.set_interview_date(application.id, None)
+    assert cleared is not None
+    assert cleared.interview_date is None

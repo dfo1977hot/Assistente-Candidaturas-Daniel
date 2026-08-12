@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, QLocale
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QDoubleSpinBox,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -18,15 +19,38 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
+from acd.presentation.dialogs.linkedin_saved_jobs_progress_dialog import (
+    LinkedInSavedJobsProgressDialog,
+)
 from acd.presentation.long_running_task_executor import LongRunningTaskExecutor
 from acd.presentation.pages.base_page import BasePage
+from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
 from acd.services.company_name_matcher import find_company_name_candidate
 from acd.services.company_service import CompanyService
 from acd.services.job_service import JobService
+from acd.services.linkedin_application_resolver import (
+    LinkedInApplicationResolution,
+    LinkedInApplicationResolver,
+    UnavailableLinkedInApplicationResolver,
+)
 from acd.services.linkedin_job_import_service import (
     ImportedLinkedInJob,
     LinkedInJobImportError,
     LinkedInJobImportService,
+)
+from acd.services.linkedin_saved_jobs_import_service import (
+    LinkedInSavedJobsImportService,
+    SavedJobsImportResult,
+    SavedJobsProgress,
+)
+from acd.services.recruiter_email_research_service import (
+    RecruiterEmailResearchRequest,
+    RecruiterEmailResearchService,
+)
+from acd.services.salary_research_service import (
+    SalaryResearchRequest,
+    SalaryResearchResult,
+    SalaryResearchService,
 )
 
 
@@ -38,6 +62,10 @@ class JobPage(BasePage):
         job_service: JobService,
         company_service: CompanyService,
         job_import_service: LinkedInJobImportService | None = None,
+        saved_jobs_import_service: LinkedInSavedJobsImportService | None = None,
+        salary_research_service: SalaryResearchService | None = None,
+        recruiter_email_research_service: RecruiterEmailResearchService | None = None,
+        application_url_resolver: LinkedInApplicationResolver | None = None,
     ) -> None:
         super().__init__("Vagas")
 
@@ -49,6 +77,50 @@ class JobPage(BasePage):
         self._import_executor.failed.connect(self._on_linkedin_import_failed)
         self._import_executor.finished.connect(self._on_linkedin_import_finished)
         self._job_import_service = job_import_service
+        self._closed_jobs_registry = getattr(
+            job_import_service,
+            "_closed_jobs_registry",
+            ClosedLinkedInJobsRegistry(),
+        )
+        self._application_url_resolver = (
+            application_url_resolver or UnavailableLinkedInApplicationResolver()
+        )
+        self._application_url_executor = LongRunningTaskExecutor(self)
+        self._application_url_executor.progress.connect(
+            self._on_application_url_progress
+        )
+        self._application_url_executor.succeeded.connect(
+            self._on_application_url_resolved
+        )
+        self._application_url_executor.failed.connect(
+            self._on_application_url_resolution_failed
+        )
+        self._application_url_executor.finished.connect(
+            self._on_application_url_resolution_finished
+        )
+        self._saved_jobs_import_service = saved_jobs_import_service
+        self._salary_research_service = salary_research_service
+        self._recruiter_email_research_service = recruiter_email_research_service
+        self._recruiter_email_executor = LongRunningTaskExecutor(self)
+        self._recruiter_email_executor.succeeded.connect(
+            self._on_recruiter_email_research_succeeded
+        )
+        self._salary_research_executor = LongRunningTaskExecutor(self)
+        self._salary_research_executor.succeeded.connect(
+            self._on_salary_research_succeeded
+        )
+        self._salary_research_executor.failed.connect(
+            self._on_salary_research_failed
+        )
+        self._salary_research_executor.finished.connect(
+            self._on_salary_research_finished
+        )
+        self._saved_jobs_dialog: LinkedInSavedJobsProgressDialog | None = None
+        self._saved_jobs_executor = LongRunningTaskExecutor(self)
+        self._saved_jobs_executor.progress.connect(self._on_saved_jobs_progress)
+        self._saved_jobs_executor.succeeded.connect(self._on_saved_jobs_succeeded)
+        self._saved_jobs_executor.failed.connect(self._on_saved_jobs_failed)
+        self._saved_jobs_executor.cancelled.connect(self._on_saved_jobs_cancelled)
         self.company_combo = QComboBox()
         self.title_input = QLineEdit()
         self.location_input = QLineEdit()
@@ -60,6 +132,8 @@ class JobPage(BasePage):
         self.salary_min_input.setMinimum(0)
         self.salary_min_input.setSingleStep(100)
         self.salary_min_input.setGroupSeparatorShown(True)
+        self.salary_min_input.setSpecialValueText("A combinar")
+        self.salary_min_input.setLocale(QLocale(QLocale.Portuguese, QLocale.Brazil))
         self.salary_min_input.setPrefix("R$ ")
         self.salary_max_input = QDoubleSpinBox()
         self.salary_max_input.setDecimals(2)
@@ -67,6 +141,7 @@ class JobPage(BasePage):
         self.salary_max_input.setMinimum(0)
         self.salary_max_input.setSingleStep(100)
         self.salary_max_input.setGroupSeparatorShown(True)
+        self.salary_max_input.setLocale(QLocale(QLocale.Portuguese, QLocale.Brazil))
         self.salary_max_input.setPrefix("R$ ")
         self.currency_input = QComboBox()
 
@@ -85,9 +160,17 @@ class JobPage(BasePage):
         self.url_input.setPlaceholderText(
             "Cole a URL da vaga do LinkedIn e clique em Importar vaga"
         )
+        self.application_url_input = QLineEdit()
+        self.application_url_input.setPlaceholderText(
+            "Cole a URL externa em que a candidatura é realmente enviada"
+        )
+        self.detect_application_url_button = QPushButton("Detectar link Candidatar-se")
         self.import_linkedin_button = QPushButton("Importar vaga do LinkedIn")
+        self.import_saved_jobs_button = QPushButton("Importar vagas salvas do LinkedIn")
         self.import_status_label = QLabel("")
         self.recruiter_input = QLineEdit()
+        self.recruiter_email_input = QLineEdit()
+        self.recruiter_email_input.setPlaceholderText("E-mail profissional público")
         self.deadline_input = QDateEdit()
         self.deadline_input.setCalendarPopup(True)
         self.deadline_input.setDisplayFormat("dd/MM/yyyy")
@@ -101,12 +184,16 @@ class JobPage(BasePage):
         self.priority_input.setMaximum(5)
         self.priority_input.setValue(3)
         self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(90)
+        self.benefits_input = QTextEdit()
+        self.benefits_input.setMaximumHeight(90)
         self.search_input = QLineEdit()
         self.filter_status_combo = QComboBox()
         self.filter_company_combo = QComboBox()
         self.filter_button = QPushButton("Filtrar")
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
+        self.salary_research_button = QPushButton("Pesquisar média salarial com IA")
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
             ["ID", "Empresa", "Cargo", "Status", "Cidade", "Cadastro"]
@@ -159,35 +246,63 @@ class JobPage(BasePage):
         self.filter_status_combo.addItems(JobService.JOB_STATUSES)
         self.filter_company_combo.addItem("", "")
 
-        form = QFormLayout()
-        form.addRow(QLabel("Empresa"), self.company_combo)
-        form.addRow(QLabel("Cargo"), self.title_input)
-        form.addRow(QLabel("Cidade"), self.location_input)
-        form.addRow(QLabel("Modelo"), self.work_model_combo)
-        form.addRow(QLabel("Tipo"), self.employment_type_combo)
-        form.addRow(QLabel("Salário mín."), self.salary_min_input)
-        form.addRow(QLabel("Salário máx."), self.salary_max_input)
-        form.addRow(QLabel("Moeda"), self.currency_input)
-        form.addRow(QLabel("Status"), self.status_combo)
-        form.addRow(QLabel("Fonte"), self.source_input)
+
+        form_columns = QHBoxLayout()
+
+        first_column = QFormLayout()
+        first_column.addRow(QLabel("Empresa"), self.company_combo)
+        first_column.addRow(QLabel("Cargo"), self.title_input)
+        first_column.addRow(QLabel("Cidade"), self.location_input)
+        first_column.addRow(QLabel("Modelo"), self.work_model_combo)
+        first_column.addRow(QLabel("Tipo"), self.employment_type_combo)
+        first_column.addRow(QLabel("Status"), self.status_combo)
+
+        second_column = QFormLayout()
+        second_column.addRow(QLabel("Remuneração oferecida"), self.salary_min_input)
+        second_column.addRow(QLabel("Remuneração ideal"), self.salary_max_input)
+        second_column.addRow(QLabel("Moeda"), self.currency_input)
+        second_column.addRow(QLabel("Fonte"), self.source_input)
+        second_column.addRow(QLabel("Recrutador"), self.recruiter_input)
+        second_column.addRow(QLabel("E-mail"), self.recruiter_email_input)
+        second_column.addRow(QLabel("Prioridade"), self.priority_input)
+
+        third_column = QFormLayout()
+        third_column.addRow(QLabel("Prazo"), self.deadline_input)
+        third_column.addRow(QLabel("Data aplicação"), self.application_date_input)
+        third_column.addRow(QLabel("Importação"), self.import_status_label)
+
+        form_columns.addLayout(first_column, 1)
+        form_columns.addLayout(second_column, 1)
+        form_columns.addLayout(third_column, 1)
+
+        full_width_fields = QFormLayout()
         link_layout = QHBoxLayout()
         link_layout.addWidget(self.url_input)
         link_layout.addWidget(self.import_linkedin_button)
-        form.addRow(QLabel("Link"), link_layout)
-        form.addRow(QLabel("Importação"), self.import_status_label)
-        form.addRow(QLabel("Recrutador"), self.recruiter_input)
-        form.addRow(QLabel("Prazo"), self.deadline_input)
-        form.addRow(QLabel("Data aplicação"), self.application_date_input)
-        form.addRow(QLabel("Prioridade"), self.priority_input)
-        form.addRow(QLabel("Observações"), self.notes_input)
+        full_width_fields.addRow(QLabel("Link da vaga"), link_layout)
 
-        actions = QHBoxLayout()
-        actions.addWidget(self.save_button)
-        actions.addWidget(self.delete_button)
-        actions.addStretch()
-        self.save_button.clicked.connect(self._save_job)
+        application_url_layout = QHBoxLayout()
+        application_url_layout.addWidget(self.application_url_input)
+        application_url_layout.addWidget(self.detect_application_url_button)
+        full_width_fields.addRow(QLabel("URL da candidatura"), application_url_layout)
+        full_width_fields.addRow(QLabel("Benefícios e valores"), self.benefits_input)
+        full_width_fields.addRow(QLabel("Observações"), self.notes_input)
+
+        actions = QGridLayout()
+        action_buttons = (
+            self.save_button,
+            self.delete_button,
+            self.import_saved_jobs_button,
+            self.salary_research_button,
+        )
+        for column, button in enumerate(action_buttons):
+            actions.addWidget(button, 0, column)
+        self.save_button.clicked.connect(self._save_current_job)
         self.delete_button.clicked.connect(self._delete_job)
         self.import_linkedin_button.clicked.connect(self._import_linkedin_job)
+        self.detect_application_url_button.clicked.connect(self._detect_application_url)
+        self.import_saved_jobs_button.clicked.connect(self._import_saved_linkedin_jobs)
+        self.salary_research_button.clicked.connect(self._research_salary)
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(QLabel("Pesquisar"))
@@ -201,11 +316,12 @@ class JobPage(BasePage):
         filter_layout.addWidget(QLabel("Empresa"))
         filter_layout.addWidget(self.filter_company_combo)
 
-        self.layout.addLayout(form)
-        self.layout.addLayout(actions)
         self.layout.addLayout(search_layout)
         self.layout.addLayout(filter_layout)
         self.layout.addWidget(self.table)
+        self.layout.addLayout(form_columns)
+        self.layout.addLayout(full_width_fields)
+        self.layout.addLayout(actions)
 
     def _load_companies(self) -> None:
         companies = self.company_service.list_companies()
@@ -216,6 +332,60 @@ class JobPage(BasePage):
         for company in companies:
             self.company_combo.addItem(company.name, company.id)
             self.filter_company_combo.addItem(company.name, company.id)
+
+    def _import_saved_linkedin_jobs(self) -> None:
+        if self._saved_jobs_import_service is None:
+            QMessageBox.warning(
+                self,
+                "Importar vagas salvas",
+                "O serviço de importação em lote não está disponível.",
+            )
+            return
+        dialog = LinkedInSavedJobsProgressDialog(self)
+        dialog.cancel_requested.connect(self._saved_jobs_executor.cancel)
+        self._saved_jobs_dialog = dialog
+        service = self._saved_jobs_import_service
+        self.import_saved_jobs_button.setEnabled(False)
+
+        def task(progress_emit, cancellation_token):
+            return service.import_saved_jobs(
+                progress_callback=progress_emit,
+                cancellation_requested=lambda: cancellation_token.is_cancellation_requested,
+            )
+
+        self._saved_jobs_executor.execute_with_context(task)
+        dialog.open()
+
+    def _on_saved_jobs_progress(self, progress: object) -> None:
+        if self._saved_jobs_dialog is not None and isinstance(progress, SavedJobsProgress):
+            self._saved_jobs_dialog.update_progress(progress)
+
+    def _on_saved_jobs_succeeded(self, result: object) -> None:
+        if self._saved_jobs_dialog is not None and isinstance(result, SavedJobsImportResult):
+            self._saved_jobs_dialog.show_result(result)
+            QMessageBox.information(
+                self,
+                "Importação concluída",
+                (
+                    f"Importadas: {result.imported}\n"
+                    f"Já existentes: {result.existing}\n"
+                    f"Excluídas por não aceitarem mais candidaturas: {result.deleted}\n"
+                    f"Falhas: {result.failed}"
+                ),
+            )
+        self._load_companies()
+        self._load_jobs()
+        self.import_saved_jobs_button.setEnabled(True)
+
+    def _on_saved_jobs_failed(self, error: object) -> None:
+        if self._saved_jobs_dialog is not None:
+            self._saved_jobs_dialog.show_failure(str(error))
+        self.import_saved_jobs_button.setEnabled(True)
+
+    def _on_saved_jobs_cancelled(self) -> None:
+        if self._saved_jobs_dialog is not None:
+            self._saved_jobs_dialog.show_cancelled()
+        self.import_saved_jobs_button.setEnabled(True)
 
     def _import_linkedin_job(self) -> None:
         if self._job_import_service is None:
@@ -252,6 +422,22 @@ class JobPage(BasePage):
         self._import_executor.execute(lambda: service.import_from_url(normalized_url))
 
     def _on_linkedin_import_succeeded(self, result: ImportedLinkedInJob) -> None:
+        if result.accepting_applications is False:
+            deleted = self._delete_closed_imported_job(result)
+            self.import_status_label.setText(
+                "Vaga encerrada: excluída e bloqueada para novas importações."
+            )
+            self._load_jobs()
+            if deleted:
+                self._clear_form()
+            QMessageBox.information(
+                self,
+                "Vaga encerrada",
+                "O anúncio não aceita mais candidaturas. "
+                "A vaga foi excluída do ACD e não será importada novamente.",
+            )
+            return
+
         if not result.title and not result.company_name and not result.description:
             QMessageBox.warning(
                 self,
@@ -281,32 +467,91 @@ class JobPage(BasePage):
                 return
 
         self._apply_imported_job(result)
+        self._research_recruiter_email_if_needed(result)
         self.import_status_label.setText("Vaga importada. Revise os dados antes de salvar.")
+        if not self.application_url_input.text().strip():
+            self._detect_application_url()
+
+    def _delete_closed_imported_job(self, result: ImportedLinkedInJob) -> bool:
+        """Delete a persisted vacancy when LinkedIn reports applications closed."""
+
+        job = None
+        if self.current_job_id is not None:
+            job = self.job_service.get_job(self.current_job_id)
+        if job is None and result.source_url:
+            job = self.job_service.get_job_by_url(result.source_url)
+        if job is None and result.linkedin_job_id:
+            job = self.job_service.get_job_by_linkedin_job_id(
+                result.linkedin_job_id
+            )
+        if job is None or job.id is None:
+            return False
+        deleted = self.job_service.delete_job(int(job.id), delete_linked=True)
+        if deleted:
+            self.current_job_id = None
+        return deleted
+
+    def _research_recruiter_email_if_needed(
+        self,
+        result: ImportedLinkedInJob,
+    ) -> None:
+        if self.recruiter_email_input.text().strip():
+            return
+        service = self._recruiter_email_research_service
+        if service is None or not result.company_name.strip():
+            return
+
+        request = RecruiterEmailResearchRequest(
+            company_name=result.company_name,
+            job_title=result.title,
+            location=result.location,
+            recruiter_name=result.recruiter,
+        )
+        self._recruiter_email_executor.execute(
+            lambda: service.research(request),
+            timeout_ms=90_000,
+        )
+
+    def _on_recruiter_email_research_succeeded(self, result: object) -> None:
+        email = str(result or "").strip()
+        if email and not self.recruiter_email_input.text().strip():
+            self.recruiter_email_input.setText(email)
 
     def _apply_imported_job(self, result: ImportedLinkedInJob) -> None:
         self.title_input.setText(result.title)
         self.location_input.setText(result.location)
-        if result.work_model:
-            self.work_model_combo.setCurrentText(result.work_model)
+        self.work_model_combo.setCurrentText(result.work_model or "Presencial")
         if result.employment_type:
             self.employment_type_combo.setCurrentText(result.employment_type)
-        if result.salary_min is not None:
-            self.salary_min_input.setValue(result.salary_min)
-        if result.salary_max is not None:
-            self.salary_max_input.setValue(result.salary_max)
+        advertised_values = [
+            value for value in (result.salary_min, result.salary_max) if value is not None
+        ]
+        self._set_offered_remuneration(max(advertised_values) if advertised_values else None)
+        self.salary_max_input.setValue(0.00)
         if result.currency:
             self.currency_input.setCurrentText(result.currency)
             self._update_currency_symbol()
         self.source_input.setText("LinkedIn")
         self.url_input.setText(result.source_url)
+        imported_application_url = str(
+            getattr(result, "application_url", "") or ""
+        ).strip()
+        if imported_application_url:
+            self.application_url_input.setText(imported_application_url)
         self.recruiter_input.setText(result.recruiter)
+        self.recruiter_email_input.setText(
+            str(getattr(result, "recruiter_email", "") or "")
+        )
         if result.application_deadline:
             deadline = QDate.fromString(result.application_deadline, "yyyy-MM-dd")
             if deadline.isValid():
                 self.deadline_input.setDate(deadline)
+        benefits_text = self._format_benefits(getattr(result, "benefits", ""))
+        if benefits_text:
+            self.benefits_input.setPlainText(benefits_text)
         notes = result.notes_text()
         if notes:
-            self.notes_input.setPlainText(notes)
+            self.notes_input.setPlainText(self._strip_benefits_marker(notes))
 
         company_matched = self._select_imported_company(result.company_name)
         if result.company_name and not company_matched:
@@ -344,6 +589,165 @@ class JobPage(BasePage):
         self.company_combo.setCurrentIndex(candidate.index)
         return True
 
+    def _detect_application_url(self) -> None:
+        job_url = self.url_input.text().strip()
+        if not job_url:
+            QMessageBox.warning(
+                self,
+                "URL da candidatura",
+                "Informe primeiro o link da vaga do LinkedIn.",
+            )
+            return
+        if "linkedin.com" not in job_url.lower():
+            QMessageBox.information(
+                self,
+                "URL da candidatura",
+                "A detecção automática está disponível para vagas do LinkedIn.",
+            )
+            return
+        self.detect_application_url_button.setEnabled(False)
+        self.import_status_label.setText("Localizando link Candidatar-se...")
+        resolver = self._application_url_resolver
+        self._application_url_executor.execute_with_context(
+            lambda emit, _token: resolver.resolve_linkedin_application_url(
+                job_url,
+                progress=emit,
+            )
+        )
+
+    def _on_application_url_progress(self, payload: object) -> None:
+        if isinstance(payload, tuple) and len(payload) == 2:
+            _value, message = payload
+            self.import_status_label.setText(str(message))
+
+    def _on_application_url_resolved(self, result: object) -> None:
+        resolution = (
+            result
+            if isinstance(result, LinkedInApplicationResolution)
+            else LinkedInApplicationResolution(url=str(result or "").strip())
+        )
+        if resolution.accepting_applications is False:
+            self.import_status_label.setText("Não aceita mais candidaturas")
+            confirmation = QMessageBox.question(
+                self,
+                "Não aceita mais candidaturas",
+                "Não foi localizado o botão Candidatar-se nem Candidatura "
+                "simplificada. A vaga não aceita mais candidaturas.\n\n"
+                "Deseja excluir esta vaga do aplicativo?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if confirmation == QMessageBox.Yes:
+                self._delete_current_closed_job()
+            return
+
+        application_url = resolution.url.strip()
+        if application_url and self._same_job_and_application_url(
+            self.url_input.text(),
+            application_url,
+        ):
+            self.import_status_label.setText("Não aceita mais candidaturas")
+            confirmation = QMessageBox.question(
+                self,
+                "Não aceita mais candidaturas",
+                "O Link da vaga e a URL da candidatura são iguais. "
+                "Esta vaga não aceita mais candidaturas.\n\n"
+                "Deseja excluir esta vaga do aplicativo?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if confirmation == QMessageBox.Yes:
+                self._delete_current_closed_job()
+            return
+
+        if application_url:
+            self.application_url_input.setText(application_url)
+            label = (
+                "Candidatura simplificada localizada."
+                if resolution.application_type == "easy_apply"
+                else "Link Candidatar-se localizado."
+            )
+            self.import_status_label.setText(label)
+            self._persist_application_url_if_possible(application_url)
+            return
+
+        if resolution.accepting_applications:
+            self.import_status_label.setText(
+                "Candidatar-se localizado, mas a URL não pôde ser determinada."
+            )
+            QMessageBox.warning(
+                self,
+                "URL da candidatura",
+                "O botão Candidatar-se foi localizado, portanto a vaga aceita "
+                "candidaturas, mas o LinkedIn não expôs a URL de destino. "
+                "A vaga não será excluída.",
+            )
+            return
+
+        if resolution.accepting_applications is None:
+            self.import_status_label.setText(
+                "Não foi possível confirmar a forma de candidatura."
+            )
+            QMessageBox.warning(
+                self,
+                "URL da candidatura",
+                "Não foi possível localizar o botão Candidatar-se nem confirmar "
+                "que a vaga esteja encerrada. A vaga não será excluída.",
+            )
+            return
+
+        self.import_status_label.setText("Não aceita mais candidaturas")
+
+    @staticmethod
+    def _same_job_and_application_url(job_url: str, application_url: str) -> bool:
+        return job_url.strip().rstrip("/") == application_url.strip().rstrip("/")
+
+    def _delete_current_closed_job(self) -> None:
+        job_url = self.url_input.text().strip()
+        linkedin_job_id = self._closed_jobs_registry.job_id_from_url(job_url)
+        if linkedin_job_id:
+            self._closed_jobs_registry.mark_closed(linkedin_job_id)
+
+        job = None
+        if self.current_job_id is not None:
+            job = self.job_service.get_job(self.current_job_id)
+        if job is None and job_url:
+            job = self.job_service.get_job_by_url(job_url)
+        if job is None and linkedin_job_id:
+            job = self.job_service.get_job_by_linkedin_job_id(linkedin_job_id)
+
+        if job is not None and job.id is not None:
+            self.job_service.delete_job(int(job.id), delete_linked=True)
+
+        self.current_job_id = None
+        self._clear_form()
+        self._load_jobs()
+        self.import_status_label.setText(
+            "Vaga encerrada: excluída e bloqueada para novas importações."
+        )
+        QMessageBox.information(
+            self,
+            "Vaga excluída",
+            "A vaga foi excluída do aplicativo e não será importada novamente.",
+        )
+
+    def _persist_application_url_if_possible(self, application_url: str) -> None:
+        if self.current_job_id is None:
+            return
+        job = self.job_service.get_job(self.current_job_id)
+        if job is None:
+            return
+        # Reuse the regular form-save path so the detected URL is persisted
+        # together with the values currently displayed to the user.
+        self._save_job(clear_after=False, show_success=False)
+
+    def _on_application_url_resolution_failed(self, error: object) -> None:
+        self.import_status_label.setText("Falha ao localizar link externo.")
+        QMessageBox.warning(self, "URL da candidatura", str(error))
+
+    def _on_application_url_resolution_finished(self) -> None:
+        self.detect_application_url_button.setEnabled(True)
+
     def _on_linkedin_import_failed(self, error: object) -> None:
         self.import_status_label.setText("Falha na importação.")
         QMessageBox.critical(self, "Não foi possível importar", str(error))
@@ -351,20 +755,103 @@ class JobPage(BasePage):
     def _on_linkedin_import_finished(self) -> None:
         self.import_linkedin_button.setEnabled(True)
 
-    def _save_job(self) -> None:
+
+    def _research_salary(self) -> None:
+        if self._salary_research_service is None:
+            QMessageBox.warning(
+                self,
+                "Pesquisa salarial",
+                "O serviço de pesquisa salarial não está disponível.",
+            )
+            return
+
+        request = SalaryResearchRequest(
+            title=self.title_input.text().strip(),
+            location=self.location_input.text().strip(),
+            work_model=self.work_model_combo.currentText().strip(),
+            employment_type=self.employment_type_combo.currentText().strip(),
+        )
+        try:
+            SalaryResearchService._validate_request(request)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Pesquisa salarial", str(exc))
+            return
+
+        if self._salary_research_executor.is_running:
+            QMessageBox.information(
+                self,
+                "Pesquisa salarial",
+                "A pesquisa salarial já está em andamento.",
+            )
+            return
+
+        self.salary_research_button.setEnabled(False)
+        self.salary_research_button.setText("Pesquisando salários...")
+        service = self._salary_research_service
+        self._salary_research_executor.execute(
+            lambda: service.research(request, force_refresh=True),
+            timeout_ms=120_000,
+        )
+
+    def _on_salary_research_succeeded(self, result: object) -> None:
+        if not isinstance(result, SalaryResearchResult):
+            QMessageBox.warning(
+                self,
+                "Pesquisa salarial",
+                "A pesquisa retornou um resultado inválido.",
+            )
+            return
+
+        currency_index = self.currency_input.findText(result.currency)
+        if currency_index >= 0:
+            self.currency_input.setCurrentIndex(currency_index)
+        self.salary_max_input.setValue(result.salary_max)
+        self._update_currency_symbol()
+        if self._save_job(clear_after=False, show_success=False):
+            self.import_status_label.setText(
+                "Remuneração ideal atualizada pela IA e vaga salva."
+            )
+        else:
+            self.import_status_label.setText(
+                "Remuneração ideal preenchida, mas a vaga não pôde ser salva."
+            )
+
+    def _on_salary_research_failed(self, error: object) -> None:
+        QMessageBox.critical(
+            self,
+            "Não foi possível pesquisar salários",
+            str(error),
+        )
+
+    def _on_salary_research_finished(self) -> None:
+        self.salary_research_button.setEnabled(True)
+        self.salary_research_button.setText("Pesquisar média salarial com IA")
+
+    def _save_current_job(self) -> None:
+        """Salva e permanece no registro atual, confirmando ao usuário."""
+        if self._save_job(clear_after=False, show_success=False):
+            QMessageBox.information(
+                self,
+                "Registro salvo",
+                "O registro foi salvo",
+            )
+
+    def _save_job(self, *, clear_after: bool = True, show_success: bool = True) -> bool:
         try:
             company_id = self.company_combo.currentData()
             title = self.title_input.text().strip()
             location = self.location_input.text().strip()
             work_model = self.work_model_combo.currentText()
             employment_type = self.employment_type_combo.currentText()
-            salary_min = self.salary_min_input.value()
+            salary_min = self._parse_offered_remuneration()
             salary_max = self.salary_max_input.value()
             currency = self.currency_input.currentText()
             status = self.status_combo.currentText()
             source = self.source_input.text().strip()
             job_url = self.url_input.text().strip()
+            application_url = self.application_url_input.text().strip()
             recruiter = self.recruiter_input.text().strip()
+            recruiter_email = self.recruiter_email_input.text().strip()
             deadline = (
                 self.deadline_input.date().toString("yyyy-MM-dd")
                 if self.deadline_input.date().isValid()
@@ -376,14 +863,17 @@ class JobPage(BasePage):
                 else ""
             )
             priority = self.priority_input.value()
-            notes = self.notes_input.toPlainText().strip()
+            notes = self._notes_with_benefits(
+                self.notes_input.toPlainText().strip(),
+                self.benefits_input.toPlainText().strip(),
+            )
 
             if company_id in (None, ""):
                 raise ValueError("Selecione uma empresa.")
             company_id_value = int(company_id)
 
             if self.current_job_id is None:
-                self.job_service.create_job(
+                saved_job = self.job_service.create_job(
                     company_id=company_id_value,
                     title=title,
                     location=location,
@@ -395,14 +885,16 @@ class JobPage(BasePage):
                     status=status,
                     source=source,
                     job_url=job_url,
+                    application_url=application_url,
                     recruiter=recruiter,
+                    recruiter_email=recruiter_email,
                     application_deadline=deadline,
                     application_date=application_date,
                     priority=priority,
                     notes=notes,
                 )
             else:
-                self.job_service.update_job(
+                saved_job = self.job_service.update_job(
                     self.current_job_id,
                     company_id=company_id_value,
                     title=title,
@@ -415,19 +907,33 @@ class JobPage(BasePage):
                     status=status,
                     source=source,
                     job_url=job_url,
+                    application_url=application_url,
                     recruiter=recruiter,
+                    recruiter_email=recruiter_email,
                     application_deadline=deadline,
                     application_date=application_date,
                     priority=priority,
                     notes=notes,
                 )
 
-            self._clear_form()
+            if saved_job is None:
+                raise ValueError("A vaga não foi encontrada para atualização.")
+            self.current_job_id = int(saved_job.id)
+            selected_job_id = self.current_job_id
             self._load_jobs()
+            if clear_after:
+                self._clear_form()
+            else:
+                self._select_job_row_by_id(selected_job_id)
+                if show_success:
+                    self.import_status_label.setText("Vaga salva.")
+            return True
         except ValueError as exc:
             QMessageBox.warning(self, "Dados inválidos", str(exc))
+            return False
         except Exception as exc:  # pragma: no cover - defensive UI handling
             QMessageBox.critical(self, "Erro", str(exc))
+            return False
 
     def _delete_job(self) -> None:
         if self.current_job_id is None:
@@ -520,11 +1026,11 @@ class JobPage(BasePage):
         self.title_input.setText(job.title or "")
         self.location_input.setText(job.location or "")
 
-        self.work_model_combo.setCurrentText(job.work_model or "")
+        self.work_model_combo.setCurrentText(job.work_model or "Presencial")
 
         self.employment_type_combo.setCurrentText(job.employment_type or "")
 
-        self.salary_min_input.setValue(float(job.salary_min or 0))
+        self._set_offered_remuneration(float(job.salary_min) if job.salary_min is not None else None)
 
         self.salary_max_input.setValue(float(job.salary_max or 0))
 
@@ -540,8 +1046,12 @@ class JobPage(BasePage):
         self.source_input.setText(job.source or "")
 
         self.url_input.setText(job.job_url or "")
+        self.application_url_input.setText(getattr(job, "application_url", "") or "")
 
         self.recruiter_input.setText(job.recruiter or "")
+        self.recruiter_email_input.setText(
+            getattr(job, "recruiter_email", "") or ""
+        )
 
         if job.application_deadline:
             self.deadline_input.setDate(job.application_deadline)
@@ -551,7 +1061,9 @@ class JobPage(BasePage):
 
         self.priority_input.setValue(job.priority or 3)
 
-        self.notes_input.setPlainText(job.notes or "")
+        stored_notes = job.notes or ""
+        self.benefits_input.setPlainText(self._extract_benefits_marker(stored_notes))
+        self.notes_input.setPlainText(self._strip_benefits_marker(stored_notes))
 
     def _load_jobs(self) -> None:
         jobs = self.job_service.list_jobs()
@@ -593,13 +1105,24 @@ class JobPage(BasePage):
             )
         self.table.resizeColumnsToContents()
 
+    def _select_job_row_by_id(self, job_id: int | None) -> None:
+        """Mantém a seleção da tabela no registro atualmente editado."""
+        if job_id is None:
+            return
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None and item.text() == str(job_id):
+                self.table.selectRow(row)
+                self.table.scrollToItem(item)
+                return
+
     def _clear_form(self) -> None:
         """Limpa o formulário e prepara para um novo cadastro."""
         self.current_job_id = None
         self.company_combo.setCurrentIndex(0)
         self.title_input.clear()
         self.location_input.clear()
-        self.work_model_combo.setCurrentIndex(0)
+        self.work_model_combo.setCurrentText("Presencial")
         self.employment_type_combo.setCurrentIndex(0)
         self.salary_min_input.setValue(0.00)
         self.salary_max_input.setValue(0.00)
@@ -607,12 +1130,15 @@ class JobPage(BasePage):
         self.status_combo.setCurrentIndex(0)
         self.source_input.clear()
         self.url_input.clear()
+        self.application_url_input.clear()
         self.import_status_label.clear()
         self.recruiter_input.clear()
+        self.recruiter_email_input.clear()
         # Reinicia as datas para a data atual
         self.deadline_input.setDate(QDate.currentDate())
         self.application_date_input.setDate(QDate.currentDate())
         self.priority_input.setValue(3)
+        self.benefits_input.clear()
         self.notes_input.clear()
         # Remove seleção da tabela
         self.table.clearSelection()
@@ -636,6 +1162,53 @@ class JobPage(BasePage):
 
         self.salary_min_input.setPrefix(f"{symbol} ")
         self.salary_max_input.setPrefix(f"{symbol} ")
+
+    _BENEFITS_START = "[BENEFICIOS]"
+    _BENEFITS_END = "[/BENEFICIOS]"
+
+    def _set_offered_remuneration(self, value: float | None) -> None:
+        self.salary_min_input.setValue(float(value or 0.0))
+
+    def _parse_offered_remuneration(self) -> float | None:
+        value = float(self.salary_min_input.value())
+        return value if value > 0 else None
+
+    @classmethod
+    def _notes_with_benefits(cls, notes: str, benefits: str) -> str:
+        clean_notes = cls._strip_benefits_marker(notes).strip()
+        clean_benefits = benefits.strip()
+        if not clean_benefits:
+            return clean_notes
+        marker = f"{cls._BENEFITS_START}\n{clean_benefits}\n{cls._BENEFITS_END}"
+        return f"{clean_notes}\n\n{marker}".strip()
+
+    @classmethod
+    def _extract_benefits_marker(cls, notes: str) -> str:
+        start = notes.find(cls._BENEFITS_START)
+        end = notes.find(cls._BENEFITS_END)
+        if start < 0 or end < 0 or end <= start:
+            return ""
+        start += len(cls._BENEFITS_START)
+        return notes[start:end].strip()
+
+    @classmethod
+    def _strip_benefits_marker(cls, notes: str) -> str:
+        start = notes.find(cls._BENEFITS_START)
+        end = notes.find(cls._BENEFITS_END)
+        if start < 0 or end < 0 or end <= start:
+            return notes.strip()
+        end += len(cls._BENEFITS_END)
+        return f"{notes[:start]}{notes[end:]}".strip()
+
+    @staticmethod
+    def _format_benefits(value: object) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, (list, tuple, set)):
+            return "\n".join(str(item).strip() for item in value if str(item).strip())
+        return str(value).strip()
 
     def _parse_optional_number(self, value: str) -> float | None:
         if not value.strip():

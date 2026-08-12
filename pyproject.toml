@@ -9,8 +9,10 @@ description = "Assistente de Candidaturas do Daniel"
 requires-python = ">=3.14"
 
 dependencies = [
+    "keyring>=25.6.0,<26",
     "openai>=2.46.0,<3",
     "pandas>=3.0.3,<4",
+    "playwright>=1.62.0,<2",
     "psutil>=7.2.2,<8",
     "pydantic>=2.13.4,<3",
     "PySide6>=6.11.1,<7",

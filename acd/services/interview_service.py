@@ -14,9 +14,13 @@ class InterviewService:
     VALID_INTERVIEW_TYPES = {"RH", "Gestor", "Técnica", "Painel", "Case", "Teste Prático", "Final"}
     VALID_RESULTS = {"Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"}
 
-    def __init__(self, repository: InterviewRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: InterviewRepository | None = None,
+        application_service: ApplicationService | None = None,
+    ) -> None:
         self.repository = repository or InterviewRepository()
-        self.application_service = ApplicationService()
+        self.application_service = application_service or ApplicationService()
 
     def create_interview(
         self,
@@ -54,6 +58,7 @@ class InterviewService:
             result=result,
         )
         created = self.repository.create(interview)
+        self._sync_application_interview_date(application_id)
         self.application_service.repository.add_event(
             application_id, "interview_scheduled", f"Entrevista agendada ({interview_type})"
         )
@@ -81,9 +86,12 @@ class InterviewService:
         self._validate_required_fields(
             application_id=application_id, interview_date=parsed_date, interview_type=interview_type
         )
+        self._validate_type(interview_type)
+        self._validate_result(result)
         interview = self.repository.get_by_id(interview_id)
         if interview is None:
             return None
+        previous_application_id = interview.application_id
         interview.application_id = application_id
         interview.interview_date = parsed_date
         interview.interview_type = interview_type
@@ -96,6 +104,9 @@ class InterviewService:
         interview.feedback = feedback.strip()
         interview.result = result
         updated = self.repository.update(interview)
+        self._sync_application_interview_date(previous_application_id)
+        if application_id != previous_application_id:
+            self._sync_application_interview_date(application_id)
         self.application_service.repository.add_event(
             application_id, "interview_updated", f"Entrevista atualizada ({interview_type})"
         )
@@ -103,9 +114,14 @@ class InterviewService:
         return updated
 
     def delete_interview(self, interview_id: int) -> bool:
-        """Remove uma entrevista."""
+        """Remove uma entrevista e recalcula a data da candidatura."""
+        interview = self.repository.get_by_id(interview_id)
+        if interview is None:
+            return False
+        application_id = interview.application_id
         deleted = self.repository.delete(interview_id)
         if deleted:
+            self._sync_application_interview_date(application_id)
             logger.info("Entrevista removida: %s", interview_id)
         return deleted
 
@@ -155,6 +171,14 @@ class InterviewService:
             if datetime.now() <= interview.interview_date <= threshold
             and interview.result == "Agendada"
         ]
+
+    def _sync_application_interview_date(self, application_id: int) -> None:
+        interviews = self.repository.get_for_application(application_id)
+        active_interviews = [
+            interview for interview in interviews if interview.result != "Cancelada"
+        ]
+        next_date = active_interviews[0].interview_date.date() if active_interviews else None
+        self.application_service.set_interview_date(application_id, next_date)
 
     def _validate_required_fields(
         self, *, application_id: int, interview_date: datetime, interview_type: str

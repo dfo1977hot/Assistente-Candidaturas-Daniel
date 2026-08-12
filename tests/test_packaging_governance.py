@@ -23,7 +23,8 @@ def test_pyproject_is_the_official_metadata_source() -> None:
     assert project["version"] == "0.1.0"
     assert project["requires-python"] == ">=3.14"
     assert {item.split(">=", 1)[0] for item in project["dependencies"]} == {
-        "openai", "pandas", "psutil", "pydantic", "PySide6", "python-docx", "SQLAlchemy"
+        "keyring", "openai", "pandas", "playwright", "psutil", "pydantic",
+        "PySide6", "python-docx", "SQLAlchemy"
     }
     assert {item.split(">=", 1)[0] for item in project["optional-dependencies"]["dev"]} == {
         "build", "pytest", "pytest-cov", "pytest-qt", "ruff"

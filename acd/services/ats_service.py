@@ -372,6 +372,55 @@ class ATSService:
             for criterion in result.criteria
         }
 
+
+    def persist_resume_match_result(
+        self,
+        *,
+        application_id: int,
+        curriculum_id: int,
+        result: object,
+    ) -> ATSScore:
+        """Bridge the persisted resume-match analysis into ATS history."""
+        latest = getattr(self.repository, "get_latest_for_match", lambda **_: None)(
+            application_id=application_id,
+            curriculum_id=curriculum_id,
+        )
+        total_score = float(getattr(result, "ats_score", 0.0))
+        if latest is not None and abs(float(latest.total_score) - total_score) < 0.01:
+            return latest
+
+        score = self.repository.save_score(
+            ATSScore(
+                application_id=application_id,
+                curriculum_id=curriculum_id,
+                job_profile_id=None,
+                total_score=total_score,
+            )
+        )
+        technical_score = float(getattr(result, "score", 0.0))
+        self._persist_details(
+            score.id,
+            {
+                "compatibilidade_ats": {
+                    "score": total_score,
+                    "max_score": 100.0,
+                    "weight": 0.5,
+                },
+                "aderencia_tecnica": {
+                    "score": technical_score,
+                    "max_score": 100.0,
+                    "weight": 0.5,
+                },
+            },
+        )
+        missing = list(getattr(result, "missing_keywords", ()) or ())
+        self._persist_gaps(score.id, {"missing_skills": missing, "desired_skills": []})
+        self._persist_recommendations(
+            score.id,
+            [f"Destacar ou comprovar experiência com {skill}." for skill in missing[:5]],
+        )
+        return score
+
     def get_history(self) -> list[ATSScore]:
         """Retorna o histórico de comparações."""
         return self.repository.get_history()

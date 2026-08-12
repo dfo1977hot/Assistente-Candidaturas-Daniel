@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -32,6 +33,7 @@ class CurriculumPage(BasePage):
         self.version_input = QLineEdit()
         self.language_input = QLineEdit()
         self.description_input = QTextEdit()
+        self.description_input.setMaximumHeight(90)
         self.file_name_label = QLabel("Nenhum arquivo anexado")
         self.file_details_label = QLabel("")
         self.file_integrity_label = QLabel("Sem arquivo")
@@ -62,30 +64,40 @@ class CurriculumPage(BasePage):
         self._load_curricula()
 
     def _setup_controls(self) -> None:
-        form = QFormLayout()
-        for label, widget in (
-            ("Nome", self.name_input), ("Versão", self.version_input),
-            ("Idioma", self.language_input), ("Descrição", self.description_input),
-            ("Arquivo", self.file_name_label), ("Detalhes", self.file_details_label),
-            ("Integridade", self.file_integrity_label),
-        ):
-            form.addRow(QLabel(label), widget)
+        form_columns = QHBoxLayout()
 
-        document_actions = QHBoxLayout()
-        for button in (
-            self.select_file_button, self.open_file_button,
-            self.replace_file_button, self.remove_file_button,
-        ):
-            document_actions.addWidget(button)
-        document_actions.addStretch()
+        first_column = QFormLayout()
+        first_column.addRow(QLabel("Nome"), self.name_input)
+        first_column.addRow(QLabel("Versão"), self.version_input)
 
-        actions = QHBoxLayout()
-        for button in (
-            self.save_button, self.duplicate_button,
-            self.activate_button, self.delete_button,
-        ):
-            actions.addWidget(button)
-        actions.addStretch()
+        second_column = QFormLayout()
+        second_column.addRow(QLabel("Idioma"), self.language_input)
+        second_column.addRow(QLabel("Arquivo"), self.file_name_label)
+
+        third_column = QFormLayout()
+        third_column.addRow(QLabel("Detalhes"), self.file_details_label)
+        third_column.addRow(QLabel("Integridade"), self.file_integrity_label)
+
+        form_columns.addLayout(first_column, 1)
+        form_columns.addLayout(second_column, 1)
+        form_columns.addLayout(third_column, 1)
+
+        full_width_fields = QFormLayout()
+        full_width_fields.addRow(QLabel("Descrição"), self.description_input)
+
+        actions = QGridLayout()
+        action_buttons = (
+            self.select_file_button,
+            self.open_file_button,
+            self.replace_file_button,
+            self.remove_file_button,
+            self.save_button,
+            self.duplicate_button,
+            self.activate_button,
+            self.delete_button,
+        )
+        for index, button in enumerate(action_buttons):
+            actions.addWidget(button, index // 3, index % 3)
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(QLabel("Pesquisar"))
@@ -102,11 +114,11 @@ class CurriculumPage(BasePage):
         self.delete_button.clicked.connect(self._delete_curriculum)
         self.search_button.clicked.connect(self._search_curricula)
 
-        self.layout.addLayout(form)
-        self.layout.addLayout(document_actions)
-        self.layout.addLayout(actions)
         self.layout.addLayout(search_layout)
         self.layout.addWidget(self.table)
+        self.layout.addLayout(form_columns)
+        self.layout.addLayout(full_width_fields)
+        self.layout.addLayout(actions)
 
     def _save_curriculum(self) -> None:
         try:
@@ -300,6 +312,24 @@ class CurriculumPage(BasePage):
                     "Não foi possível excluir",
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
+
+    def open_curriculum(self, curriculum_id: int) -> bool:
+        """Atualiza a página, seleciona o currículo e exibe seu conteúdo."""
+        self._load_curricula()
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is None or int(item.text()) != int(curriculum_id):
+                continue
+            self.table.selectRow(row)
+            self.table.scrollToItem(item)
+            self._on_row_selected()
+            return True
+        return False
+
+    def refresh_reference_data(self) -> None:
+        """Atualiza a tabela ao abrir ou retornar à página."""
+
+        self._load_curricula()
 
     def _load_curricula(self) -> None:
         self._render_curricula(self.curriculum_service.repository.get_all())
