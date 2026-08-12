@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 
@@ -43,3 +43,8 @@ class KPICard(QFrame):
     def set_history(self, values: Sequence[int | float]) -> None:
         """Mantém compatibilidade com chamadas antigas, sem renderizar gráfico."""
         del values
+
+    def mouseReleaseEvent(self, event: object) -> None:
+        self.clicked.emit()
+        super().mouseReleaseEvent(event)
+    clicked = Signal()

@@ -10,7 +10,9 @@ from acd.domain.entities.analytics_snapshot import (
     AnalyticsSnapshot,
 )
 from acd.domain.entities.application import Application
+from acd.domain.entities.ats_score import ATSScore
 from acd.domain.entities.cover_letter_version import CoverLetterVersion
+from acd.domain.entities.curriculum import Curriculum
 from acd.domain.entities.job import Job
 from acd.domain.entities.metric import Metric
 from acd.domain.entities.report import Report
@@ -35,6 +37,8 @@ class AnalyticsRepository:
                     Job.title,
                     Job.status,
                     Job.source,
+                    Job.salary_min,
+                    Job.salary_max,
                     Job.created_at,
                     Job.updated_at,
                 ),
@@ -47,6 +51,8 @@ class AnalyticsRepository:
                     Application.created_at,
                     Application.updated_at,
                     Application.last_update,
+                    Application.curriculum_id,
+                    Application.cover_letter_id,
                 ),
                 "workflows": select(
                     Workflow.id,
@@ -57,6 +63,7 @@ class AnalyticsRepository:
                 "workflow_executions": select(
                     WorkflowExecution.id,
                     WorkflowExecution.workflow_id,
+                    WorkflowExecution.application_id,
                     WorkflowExecution.status,
                     WorkflowExecution.started_at,
                     WorkflowExecution.finished_at,
@@ -65,11 +72,20 @@ class AnalyticsRepository:
                 ),
                 "cover_letters": select(
                     CoverLetterVersion.id,
+                    CoverLetterVersion.job_id,
+                    CoverLetterVersion.application_id,
                     CoverLetterVersion.created_at,
                 ),
                 "resume_versions": select(
                     ResumeVersion.id,
                     ResumeVersion.created_at,
+                ),
+                "curricula": select(Curriculum.id, Curriculum.name),
+                "ats_scores": select(
+                    ATSScore.id,
+                    ATSScore.application_id,
+                    ATSScore.total_score,
+                    ATSScore.calculated_at,
                 ),
             }
             return {

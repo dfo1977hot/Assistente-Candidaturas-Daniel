@@ -35,6 +35,7 @@ from acd.presentation.pages.resume_optimization_view_model import ResumeOptimiza
 from acd.presentation.pages.resume_version_review_view_model import ResumeVersionReviewViewModel
 from acd.presentation.pages.settings_page import SettingsPage
 from acd.presentation.pages.workflow_page import WorkflowPage
+from acd.services.analytics_export_service import AnalyticsExportService
 from acd.services.analytics_service import AnalyticsService
 from acd.services.application_service import ApplicationService
 from acd.services.assisted_application_service import AssistedApplicationService
@@ -115,6 +116,7 @@ class DesktopCompositionRoot:
             settings_service,
         )
         analytics_service = AnalyticsService(AnalyticsRepository())
+        analytics_export_service = AnalyticsExportService()
         career_service = CareerPlanningService()
         gap_service = GapAnalysisService()
         ats_service = ATSService(ats_repository)
@@ -174,8 +176,31 @@ class DesktopCompositionRoot:
             ats_service=ats_service,
             assisted_application_service=assisted_application_service,
         )
+
+        def navigate_to_analytics_record(entity_type: str, _entity_id: int) -> None:
+            destinations = {
+                "application": "applications",
+                "job": "jobs",
+                "workflow": "workflows",
+                "cover_letter": "cover_letters",
+            }
+            if destination := destinations.get(entity_type):
+                router.navigate(destination)
+
+        dashboard = Dashboard(
+            analytics_service,
+            workflow_service.event_bus,
+            analytics_export_service,
+            navigate_to_analytics_record,
+        )
+        analytics_dashboard = Dashboard(
+            analytics_service,
+            workflow_service.event_bus,
+            analytics_export_service,
+            navigate_to_analytics_record,
+        )
         pages = {
-            "dashboard": Dashboard(analytics_service, workflow_service.event_bus),
+            "dashboard": dashboard,
             "companies": CompanyPage(
                 company_service,
                 lambda provider_name: CompanyLookupService(
@@ -205,7 +230,7 @@ class DesktopCompositionRoot:
                 curriculum_service,
                 workflow_scheduler_service,
             ),
-            "analytics": Dashboard(analytics_service, workflow_service.event_bus),
+            "analytics": analytics_dashboard,
             "career": CareerPage(career_service, gap_service),
             "assistant": self._build_assistant_page(),
             "agent_console": self._build_agent_console_page(),

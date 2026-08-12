@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
 import json
 from typing import Any
@@ -38,9 +38,46 @@ class DashboardSnapshot:
     options: dict[str, tuple[dict[str, int | str] | str, ...]]
     period_label: str
     has_data: bool
+    records: tuple[AnalyticsRecord, ...] = ()
+    drilldowns: dict[str, tuple[DrilldownItem, ...]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class AnalyticsRecord:
+    """Compact application projection for tables and exports; no large text fields."""
+
+    application_id: int
+    job_id: int
+    company_id: int
+    company: str
+    title: str
+    source: str
+    application_status: str
+    created_at: datetime
+    updated_at: datetime
+    salary_offered: float | None
+    salary_ideal: float | None
+    fit_score: float | None
+    curriculum: str
+    cover_letter: str
+    workflow_status: str
+
+
+@dataclass(frozen=True, slots=True)
+class DrilldownItem:
+    """Navigation-safe row for KPI and funnel detail lists."""
+
+    entity_type: str
+    entity_id: int
+    related_id: int | None
+    company: str
+    title: str
+    status: str
+    relevant_date: datetime
+    source: str
 
 
 class AnalyticsService:
@@ -131,6 +168,10 @@ class AnalyticsService:
             applications, jobs, rows["workflow_executions"], schedules, current
         )
         options = self._options(rows)
+        records = self._records(rows, applications)
+        drilldowns = self._drilldowns(
+            jobs, applications, executions, letters, rows, records, current
+        )
         return DashboardSnapshot(
             kpis=kpis,
             funnel=tuple(funnel),
@@ -140,7 +181,15 @@ class AnalyticsService:
             options=options,
             period_label=self._period_label(start, end),
             has_data=bool(jobs or applications or executions or letters or resumes),
+            records=tuple(records),
+            drilldowns=drilldowns,
         )
+
+    def get_filtered_records(
+        self, filters: AnalyticsFilters | None = None
+    ) -> tuple[AnalyticsRecord, ...]:
+        """Return the same filtered projection used by Dashboard drill-down/export."""
+        return self.get_dashboard(filters).records
 
     def calculate_kpis(self) -> dict[str, Any]:
         """Preserve the established analytics API while using operational data."""
@@ -432,6 +481,155 @@ class AnalyticsService:
             "statuses": tuple(ApplicationService.VALID_STATUS_TRANSITIONS),
             "sources": sources,
         }
+
+    @classmethod
+    def _records(
+        cls,
+        rows: dict[str, list[dict[str, object]]],
+        applications: list[dict[str, object]],
+    ) -> list[AnalyticsRecord]:
+        companies = {row["id"]: str(row["name"]) for row in rows.get("companies", [])}
+        jobs = {row["id"]: row for row in rows.get("jobs", [])}
+        curricula = {row["id"]: str(row["name"]) for row in rows.get("curricula", [])}
+        latest_scores: dict[object, dict[str, object]] = {}
+        for score in rows.get("ats_scores", []):
+            application_id = score.get("application_id")
+            previous = latest_scores.get(application_id)
+            if previous is None or score["calculated_at"] > previous["calculated_at"]:
+                latest_scores[application_id] = score
+        letters_by_application = {
+            row.get("application_id"): row["id"]
+            for row in rows.get("cover_letters", [])
+            if row.get("application_id") is not None
+        }
+        workflow_by_application: dict[object, dict[str, object]] = {}
+        for execution in sorted(
+            rows.get("workflow_executions", []), key=lambda item: int(item["id"])
+        ):
+            if execution.get("application_id") is not None:
+                workflow_by_application[execution["application_id"]] = execution
+        result = []
+        for application in applications:
+            job = jobs.get(application["job_id"], {})
+            score = latest_scores.get(application["id"])
+            workflow = workflow_by_application.get(application["id"])
+            letter_id = application.get("cover_letter_id") or letters_by_application.get(
+                application["id"]
+            )
+            result.append(
+                AnalyticsRecord(
+                    application_id=int(application["id"]),
+                    job_id=int(application["job_id"]),
+                    company_id=int(application["company_id"]),
+                    company=companies.get(application["company_id"], ""),
+                    title=str(job.get("title") or ""),
+                    source=str(application.get("application_channel") or job.get("source") or ""),
+                    application_status=str(application["status"]),
+                    created_at=cls._naive(application["created_at"]),
+                    updated_at=cls._naive(application["updated_at"]),
+                    salary_offered=cls._optional_float(job.get("salary_min")),
+                    salary_ideal=cls._optional_float(job.get("salary_max")),
+                    fit_score=None if score is None else float(score["total_score"]),
+                    curriculum=curricula.get(application.get("curriculum_id"), ""),
+                    cover_letter="" if letter_id is None else f"Carta #{letter_id}",
+                    workflow_status="" if workflow is None else str(workflow["status"]),
+                )
+            )
+        return result
+
+    @classmethod
+    def _drilldowns(
+        cls,
+        jobs: list[dict[str, object]],
+        applications: list[dict[str, object]],
+        executions: list[dict[str, object]],
+        letters: list[dict[str, object]],
+        rows: dict[str, list[dict[str, object]]],
+        records: list[AnalyticsRecord],
+        current: datetime,
+    ) -> dict[str, tuple[DrilldownItem, ...]]:
+        companies = {row["id"]: str(row["name"]) for row in rows.get("companies", [])}
+        workflows = {row["id"]: str(row["name"]) for row in rows.get("workflows", [])}
+        jobs_by_id = {row["id"]: row for row in rows.get("jobs", [])}
+        job_items = tuple(
+            DrilldownItem(
+                "job", int(row["id"]), None,
+                companies.get(row["company_id"], ""), str(row["title"]), str(row["status"]),
+                cls._naive(row["created_at"]), str(row.get("source") or ""),
+            )
+            for row in jobs
+        )
+        record_items = tuple(cls._record_item(record) for record in records)
+        execution_items = tuple(
+            DrilldownItem(
+                "workflow", int(row["id"]),
+                None if row.get("application_id") is None else int(row["application_id"]),
+                "", workflows.get(row["workflow_id"], ""), str(row["status"]),
+                cls._naive(row["created_at"]), "",
+            )
+            for row in executions
+        )
+        letter_items = tuple(
+            DrilldownItem(
+                "cover_letter", int(row["id"]),
+                None if row.get("application_id") is None else int(row["application_id"]),
+                "", str(jobs_by_id.get(row.get("job_id"), {}).get("title") or ""), "Gerada",
+                cls._naive(row["created_at"]), "",
+            )
+            for row in letters
+        )
+        return {
+            "jobs_total": job_items,
+            "jobs_active": tuple(
+                item for item, row in zip(job_items, jobs, strict=True)
+                if row["status"] not in cls.CLOSED_JOB_STATUSES
+            ),
+            "applications_total": record_items,
+            "applications_in_progress": tuple(
+                item for item, row in zip(record_items, applications, strict=True)
+                if row["status"] not in cls.TERMINAL_APPLICATION_STATUSES
+            ),
+            "interviews": tuple(
+                item for item, row in zip(record_items, applications, strict=True)
+                if row["status"] in cls.INTERVIEW_STATUSES
+            ),
+            "offers": tuple(
+                item for item, row in zip(record_items, applications, strict=True)
+                if row["status"] in cls.OFFER_STATUSES
+            ),
+            "closed_or_rejected": tuple(
+                item for item, row in zip(record_items, applications, strict=True)
+                if row["status"] in {"Rejeitada", "Encerrada"}
+            ),
+            "workflows_awaiting_user": tuple(
+                item for item, row in zip(execution_items, executions, strict=True)
+                if row["status"] == "Aguardando usuário"
+            ),
+            "recent_failures": tuple(
+                item for item, row in zip(execution_items, executions, strict=True)
+                if row["status"] == "Falhou"
+                and cls._naive(row["created_at"]) >= current - timedelta(days=cls.RECENT_FAILURE_DAYS)
+            ),
+            "cover_letters": letter_items,
+            **{
+                f"funnel:{status}": tuple(
+                    item for item, row in zip(record_items, applications, strict=True)
+                    if row["status"] == status
+                )
+                for status in ApplicationService.VALID_STATUS_TRANSITIONS
+            },
+        }
+
+    @staticmethod
+    def _record_item(record: AnalyticsRecord) -> DrilldownItem:
+        return DrilldownItem(
+            "application", record.application_id, record.job_id, record.company,
+            record.title, record.application_status, record.updated_at, record.source,
+        )
+
+    @staticmethod
+    def _optional_float(value: object) -> float | None:
+        return None if value is None else float(value)
 
     @staticmethod
     def _rate(numerator: int, denominator: int) -> float:

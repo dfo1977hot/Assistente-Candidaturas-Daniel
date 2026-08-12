@@ -8,6 +8,7 @@ import logging
 import time
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
+from shiboken6 import isValid
 
 from acd.observability import log_event
 from acd.resilience import CancellationToken
@@ -72,7 +73,7 @@ class LongRunningTaskExecutor(QObject):
     @property
     def is_running(self) -> bool:
         """Return whether this executor currently owns an active worker thread."""
-        return self._thread is not None
+        return self._thread is not None and self._thread.isRunning()
 
     @property
     def queue_capacity(self) -> int:
@@ -107,6 +108,8 @@ class LongRunningTaskExecutor(QObject):
                 queue_capacity=self.queue_capacity,
             )
             raise RuntimeError("A task is already running.")
+        if self._thread is not None:
+            self._release_completed_thread(self._thread)
         if timeout_ms is not None and timeout_ms <= 0:
             raise ValueError("Task timeout must be positive")
         self._cancellation = CancellationToken()
@@ -121,7 +124,6 @@ class LongRunningTaskExecutor(QObject):
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(self._complete)
-        thread.finished.connect(thread.deleteLater)
         self._thread = thread
         self._worker = worker
         self._started_at = time.perf_counter()
@@ -250,7 +252,18 @@ class LongRunningTaskExecutor(QObject):
             log_event(
                 logger, logging.INFO, "operation.cancelled", "Task cancelled", status="cancelled"
             )
-        self._worker = None
-        self._thread = None
         self._started_at = None
         self.finished.emit()
+        completed_thread = self._thread
+        QTimer.singleShot(0, lambda: self._release_completed_thread(completed_thread))
+
+    def _release_completed_thread(self, completed_thread: QThread | None) -> None:
+        """Release Qt wrappers after the finished signal delivery has unwound."""
+        if not isValid(self):
+            return
+        if completed_thread is None or self._thread is not completed_thread:
+            return
+        self._worker = None
+        self._thread = None
+        if isValid(completed_thread):
+            completed_thread.deleteLater()
