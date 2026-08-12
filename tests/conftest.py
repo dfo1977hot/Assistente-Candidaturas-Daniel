@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import acd.database.create_database as create_database_module
 import acd.database.database as database_module
 from acd.database.database import enable_sqlite_foreign_keys
 from acd.database.model_registry import load_models
@@ -103,6 +104,11 @@ def override_database(db_session, test_engine, monkeypatch):
 
     monkeypatch.setattr(
         database_module,
+        "engine",
+        test_engine,
+    )
+    monkeypatch.setattr(
+        create_database_module,
         "engine",
         test_engine,
     )

@@ -4,17 +4,20 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Protocol
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
+    QDialog,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QTableWidget,
@@ -25,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from acd.presentation.candidate_decision_panel import CandidateDecisionPanel
+from acd.presentation.dialogs.applicant_profile_dialog import ApplicantProfileDialog
 from acd.presentation.effective_application_resume_preview_panel import (
     EffectiveApplicationResumePreviewPanel,
 )
@@ -69,6 +73,12 @@ from acd.presentation.pages.structured_resume_quality_validation_view_model impo
     StructuredResumeQualityValidationViewModel,
 )
 from acd.presentation.resume_version_review_panel import ResumeVersionReviewPanel
+from acd.services.assisted_application_service import (
+    AssistedApplicationResult,
+    AssistedApplicationService,
+)
+from acd.services.ats_service import ATSService
+from acd.services.resume_match_service import ResumeMatchResult
 
 
 class _ApplicationData(Protocol):
@@ -87,6 +97,20 @@ class _CompanyData(Protocol):
 
 class _JobData(Protocol):
     def filter_jobs(self, **filters: object) -> list[object]: ...
+    def get_job(self, job_id: int) -> object | None: ...
+
+
+
+class _CurriculumData(Protocol):
+    def associate_to_application(self, *, application_id: int, curriculum_id: int) -> object | None: ...
+    def create_optimized_curriculum(
+        self,
+        *,
+        source_curriculum_id: int,
+        generated_version: str | None = None,
+    ) -> object | None: ...
+    def list_curricula(self) -> list[object]: ...
+    def resolve_document_path(self, curriculum_id: int) -> str | None: ...
 
 
 class _EmptyApplicationData:
@@ -101,6 +125,9 @@ class _EmptyApplicationData:
     def list_applications(self) -> list[object]:
         return []
 
+    def list_curricula(self) -> list[object]:
+        return []
+
     def get_application(self, _: int) -> object | None:
         return None
 
@@ -111,6 +138,24 @@ class _EmptyApplicationData:
         return []
 
 
+
+class _ResumeMatchData(Protocol):
+    def analyze(self, *, application: object, curriculum: object) -> object: ...
+    def get_cached(self, application_id: int, curriculum_id: int) -> object | None: ...
+
+
+class _EmptyResumeMatchData:
+    """Fallback boundary for isolated Presentation tests."""
+
+    def analyze(self, *, application: object, curriculum: object) -> object:
+        del application, curriculum
+        raise RuntimeError("Serviço de aderência curricular não configurado.")
+
+    def get_cached(self, application_id: int, curriculum_id: int) -> object | None:
+        del application_id, curriculum_id
+        return None
+
+
 class ApplicationPage(BasePage):
     """Página de cadastro e gerenciamento de candidaturas."""
 
@@ -118,6 +163,7 @@ class ApplicationPage(BasePage):
         self,
         candidate_decision_view_model: CandidateDecisionViewModel | None = None,
         on_candidate_decision_action: Callable[[str], None] | None = None,
+        on_optimized_curriculum_created: Callable[[int], None] | None = None,
         resume_optimization_view_model: ResumeOptimizationViewModel | None = None,
         resume_version_review_view_model: ResumeVersionReviewViewModel | None = None,
         optimized_resume_evaluation_view_model: OptimizedResumeEvaluationViewModel | None = None,
@@ -129,11 +175,16 @@ class ApplicationPage(BasePage):
         application_service: _ApplicationData | None = None,
         company_service: _CompanyData | None = None,
         job_service: _JobData | None = None,
+        curriculum_service: _CurriculumData | None = None,
+        resume_match_service: _ResumeMatchData | None = None,
+        ats_service: ATSService | None = None,
+        assisted_application_service: AssistedApplicationService | None = None,
     ) -> None:
         super().__init__("Candidaturas")
 
         self._candidate_decision_view_model = candidate_decision_view_model
         self._on_candidate_decision_action_callback = on_candidate_decision_action
+        self._on_optimized_curriculum_created_callback = on_optimized_curriculum_created
         self._resume_optimization_view_model = resume_optimization_view_model
         self._resume_version_review_view_model = resume_version_review_view_model
         self._optimized_resume_evaluation_view_model = optimized_resume_evaluation_view_model
@@ -150,10 +201,15 @@ class ApplicationPage(BasePage):
         self._resume_optimization_executor.succeeded.connect(self._on_long_running_task_succeeded)
         self._resume_optimization_executor.failed.connect(self._on_long_running_task_failed)
         self._resume_optimization_executor.finished.connect(self._on_long_running_task_finished)
+        progress_signal = getattr(self._resume_optimization_executor, "progress", None)
+        if progress_signal is not None:
+            progress_signal.connect(self._on_optimization_progress)
+        self._optimization_progress_dialog: QProgressDialog | None = None
         self._active_long_running_task: str | None = None
         self._optimized_evaluation_request: tuple[int, int] | None = None
         self._structured_resume_generation_application_id: int | None = None
         self._effective_resume_docx_export_application_id: int | None = None
+        self._optimization_source_curriculum_id: int | None = None
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.content_widget = QWidget()
@@ -165,7 +221,18 @@ class ApplicationPage(BasePage):
         self.application_service = application_service or _EmptyApplicationData()
         self.company_service = company_service or _EmptyApplicationData()
         self.job_service = job_service or _EmptyApplicationData()
+        self.curriculum_service = curriculum_service or _EmptyApplicationData()
+        self.resume_match_service = resume_match_service or _EmptyResumeMatchData()
+        self.ats_service = ats_service
+        self.assisted_application_service = assisted_application_service
         self.current_application_id: int | None = None
+        self._assisted_application_executor = LongRunningTaskExecutor(self)
+        self._assisted_application_executor.succeeded.connect(self._on_assisted_application_succeeded)
+        self._assisted_application_executor.failed.connect(self._on_assisted_application_failed)
+        assisted_progress = getattr(self._assisted_application_executor, "progress", None)
+        if assisted_progress is not None:
+            assisted_progress.connect(self._on_assisted_application_progress)
+        self._assisted_application_progress: QProgressDialog | None = None
 
         self.company_combo = QComboBox()
         self.job_combo = QComboBox()
@@ -181,14 +248,25 @@ class ApplicationPage(BasePage):
         self.recruiter_email_input = QLineEdit()
         self.recruiter_phone_input = QLineEdit()
         self.feedback_input = QTextEdit()
+        self.feedback_input.setMaximumHeight(90)
         self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(90)
         self.search_input = QLineEdit()
         self.filter_status_combo = QComboBox()
         self.filter_company_combo = QComboBox()
         self.filter_button = QPushButton("Filtrar")
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
+        self.curriculum_combo = QComboBox()
+        self.select_curriculum_button = QPushButton("Selecionar currículo")
+        self.analyze_resume_button = QPushButton("Analisar aderência")
+        self.resume_match_label = QLabel("Currículo selecionado: nenhum | Aderência: não analisada")
+        self.resume_match_details = QTextEdit()
+        self.resume_match_details.setReadOnly(True)
+        self.resume_match_details.setMaximumHeight(120)
         self.optimize_resume_button = QPushButton("Otimizar currículo")
+        self.assisted_application_button = QPushButton("Abrir e preencher candidatura")
+        self.assisted_application_button.setEnabled(False)
         self.generate_structured_resume_button = QPushButton("Gerar versão estruturada")
         self.export_effective_resume_docx_button = QPushButton("Exportar currículo em DOCX")
         self.export_effective_resume_docx_button.setToolTip("Exporta o currículo efetivo atual para um arquivo DOCX.")
@@ -201,6 +279,8 @@ class ApplicationPage(BasePage):
         self.structured_resume_quality_issues.setReadOnly(True)
         self.generate_structured_resume_button.setEnabled(False)
         self.optimize_resume_button.setEnabled(False)
+        self.select_curriculum_button.setEnabled(False)
+        self.analyze_resume_button.setEnabled(False)
         self.optimization_status_label = QLabel()
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
@@ -234,19 +314,35 @@ class ApplicationPage(BasePage):
 
         self._setup_controls()
         self.company_combo.currentIndexChanged.connect(self._load_jobs)
+        self.job_combo.currentIndexChanged.connect(self._populate_salary_from_job)
         self._load_companies()
+        self._load_curricula()
         self._load_applications()
 
     def refresh_reference_data(self) -> None:
-        """Atualiza empresas, vagas e candidaturas ao entrar na página."""
-        selected_company = self.company_combo.currentData()
+        """Recarrega dados visíveis ao entrar ou retornar à página."""
+
+        selected_application_id = self.current_application_id
+        selected_company_id = self.company_combo.currentData()
+        selected_curriculum_id = self.curriculum_combo.currentData()
         self._load_companies()
-        if selected_company not in (None, ""):
-            index = self.company_combo.findData(selected_company)
+        if selected_company_id not in (None, ""):
+            index = self.company_combo.findData(selected_company_id)
             if index >= 0:
                 self.company_combo.setCurrentIndex(index)
         self._load_jobs()
+        self._load_curricula()
         self._load_applications()
+        if selected_curriculum_id not in (None, ""):
+            index = self.curriculum_combo.findData(selected_curriculum_id)
+            if index >= 0:
+                self.curriculum_combo.setCurrentIndex(index)
+        if selected_application_id is not None:
+            for row in range(self.table.rowCount()):
+                item = self.table.item(row, 0)
+                if item is not None and int(item.text()) == selected_application_id:
+                    self.table.selectRow(row)
+                    break
 
     def _setup_controls(self) -> None:
         for date_input in (
@@ -257,6 +353,23 @@ class ApplicationPage(BasePage):
         ):
             date_input.setCalendarPopup(True)
             date_input.setDisplayFormat("dd/MM/yyyy")
+
+        for optional_date_input in (
+            self.next_follow_up_input,
+            self.response_date_input,
+            self.interview_date_input,
+        ):
+            optional_date_input.setMinimumDate(QDate(1900, 1, 1))
+            optional_date_input.setSpecialValueText(" ")
+            optional_date_input.setDate(optional_date_input.minimumDate())
+
+        self.application_date_input.setDate(QDate.currentDate())
+
+        self.interview_date_input.setReadOnly(True)
+        self.interview_date_input.setCalendarPopup(False)
+        self.interview_date_input.setToolTip(
+            "Atualizado automaticamente ao agendar uma entrevista."
+        )
 
         self.status_combo.addItems(
             [
@@ -281,34 +394,56 @@ class ApplicationPage(BasePage):
             self.filter_status_combo.addItem(self.status_combo.itemText(index))
         self.filter_company_combo.addItem("", "")
 
-        form = QFormLayout()
-        form.addRow(QLabel("Empresa"), self.company_combo)
-        form.addRow(QLabel("Vaga"), self.job_combo)
-        form.addRow(QLabel("Status"), self.status_combo)
-        form.addRow(QLabel("Data aplicação"), self.application_date_input)
-        form.addRow(QLabel("Próximo follow-up"), self.next_follow_up_input)
-        form.addRow(QLabel("Data resposta"), self.response_date_input)
-        form.addRow(QLabel("Data entrevista"), self.interview_date_input)
-        form.addRow(QLabel("Salário esperado"), self.salary_expected_input)
-        form.addRow(QLabel("Salário oferecido"), self.salary_offered_input)
-        form.addRow(QLabel("Canal"), self.channel_input)
-        form.addRow(QLabel("Recrutador"), self.recruiter_name_input)
-        form.addRow(QLabel("E-mail"), self.recruiter_email_input)
-        form.addRow(QLabel("Telefone"), self.recruiter_phone_input)
-        form.addRow(QLabel("Feedback"), self.feedback_input)
-        form.addRow(QLabel("Observações"), self.notes_input)
+        form_columns = QHBoxLayout()
 
-        actions = QHBoxLayout()
-        actions.addWidget(self.save_button)
-        actions.addWidget(self.delete_button)
-        actions.addWidget(self.optimize_resume_button)
-        actions.addWidget(self.generate_structured_resume_button)
-        actions.addWidget(self.export_effective_resume_docx_button)
-        actions.addWidget(self.validate_structured_resume_quality_button)
-        actions.addStretch()
+        first_column = QFormLayout()
+        first_column.addRow(QLabel("Empresa"), self.company_combo)
+        first_column.addRow(QLabel("Vaga"), self.job_combo)
+        first_column.addRow(QLabel("Status"), self.status_combo)
+        first_column.addRow(QLabel("Data aplicação"), self.application_date_input)
+        first_column.addRow(QLabel("Próximo follow-up"), self.next_follow_up_input)
+
+        second_column = QFormLayout()
+        second_column.addRow(QLabel("Data resposta"), self.response_date_input)
+        second_column.addRow(QLabel("Data entrevista"), self.interview_date_input)
+        second_column.addRow(QLabel("Currículo"), self.curriculum_combo)
+        second_column.addRow(QLabel("Salário esperado"), self.salary_expected_input)
+        second_column.addRow(QLabel("Salário oferecido"), self.salary_offered_input)
+
+        third_column = QFormLayout()
+        third_column.addRow(QLabel("Canal"), self.channel_input)
+        third_column.addRow(QLabel("Recrutador"), self.recruiter_name_input)
+        third_column.addRow(QLabel("E-mail"), self.recruiter_email_input)
+        third_column.addRow(QLabel("Telefone"), self.recruiter_phone_input)
+
+        form_columns.addLayout(first_column, 1)
+        form_columns.addLayout(second_column, 1)
+        form_columns.addLayout(third_column, 1)
+
+        full_width_fields = QFormLayout()
+        full_width_fields.addRow(QLabel("Feedback"), self.feedback_input)
+        full_width_fields.addRow(QLabel("Observações"), self.notes_input)
+
+        actions = QGridLayout()
+        action_buttons = (
+            self.save_button,
+            self.delete_button,
+            self.select_curriculum_button,
+            self.analyze_resume_button,
+            self.optimize_resume_button,
+            self.assisted_application_button,
+            self.generate_structured_resume_button,
+            self.export_effective_resume_docx_button,
+            self.validate_structured_resume_quality_button,
+        )
+        for index, button in enumerate(action_buttons):
+            actions.addWidget(button, index // 3, index % 3)
         self.save_button.clicked.connect(self._save_application)
         self.delete_button.clicked.connect(self._delete_application)
+        self.select_curriculum_button.clicked.connect(self._select_curriculum)
+        self.analyze_resume_button.clicked.connect(self._analyze_resume_match)
         self.optimize_resume_button.clicked.connect(self._optimize_resume)
+        self.assisted_application_button.clicked.connect(self._prepare_assisted_application)
         self.generate_structured_resume_button.clicked.connect(self._generate_structured_resume_version)
         self.export_effective_resume_docx_button.clicked.connect(self._export_effective_resume_docx)
         self.validate_structured_resume_quality_button.clicked.connect(self._validate_structured_resume_quality)
@@ -325,17 +460,142 @@ class ApplicationPage(BasePage):
         filter_layout.addWidget(QLabel("Empresa"))
         filter_layout.addWidget(self.filter_company_combo)
 
-        self.content_layout.addLayout(form)
-        self.content_layout.addWidget(self.structured_resume_quality_label)
-        self.content_layout.addWidget(self.structured_resume_quality_issues)
-        self.content_layout.addLayout(actions)
         self.content_layout.addLayout(search_layout)
         self.content_layout.addLayout(filter_layout)
         self.content_layout.addWidget(self.table)
+        self.content_layout.addLayout(form_columns)
+        self.content_layout.addLayout(full_width_fields)
+        self.content_layout.addWidget(self.resume_match_label)
+        self.content_layout.addWidget(self.resume_match_details)
+        self.content_layout.addWidget(self.structured_resume_quality_label)
+        self.content_layout.addWidget(self.structured_resume_quality_issues)
         self.content_layout.addWidget(self.candidate_decision_panel)
         self.content_layout.addWidget(self.resume_version_review_panel)
         self.content_layout.addWidget(self.effective_application_resume_preview_panel)
         self.content_layout.addWidget(self.optimization_status_label)
+        self.content_layout.addLayout(actions)
+
+    def _load_curricula(self) -> None:
+        selected = self.curriculum_combo.currentData()
+        self.curriculum_combo.clear()
+        self.curriculum_combo.addItem("", "")
+        for curriculum in self.curriculum_service.list_curricula():
+            label = f"{curriculum.name} — {curriculum.version}"
+            self.curriculum_combo.addItem(label, curriculum.id)
+        if selected not in (None, ""):
+            index = self.curriculum_combo.findData(selected)
+            if index >= 0:
+                self.curriculum_combo.setCurrentIndex(index)
+
+    def _select_curriculum(self) -> None:
+        if self.current_application_id is None:
+            QMessageBox.information(self, "Currículo", "Selecione uma candidatura.")
+            return
+        curriculum_id = self.curriculum_combo.currentData()
+        if curriculum_id in (None, ""):
+            QMessageBox.warning(self, "Currículo", "Selecione um currículo cadastrado.")
+            return
+        associated = self.curriculum_service.associate_to_application(
+            application_id=self.current_application_id,
+            curriculum_id=int(curriculum_id),
+        )
+        if associated is None:
+            QMessageBox.warning(self, "Currículo", "Não foi possível associar o currículo.")
+            return
+        self.resume_match_label.setText(
+            f"Currículo selecionado: {self.curriculum_combo.currentText()} | Aderência: não analisada"
+        )
+        self.resume_match_details.clear()
+        self.select_curriculum_button.setEnabled(True)
+        self.analyze_resume_button.setEnabled(True)
+        self.optimize_resume_button.setEnabled(False)
+
+    def _analyze_resume_match(self) -> None:
+        if self.current_application_id is None:
+            QMessageBox.information(self, "Aderência", "Selecione uma candidatura.")
+            return
+        curriculum_id = self.curriculum_combo.currentData()
+        if curriculum_id in (None, ""):
+            QMessageBox.warning(self, "Aderência", "Selecione e associe um currículo.")
+            return
+        application = self.application_service.get_application(self.current_application_id)
+        curricula = self.curriculum_service.list_curricula()
+        curriculum = next(
+            (item for item in curricula if int(item.id) == int(curriculum_id)),
+            None,
+        )
+        if application is None or curriculum is None:
+            QMessageBox.warning(self, "Aderência", "Dados da candidatura ou currículo indisponíveis.")
+            return
+        result = self.resume_match_service.analyze(application=application, curriculum=curriculum)
+        if not result.has_vacancy_description:
+            QMessageBox.warning(
+                self,
+                "Aderência",
+                "A vaga vinculada não possui descrição no campo Observações da página Vagas.",
+            )
+            self.resume_match_label.setText(
+                f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
+                "Aderência: descrição da vaga indisponível"
+            )
+            self.resume_match_details.clear()
+            self.optimize_resume_button.setEnabled(False)
+            return
+        self._persist_resume_match_as_ats(
+            application=application,
+            curriculum=curriculum,
+            result=result,
+        )
+        self._render_resume_match(result)
+
+    def _persist_resume_match_as_ats(
+        self,
+        *,
+        application: object,
+        curriculum: object,
+        result: ResumeMatchResult,
+    ) -> None:
+        """Make the saved adherence analysis available to the optimization workflow."""
+        if self.ats_service is None:
+            return
+        application_id = getattr(application, "id", None)
+        curriculum_id = getattr(curriculum, "id", None)
+        if application_id is None or curriculum_id is None:
+            return
+        self.ats_service.persist_resume_match_result(
+            application_id=int(application_id),
+            curriculum_id=int(curriculum_id),
+            result=result,
+        )
+
+    def _render_resume_match(self, result: ResumeMatchResult) -> None:
+        self.resume_match_label.setText(
+            f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
+            f"Aderência técnica atual: {result.score:.0f}%"
+        )
+        matched = ", ".join(result.matched_keywords[:12]) or "Nenhuma identificada"
+        missing = ", ".join(result.missing_keywords[:12]) or "Nenhuma lacuna prioritária"
+        html = f"""
+        <table cellspacing="0" cellpadding="6" border="1" width="100%">
+          <tr><th align="left">Critério</th><th>Atual</th><th>Adaptado</th></tr>
+          <tr><td>Compatibilidade ATS</td><td align="center">{result.ats_score:.0f}%</td>
+              <td align="center"><b>{result.adapted_ats_score:.0f}%</b></td></tr>
+          <tr><td>Aderência técnica</td><td align="center">{result.score:.0f}%</td>
+              <td align="center"><b>{result.adapted_score:.0f}%</b></td></tr>
+          <tr><td>Probabilidade estimada de entrevista</td>
+              <td align="center">{result.interview_probability_min:.0f}–{result.interview_probability_max:.0f}%</td>
+              <td align="center"><b>{result.adapted_interview_probability_min:.0f}–{result.adapted_interview_probability_max:.0f}%</b></td></tr>
+        </table>
+        <p><b>Pontos aderentes:</b> {matched}</p>
+        <p><b>Lacunas prioritárias:</b> {missing}</p>
+        <p><i>O resultado adaptado é uma projeção após reorganizar e destacar informações verdadeiras.
+        A probabilidade de entrevista é apenas um indicador comparativo e não representa garantia.</i></p>
+        """
+        self.resume_match_details.setHtml(html)
+        self.optimize_resume_button.setEnabled(
+            self._resume_optimization_view_model is not None
+            and not self._resume_optimization_executor.is_running
+        )
 
     def _load_companies(self) -> None:
         companies = self.company_service.list_companies()
@@ -356,6 +616,24 @@ class ApplicationPage(BasePage):
             for job in jobs:
                 self.job_combo.addItem(job.title, job.id)
 
+    def _populate_salary_from_job(self) -> None:
+        job_id = self.job_combo.currentData()
+        if job_id in (None, ""):
+            self.salary_expected_input.clear()
+            self.salary_offered_input.setText("A combinar")
+            return
+        job = self.job_service.get_job(int(job_id))
+        if job is None:
+            return
+        offered = float(job.salary_min) if job.salary_min is not None else None
+        ideal = float(job.salary_max) if job.salary_max is not None else None
+        self.salary_expected_input.setText(
+            f"{ideal:.2f}" if ideal is not None else ""
+        )
+        self.salary_offered_input.setText(
+            f"{offered:.2f}" if offered is not None else "A combinar"
+        )
+
     def _save_application(self) -> None:
         try:
             company_id = self.company_combo.currentData()
@@ -366,21 +644,8 @@ class ApplicationPage(BasePage):
                 if self.application_date_input.date().isValid()
                 else ""
             )
-            next_follow_up = (
-                self.next_follow_up_input.date().toString("yyyy-MM-dd")
-                if self.next_follow_up_input.date().isValid()
-                else ""
-            )
-            response_date = (
-                self.response_date_input.date().toString("yyyy-MM-dd")
-                if self.response_date_input.date().isValid()
-                else ""
-            )
-            interview_date = (
-                self.interview_date_input.date().toString("yyyy-MM-dd")
-                if self.interview_date_input.date().isValid()
-                else ""
-            )
+            next_follow_up = self._optional_date_value(self.next_follow_up_input)
+            response_date = self._optional_date_value(self.response_date_input)
             salary_expected = self._parse_optional_number(self.salary_expected_input.text())
             salary_offered = self._parse_optional_number(self.salary_offered_input.text())
             channel = self.channel_input.text().strip()
@@ -405,7 +670,6 @@ class ApplicationPage(BasePage):
                     application_date=application_date,
                     next_follow_up=next_follow_up,
                     response_date=response_date,
-                    interview_date=interview_date,
                     salary_expected=salary_expected,
                     salary_offered=salary_offered,
                     application_channel=channel,
@@ -424,7 +688,6 @@ class ApplicationPage(BasePage):
                     application_date=application_date,
                     next_follow_up=next_follow_up,
                     response_date=response_date,
-                    interview_date=interview_date,
                     salary_expected=salary_expected,
                     salary_offered=salary_offered,
                     application_channel=channel,
@@ -511,6 +774,108 @@ class ApplicationPage(BasePage):
                     "Não foi possível excluir o registro e seus vínculos.",
                 )
 
+    def _prepare_assisted_application(self) -> None:
+        if self.current_application_id is None or self.assisted_application_service is None:
+            QMessageBox.information(self, "Candidatura assistida", "Selecione uma candidatura.")
+            return
+        application = self.application_service.get_application(self.current_application_id)
+        if application is None:
+            QMessageBox.warning(self, "Candidatura assistida", "Candidatura não encontrada.")
+            return
+        job = self.job_service.get_job(int(application.job_id))
+        application_url = (
+            ""
+            if job is None
+            else str(getattr(job, "application_url", "") or "").strip()
+        )
+        job_url = (
+            ""
+            if job is None
+            else str(getattr(job, "job_url", "") or "").strip()
+        )
+        target_url = application_url or job_url
+        if not target_url:
+            QMessageBox.warning(
+                self,
+                "Candidatura assistida",
+                "Cadastre a URL da candidatura ou a URL da vaga antes de continuar.",
+            )
+            return
+        profile = self.assisted_application_service.profile_store.load()
+        dialog = ApplicantProfileDialog(profile, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        profile = dialog.profile()
+        if not profile.full_name or not profile.email:
+            QMessageBox.warning(self, "Candidatura assistida", "Informe nome completo e e-mail.")
+            return
+        curriculum_id = self.curriculum_combo.currentData()
+        resume_path = None
+        if curriculum_id not in (None, ""):
+            resolver = getattr(self.curriculum_service, "resolve_document_path", None)
+            if callable(resolver):
+                resume_path = resolver(int(curriculum_id))
+        self._assisted_application_progress = QProgressDialog(
+            "Preparando candidatura...", "Cancelar", 0, 100, self
+        )
+        self._assisted_application_progress.setWindowTitle("Candidatura assistida")
+        self._assisted_application_progress.setWindowModality(Qt.NonModal)
+        self._assisted_application_progress.setAutoClose(False)
+        self._assisted_application_progress.setValue(0)
+        self._assisted_application_progress.show()
+        self.assisted_application_button.setEnabled(False)
+        service = self.assisted_application_service
+        self._assisted_application_executor.execute_with_context(
+            lambda emit, _token: service.prepare(
+                job_url=target_url,
+                source_url=job_url if application_url and job_url != target_url else None,
+                profile=profile,
+                resume_path=resume_path,
+                progress=emit,
+            )
+        )
+
+    def _on_assisted_application_progress(self, payload: object) -> None:
+        if self._assisted_application_progress is None:
+            return
+        if isinstance(payload, tuple) and len(payload) == 2:
+            value, message = payload
+            self._assisted_application_progress.setValue(int(value))
+            self._assisted_application_progress.setLabelText(str(message))
+
+    def _on_assisted_application_succeeded(self, result: object) -> None:
+        if self._assisted_application_progress is not None:
+            self._assisted_application_progress.close()
+            self._assisted_application_progress = None
+        self.assisted_application_button.setEnabled(True)
+        if not isinstance(result, AssistedApplicationResult):
+            return
+        message = (
+            f"Plataforma: {result.platform}\n"
+            f"Campos preenchidos: {result.fields_filled}\n"
+            f"Currículo anexado: {'sim' if result.resume_attached else 'não'}\n\n"
+            "A candidatura foi enviada no navegador?"
+        )
+        if result.linkedin_restricted_mode:
+            message = (
+                "O LinkedIn foi aberto em modo manual para proteger sua conta.\n\n" + message
+            )
+        answer = QMessageBox.question(
+            self, "Candidatura assistida", message,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if answer == QMessageBox.Yes:
+            self.status_combo.setCurrentText("Aplicada")
+            self.application_date_input.setDate(QDate.currentDate())
+            self._save_application()
+
+    def _on_assisted_application_failed(self, error: object) -> None:
+        if self._assisted_application_progress is not None:
+            self._assisted_application_progress.close()
+            self._assisted_application_progress = None
+        self.assisted_application_button.setEnabled(True)
+        QMessageBox.critical(self, "Candidatura assistida", str(error))
+
     @staticmethod
     def _is_integrity_error(error: Exception) -> bool:
         error_type = type(error)
@@ -522,7 +887,10 @@ class ApplicationPage(BasePage):
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
             self.current_application_id = None
+            self.select_curriculum_button.setEnabled(False)
+            self.analyze_resume_button.setEnabled(False)
             self.optimize_resume_button.setEnabled(False)
+            self.assisted_application_button.setEnabled(False)
             self.generate_structured_resume_button.setEnabled(False)
             self.candidate_decision_panel.show_empty_state()
             self.candidate_decision_panel.render_actions(())
@@ -531,10 +899,10 @@ class ApplicationPage(BasePage):
             return
         row = selected_rows[0].row()
         self.current_application_id = int(self.table.item(row, 0).text())
-        self.optimize_resume_button.setEnabled(
-            self._resume_optimization_view_model is not None
-            and not self._resume_optimization_executor.is_running
-        )
+        self.select_curriculum_button.setEnabled(True)
+        self.assisted_application_button.setEnabled(self.assisted_application_service is not None)
+        self.analyze_resume_button.setEnabled(False)
+        self.optimize_resume_button.setEnabled(False)
         self.generate_structured_resume_button.setEnabled(
             self._structured_resume_generation_view_model is not None
             and not self._resume_optimization_executor.is_running
@@ -559,19 +927,30 @@ class ApplicationPage(BasePage):
             if job_index >= 0:
                 self.job_combo.setCurrentIndex(job_index)
             self.status_combo.setCurrentText(application.status or "")
+            application_date = application.application_date
+            if application_date is None:
+                self.application_date_input.setDate(QDate.currentDate())
+            else:
+                self.application_date_input.setDate(
+                    QDate(application_date.year, application_date.month, application_date.day)
+                )
+
             for widget, value in (
-                (self.application_date_input, application.application_date),
                 (self.next_follow_up_input, application.next_follow_up),
                 (self.response_date_input, application.response_date),
                 (self.interview_date_input, application.interview_date),
             ):
-                if value is not None:
+                if value is None:
+                    widget.setDate(widget.minimumDate())
+                else:
                     widget.setDate(QDate(value.year, value.month, value.day))
             self.salary_expected_input.setText(
                 "" if application.salary_expected is None else str(application.salary_expected)
             )
             self.salary_offered_input.setText(
-                "" if application.salary_offered is None else str(application.salary_offered)
+                "A combinar"
+                if application.salary_offered is None
+                else str(application.salary_offered)
             )
             self.channel_input.setText(application.application_channel or "")
             self.recruiter_name_input.setText(application.recruiter_name or "")
@@ -579,6 +958,47 @@ class ApplicationPage(BasePage):
             self.recruiter_phone_input.setText(application.recruiter_phone or "")
             self.feedback_input.setPlainText(application.feedback or "")
             self.notes_input.setPlainText(application.notes or "")
+            curriculum_id = getattr(application, "curriculum_id", None)
+            curriculum_index = self.curriculum_combo.findData(curriculum_id)
+            self.curriculum_combo.setCurrentIndex(curriculum_index if curriculum_index >= 0 else 0)
+            if curriculum_index >= 0:
+                self.resume_match_label.setText(
+                    f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
+                    "Aderência: não analisada"
+                )
+                self.analyze_resume_button.setEnabled(True)
+                self.optimize_resume_button.setEnabled(
+                    self._resume_optimization_view_model is not None
+                    and not self._resume_optimization_executor.is_running
+                )
+                curriculum = next(
+                    (
+                        item
+                        for item in self.curriculum_service.list_curricula()
+                        if int(item.id) == int(curriculum_id)
+                    ),
+                    None,
+                )
+                cached = (
+                    None
+                    if curriculum is None
+                    else self.resume_match_service.get_cached(
+                        application=application,
+                        curriculum=curriculum,
+                    )
+                )
+                if cached is not None:
+                    self._persist_resume_match_as_ats(
+                        application=application,
+                        curriculum=curriculum,
+                        result=cached,
+                    )
+                    self._render_resume_match(cached)
+            else:
+                self.resume_match_label.setText(
+                    "Currículo selecionado: nenhum | Aderência: não analisada"
+                )
+                self.resume_match_details.clear()
 
         self._load_candidate_decision()
         self._load_resume_version_review()
@@ -824,10 +1244,91 @@ class ApplicationPage(BasePage):
         ):
             return
         application_id = self.current_application_id
+        selected_curriculum_id = self.curriculum_combo.currentData()
+        if selected_curriculum_id in (None, ""):
+            QMessageBox.information(
+                self,
+                "Otimizar currículo",
+                "Selecione e associe um currículo antes de iniciar a otimização.",
+            )
+            return
+
+        source_curriculum_id = int(selected_curriculum_id)
+        self._optimization_source_curriculum_id = source_curriculum_id
         self._active_long_running_task = "optimization"
-        self._resume_optimization_executor.execute(
-            lambda: self._resume_optimization_view_model.optimize(application_id)
+        self._show_optimization_progress()
+
+        def optimize_task(emit_progress, cancellation_token):
+            emit_progress((5, "Preparando dados da candidatura e do currículo..."))
+            state = self._resume_optimization_view_model.optimize(application_id)
+            emit_progress((70, "Conteúdo otimizado. Cadastrando a nova versão..."))
+            if not state.success:
+                return state, None
+            if cancellation_token.is_cancellation_requested:
+                raise RuntimeError("Otimização cancelada.")
+
+            creator = getattr(self.curriculum_service, "create_optimized_curriculum", None)
+            if creator is None:
+                raise RuntimeError("O serviço de currículos não permite criar a versão otimizada.")
+
+            optimized = creator(
+                source_curriculum_id=source_curriculum_id,
+                generated_version=state.version,
+            )
+            if optimized is None or getattr(optimized, "id", None) is None:
+                raise RuntimeError("A nova versão do currículo não pôde ser cadastrada.")
+
+            emit_progress((90, "Associando o novo currículo à candidatura..."))
+            associated = self.curriculum_service.associate_to_application(
+                application_id=application_id,
+                curriculum_id=int(optimized.id),
+            )
+            if associated is None:
+                raise RuntimeError("A nova versão foi criada, mas não pôde ser associada à candidatura.")
+            emit_progress((100, "Nova versão criada com sucesso."))
+            return state, optimized
+
+        try:
+            self._resume_optimization_executor.execute_with_context(optimize_task)
+        except Exception as error:
+            self._on_optimization_failed(error)
+            self._on_long_running_task_finished()
+
+    def _show_optimization_progress(self) -> None:
+        dialog = QProgressDialog(
+            "Preparando otimização...",
+            "",
+            0,
+            100,
+            self,
         )
+        dialog.setWindowTitle("Otimizar currículo")
+        dialog.setCancelButton(None)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setMinimumDuration(0)
+        dialog.setValue(0)
+        dialog.show()
+        self._optimization_progress_dialog = dialog
+
+    def _on_optimization_progress(self, progress: object) -> None:
+        if self._active_long_running_task != "optimization":
+            return
+        dialog = self._optimization_progress_dialog
+        if dialog is None:
+            return
+        value = 0
+        message = ""
+        if isinstance(progress, tuple) and len(progress) == 2:
+            value, message = progress
+        elif isinstance(progress, dict):
+            value = progress.get("value", 0)
+            message = progress.get("message", "")
+        elif isinstance(progress, int):
+            value = progress
+        dialog.setValue(max(0, min(100, int(value))))
+        if message:
+            dialog.setLabelText(str(message))
 
     def _generate_structured_resume_version(self) -> None:
         if (
@@ -926,19 +1427,89 @@ class ApplicationPage(BasePage):
 
     def _on_optimization_started(self) -> None:
         self.optimize_resume_button.setEnabled(False)
+        self.select_curriculum_button.setEnabled(False)
+        self.analyze_resume_button.setEnabled(False)
         self.generate_structured_resume_button.setEnabled(False)
         self.optimization_status_label.setText("Otimizando currículo...")
 
-    def _on_optimization_succeeded(self, state: ResumeOptimizationViewState) -> None:
+    def _on_optimization_succeeded(self, result: object) -> None:
+        optimized = None
+        state = result
+        if isinstance(result, tuple) and len(result) == 2:
+            state, optimized = result
+        if not isinstance(state, ResumeOptimizationViewState):
+            self._on_optimization_failed(
+                RuntimeError("A otimização retornou um resultado inesperado.")
+            )
+            return
         if state.application_id != self.current_application_id:
             return
-        message = state.message if state.version is None else f"{state.message} Versão: {state.version}."
-        self.optimization_status_label.setText(f"{state.title}: {message}")
+
+        message = (
+            state.message
+            if state.version is None
+            else f"{state.message} Versão gerada: {state.version}."
+        )
+        if not state.success:
+            self.optimization_status_label.setText(f"{state.title}: {message}")
+            QMessageBox.warning(self, state.title, message)
+            return
+
+        if optimized is None:
+            source_curriculum_id = self._optimization_source_curriculum_id
+            creator = getattr(self.curriculum_service, "create_optimized_curriculum", None)
+            if source_curriculum_id in (None, "") or creator is None:
+                self._on_optimization_failed(
+                    RuntimeError("Não foi possível identificar o currículo de origem.")
+                )
+                return
+            optimized = creator(
+                source_curriculum_id=int(source_curriculum_id),
+                generated_version=state.version,
+            )
+            if optimized is None:
+                self._on_optimization_failed(
+                    RuntimeError("Não foi possível cadastrar a nova versão em Currículos.")
+                )
+                return
+            associated = self.curriculum_service.associate_to_application(
+                application_id=state.application_id,
+                curriculum_id=int(optimized.id),
+            )
+            if associated is None:
+                self._on_optimization_failed(
+                    RuntimeError("O currículo foi criado, mas não pôde ser associado à candidatura.")
+                )
+                return
+
+        self._load_curricula()
+        optimized_index = self.curriculum_combo.findData(optimized.id)
+        if optimized_index >= 0:
+            self.curriculum_combo.setCurrentIndex(optimized_index)
+        self.resume_match_label.setText(
+            f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
+            "Aderência: nova versão otimizada"
+        )
+        self.optimization_status_label.setText(
+            f"{state.title}: currículo cadastrado como "
+            f"{optimized.name} — {optimized.version}."
+        )
+        self.refresh_reference_data()
+        callback = self._on_optimized_curriculum_created_callback
+        if callback is not None:
+            callback(int(optimized.id))
 
     def _on_optimization_failed(self, error: Exception) -> None:
-        self.optimization_status_label.setText(f"Não foi possível otimizar o currículo: {error}")
+        message = f"Não foi possível otimizar o currículo: {error}"
+        self.optimization_status_label.setText(message)
+        QMessageBox.critical(self, "Otimização de currículo", message)
 
     def _on_optimization_finished(self) -> None:
+        if self._optimization_progress_dialog is not None:
+            self._optimization_progress_dialog.close()
+            self._optimization_progress_dialog.deleteLater()
+            self._optimization_progress_dialog = None
+        self._optimization_source_curriculum_id = None
         self.optimize_resume_button.setEnabled(
             self.current_application_id is not None and self._resume_optimization_view_model is not None
         )
@@ -1037,10 +1608,13 @@ class ApplicationPage(BasePage):
         self.company_combo.setCurrentIndex(0)
         self.job_combo.clear()
         self.status_combo.setCurrentIndex(0)
-        self.application_date_input.setDate(self.application_date_input.minimumDate())
+        self.application_date_input.setDate(QDate.currentDate())
         self.next_follow_up_input.setDate(self.next_follow_up_input.minimumDate())
         self.response_date_input.setDate(self.response_date_input.minimumDate())
         self.interview_date_input.setDate(self.interview_date_input.minimumDate())
+        self.curriculum_combo.setCurrentIndex(0)
+        self.resume_match_label.setText("Currículo selecionado: nenhum | Aderência: não analisada")
+        self.resume_match_details.clear()
         self.salary_expected_input.clear()
         self.salary_offered_input.clear()
         self.channel_input.clear()
@@ -1050,7 +1624,15 @@ class ApplicationPage(BasePage):
         self.feedback_input.clear()
         self.notes_input.clear()
 
-    def _parse_optional_number(self, value: str) -> float | None:
-        if not value.strip():
+    @staticmethod
+    def _optional_date_value(date_input: QDateEdit) -> str | None:
+        value = date_input.date()
+        if value == date_input.minimumDate():
             return None
-        return float(value)
+        return value.toString("yyyy-MM-dd")
+
+    def _parse_optional_number(self, value: str) -> float | None:
+        normalized = value.strip()
+        if not normalized or normalized.casefold() in {"a combinar", "combinar"}:
+            return None
+        return float(normalized.replace(",", "."))

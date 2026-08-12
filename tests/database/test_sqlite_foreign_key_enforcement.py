@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from sqlalchemy import create_engine, text
 
-from acd.database.database import enable_sqlite_foreign_keys, engine
+import acd.database.database as database_module
+from acd.database.database import enable_sqlite_foreign_keys
 
 
 def test_official_engine_enables_foreign_keys_for_each_connection() -> None:
     """The official engine configures referential enforcement centrally."""
-    with engine.connect() as first_connection:
+    with database_module.engine.connect() as first_connection:
         assert first_connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1
-    with engine.connect() as second_connection:
+    with database_module.engine.connect() as second_connection:
         assert second_connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1
 
 

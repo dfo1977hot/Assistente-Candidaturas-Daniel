@@ -38,12 +38,9 @@ def test_mvp_validation_messages_are_user_friendly(acceptance_runtime, monkeypat
     acceptance_runtime.job_page.current_job_id = job_id
     acceptance_runtime.job_page.url_input.setText("ftp://invalid")
     acceptance_runtime.job_page._save_job()
-    assert "A URL da vaga deve iniciar com http://" in warnings[-1]
+    assert "URL da vaga deve iniciar com http:// ou https://." in warnings[-1]
 
-    acceptance_runtime.company_page.name_input.setText("Empresa Sintetica")
-    acceptance_runtime.company_page.city_input.setText("Cidade Sintetica")
-    acceptance_runtime.company_page.website_input.setText("https://empresa-sintetica.example")
-    acceptance_runtime.company_page._save_company()
+    acceptance_runtime.company_page.current_company_id = None
     acceptance_runtime.company_page.name_input.setText("Empresa Sintetica")
     acceptance_runtime.company_page.city_input.setText("Cidade Sintetica")
     acceptance_runtime.company_page.website_input.setText("https://empresa-sintetica.example")

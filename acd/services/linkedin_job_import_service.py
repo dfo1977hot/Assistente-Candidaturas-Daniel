@@ -8,7 +8,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from acd.security.secret_provider import EnvironmentSecretProvider, read_setting
+from acd.security.secret_provider import read_setting
+from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
+from acd.services.settings_service import SettingsService
 
 
 class LinkedInJobImportError(RuntimeError):
@@ -38,6 +40,7 @@ class ImportedLinkedInJob:
     linkedin_job_id: str = ""
     confidence: str = ""
     source_references: tuple[str, ...] = ()
+    accepting_applications: bool | None = None
 
     def notes_text(self) -> str:
         """Consolida o conteúdo detalhado para o campo Observações."""
@@ -79,8 +82,12 @@ class LinkedInJobImportService:
         api_key: str | None = None,
         model: str | None = None,
         timeout: float | None = None,
+        closed_jobs_registry: ClosedLinkedInJobsRegistry | None = None,
     ) -> None:
-        self._api_key = (api_key or EnvironmentSecretProvider().get_secret("OPENAI_API_KEY") or "").strip()
+        self._api_key = (api_key or "").strip()
+        self._closed_jobs_registry = (
+            closed_jobs_registry or ClosedLinkedInJobsRegistry()
+        )
         self._model = (model or read_setting("OPENAI_JOB_IMPORT_MODEL", default="gpt-5-mini")).strip()
         configured_timeout = read_setting("OPENAI_JOB_IMPORT_TIMEOUT", default="120")
         self._timeout = timeout if timeout is not None else self._parse_timeout(configured_timeout)
@@ -89,9 +96,19 @@ class LinkedInJobImportService:
         """Obtém e estrutura os dados públicos disponíveis para a URL informada."""
 
         normalized_url = self.normalize_linkedin_job_url(url)
-        if not self._api_key:
+        linkedin_job_id = self._closed_jobs_registry.job_id_from_url(normalized_url)
+        if linkedin_job_id and self._closed_jobs_registry.contains(linkedin_job_id):
+            return ImportedLinkedInJob(
+                source_url=normalized_url,
+                linkedin_job_id=linkedin_job_id,
+                accepting_applications=False,
+            )
+
+        api_key = self._api_key or SettingsService().get_api_key("openai").strip()
+        if not api_key:
             raise LinkedInJobImportError(
-                "A variável OPENAI_API_KEY não está configurada para importar a vaga."
+                "A chave da OpenAI não está configurada. Cadastre e teste a chave "
+                "na página Configurações."
             )
 
         payload = {
@@ -105,7 +122,7 @@ class LinkedInJobImportService:
             self.RESPONSES_URL,
             data=body,
             headers={
-                "Authorization": f"Bearer {self._api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json; charset=utf-8",
                 "Accept": "application/json",
                 "User-Agent": "ACD-LinkedIn-Job-Importer/0.1",
@@ -134,7 +151,14 @@ class LinkedInJobImportService:
 
         output_text = self._extract_output_text(response_data)
         structured_data = self._parse_structured_json(output_text)
-        return self._to_result(structured_data, normalized_url)
+        result = self._to_result(structured_data, normalized_url)
+        if result.accepting_applications is False:
+            closed_id = (
+                result.linkedin_job_id
+                or self._closed_jobs_registry.job_id_from_url(normalized_url)
+            )
+            self._closed_jobs_registry.mark_closed(closed_id)
+        return result
 
     @staticmethod
     def normalize_linkedin_job_url(url: str) -> str:
@@ -187,6 +211,7 @@ Use exatamente estas chaves:
 
 Regras:
 - Não invente informações ausentes.
+- Se o modelo de trabalho não puder ser determinado, use Presencial.
 - Mantenha textos em português quando a vaga estiver em português.
 - Converta salário somente quando o valor e a moeda estiverem explícitos.
 - Em source_references, inclua URLs públicas efetivamente consultadas.
@@ -251,7 +276,7 @@ Regras:
             title=cls._text(data.get("title")),
             company_name=cls._text(data.get("company_name")),
             location=cls._text(data.get("location")),
-            work_model=cls._choice(data.get("work_model"), {"Presencial", "Híbrido", "Remoto"}),
+            work_model=cls._choice(data.get("work_model"), {"Presencial", "Híbrido", "Remoto"}) or "Presencial",
             employment_type=cls._choice(
                 data.get("employment_type"),
                 {"CLT", "PJ", "Temporário", "Estágio", "Freelancer", "Terceirizado"},
@@ -270,7 +295,16 @@ Regras:
             linkedin_job_id=cls._text(data.get("linkedin_job_id")) or cls._job_id_from_url(source_url),
             confidence=cls._choice(data.get("confidence"), {"Alta", "Média", "Baixa"}),
             source_references=cls._string_tuple(data.get("source_references")),
+            accepting_applications=cls._optional_bool(
+                data.get("accepting_applications")
+            ),
         )
+
+    @staticmethod
+    def _optional_bool(value: Any) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        return None
 
     @staticmethod
     def _text(value: Any) -> str:
@@ -318,7 +352,7 @@ Regras:
     @staticmethod
     def _http_error_message(status: int, details: str) -> str:
         if status == 401:
-            return "A chave da OpenAI foi recusada. Verifique OPENAI_API_KEY."
+            return "A chave da OpenAI foi recusada. Verifique e teste a chave na página Configurações."
         if status == 403:
             return "A chave não possui permissão para realizar esta importação."
         if status == 429:

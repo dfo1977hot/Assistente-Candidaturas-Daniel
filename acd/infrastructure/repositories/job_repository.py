@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import joinedload
 
@@ -55,6 +57,26 @@ class JobRepository:
             return session.scalar(stmt)
 
 
+    def get_linkedin_job_ids(self) -> set[str]:
+        """Return numeric LinkedIn identifiers from already persisted job URLs."""
+        with database_module.SessionLocal() as session:
+            stmt = select(Job.job_url).where(
+                Job.source.ilike("LinkedIn"),
+                Job.job_url.is_not(None),
+                Job.job_url != "",
+            )
+            urls = session.scalars(stmt).all()
+
+        identifiers: set[str] = set()
+        for url in urls:
+            match = re.search(
+                r"(?:currentJobId=|/jobs/view/(?:[^/?]+-)?)(\d{6,})",
+                url or "",
+            )
+            if match:
+                identifiers.add(match.group(1))
+        return identifiers
+
     def get_by_url(self, job_url: str) -> Job | None:
         """Retorna a vaga cadastrada com a URL informada."""
         normalized = job_url.strip()
@@ -65,6 +87,23 @@ class JobRepository:
                 select(Job)
                 .options(joinedload(Job.company))
                 .where(Job.job_url == normalized)
+            )
+            return session.scalar(stmt)
+
+    def get_by_linkedin_job_id(self, linkedin_job_id: str) -> Job | None:
+        """Return a LinkedIn job matching its numeric identifier."""
+        normalized = linkedin_job_id.strip()
+        if not normalized:
+            return None
+        with database_module.SessionLocal() as session:
+            patterns = (
+                f"%/jobs/view/%{normalized}%",
+                f"%currentJobId={normalized}%",
+            )
+            stmt = (
+                select(Job)
+                .options(joinedload(Job.company))
+                .where(or_(*(Job.job_url.like(pattern) for pattern in patterns)))
             )
             return session.scalar(stmt)
 
@@ -95,6 +134,7 @@ class JobRepository:
                     or_(
                         Job.title.ilike(search_text),
                         Job.recruiter.ilike(search_text),
+                        Job.recruiter_email.ilike(search_text),
                         Job.source.ilike(search_text),
                         Job.notes.ilike(search_text),
                     )

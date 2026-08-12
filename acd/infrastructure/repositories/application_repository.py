@@ -109,13 +109,22 @@ class ApplicationRepository:
             stmt = stmt.order_by(Application.created_at.desc())
             return list(session.scalars(stmt).all())
 
-    def change_status(self, application_id: int, status: str) -> Application | None:
+    def change_status(
+        self,
+        application_id: int,
+        status: str,
+        *,
+        clear_application_dates: bool = False,
+    ) -> Application | None:
         with database_module.SessionLocal() as session:
             application = session.get(Application, application_id)
             if application is None:
                 return None
             application.status = status
             application.last_update = date.today()
+            if clear_application_dates:
+                application.application_date = None
+                application.next_follow_up = None
             session.commit()
             session.refresh(application)
             return application

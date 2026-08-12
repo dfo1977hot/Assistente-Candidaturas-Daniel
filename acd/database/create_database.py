@@ -29,6 +29,9 @@ def create_database(target_engine: Engine | None = None) -> None:
     _ensure_application_resume_version_selection(selected_engine)
     _ensure_structured_resume_snapshot_columns(selected_engine)
     _ensure_curriculum_document_columns(selected_engine)
+    _ensure_job_application_url_column(selected_engine)
+    _ensure_job_recruiter_email_column(selected_engine)
+    _ensure_cover_letter_columns(selected_engine)
 
 
 def _ensure_companies_columns(target_engine: Engine | None = None) -> None:
@@ -198,6 +201,87 @@ def _backup_database_before_curriculum_document_evolution(
         backup_path,
     )
     return backup_path
+
+
+def _ensure_job_application_url_column(
+    target_engine: Engine | None = None,
+) -> None:
+    """Add the external application URL column to legacy job tables."""
+
+    selected_engine = target_engine or engine
+    with selected_engine.begin() as connection:
+        existing_columns = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(jobs)"
+            ).fetchall()
+        }
+        if "application_url" not in existing_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE jobs ADD COLUMN application_url TEXT NOT NULL DEFAULT ''"
+            )
+
+
+
+def _ensure_job_recruiter_email_column(
+    target_engine: Engine | None = None,
+) -> None:
+    """Add recruiter/RH e-mail to existing job tables."""
+
+    selected_engine = target_engine or engine
+    with selected_engine.begin() as connection:
+        existing_columns = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(jobs)"
+            ).fetchall()
+        }
+        if "recruiter_email" not in existing_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE jobs "
+                "ADD COLUMN recruiter_email TEXT NOT NULL DEFAULT ''"
+            )
+
+
+def _ensure_cover_letter_columns(
+    target_engine: Engine | None = None,
+) -> None:
+    """Evolve legacy cover_letter_versions for the Cartas workspace."""
+
+    required_columns = {
+        "job_id": "INTEGER REFERENCES jobs(id)",
+        "application_id": "INTEGER REFERENCES applications(id)",
+        "letter_type": "TEXT NOT NULL DEFAULT 'Carta de Apresentação'",
+        "language": "TEXT NOT NULL DEFAULT 'Português'",
+        "tone": "TEXT NOT NULL DEFAULT 'Profissional'",
+        "length": "TEXT NOT NULL DEFAULT 'Média'",
+        "subject": "TEXT NOT NULL DEFAULT ''",
+        "status": "TEXT NOT NULL DEFAULT 'Rascunho'",
+        "notes": "TEXT NOT NULL DEFAULT ''",
+        "updated_at": "DATETIME",
+    }
+    selected_engine = target_engine or engine
+    with selected_engine.begin() as connection:
+        existing = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(cover_letter_versions)"
+            ).fetchall()
+        }
+        for column_name, column_type in required_columns.items():
+            if column_name not in existing:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE cover_letter_versions "
+                    f"ADD COLUMN {column_name} {column_type}"
+                )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_cover_letter_versions_job_id "
+            "ON cover_letter_versions(job_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_cover_letter_versions_application_id "
+            "ON cover_letter_versions(application_id)"
+        )
 
 
 if __name__ == "__main__":

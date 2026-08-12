@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from acd.security.secret_provider import EnvironmentSecretProvider, read_setting
+from acd.services.settings_service import SettingsService
 
 
 class CompanyLookupError(RuntimeError):
@@ -102,8 +103,17 @@ class OpenAIWebCompanyLookupProvider:
         model: str | None = None,
         timeout_seconds: float | None = None,
         client: Any | None = None,
+        settings_service: SettingsService | None = None,
     ) -> None:
-        self.api_key = (api_key or EnvironmentSecretProvider().get_secret("OPENAI_API_KEY") or "").strip()
+        settings = settings_service or SettingsService()
+        if api_key is not None:
+            self.api_key = api_key.strip()
+        else:
+            self.api_key = (
+                settings.get_api_key("openai")
+                or EnvironmentSecretProvider().get_secret("OPENAI_API_KEY")
+                or ""
+            ).strip()
         self.model = (model or read_setting("OPENAI_COMPANY_LOOKUP_MODEL", default="gpt-5-mini")).strip()
         configured_timeout = read_setting("OPENAI_COMPANY_LOOKUP_TIMEOUT", default="120").strip()
         self.timeout_seconds = (
@@ -413,8 +423,22 @@ class GooglePlacesCompanyLookupProvider:
         )
     )
 
-    def __init__(self, api_key: str | None = None, *, timeout_seconds: float = 15.0) -> None:
-        self.api_key = (api_key or read_setting("GOOGLE_PLACES_API_KEY")).strip()
+    def __init__(
+        self,
+        api_key: str | None = None,
+        *,
+        timeout_seconds: float = 15.0,
+        settings_service: SettingsService | None = None,
+    ) -> None:
+        settings = settings_service or SettingsService()
+        if api_key is not None:
+            self.api_key = api_key.strip()
+        else:
+            self.api_key = (
+                settings.get_api_key("google")
+                or read_setting("GOOGLE_PLACES_API_KEY")
+                or ""
+            ).strip()
         self.timeout_seconds = timeout_seconds
 
     def search(self, name: str, *, limit: int = 8) -> list[CompanyLookupResult]:
@@ -518,10 +542,17 @@ class HybridCompanyLookupProvider:
         openai_provider: CompanyLookupProvider | None = None,
         receita_enricher: ReceitaWSCompanyEnricher | None = None,
         google_provider: CompanyLookupProvider | None = None,
+        *,
+        settings_service: SettingsService | None = None,
     ) -> None:
-        self.openai_provider = openai_provider or OpenAIWebCompanyLookupProvider()
+        settings = settings_service or SettingsService()
+        self.openai_provider = openai_provider or OpenAIWebCompanyLookupProvider(
+            settings_service=settings
+        )
         self.receita_enricher = receita_enricher or ReceitaWSCompanyEnricher()
-        self.google_provider = google_provider or GooglePlacesCompanyLookupProvider()
+        self.google_provider = google_provider or GooglePlacesCompanyLookupProvider(
+            settings_service=settings
+        )
 
     def search(self, name: str, *, limit: int = 8) -> list[CompanyLookupResult]:
         primary_error: CompanyLookupError | None = None
@@ -550,7 +581,9 @@ class CompanyLookupService:
         *,
         provider_name: str | None = None,
         cache_ttl: timedelta = timedelta(hours=24),
+        settings_service: SettingsService | None = None,
     ) -> None:
+        self.settings_service = settings_service or SettingsService()
         self.provider_name = _normalize_provider_name(
             provider_name or read_setting("COMPANY_LOOKUP_PROVIDER", default="hybrid")
         )
@@ -558,13 +591,18 @@ class CompanyLookupService:
         self.cache_ttl = cache_ttl
         self._cache: dict[tuple[str, str], tuple[datetime, list[CompanyLookupResult]]] = {}
 
-    @staticmethod
-    def _build_provider(provider_name: str) -> CompanyLookupProvider:
+    def _build_provider(self, provider_name: str) -> CompanyLookupProvider:
         if provider_name == "openai":
-            return OpenAIWebCompanyLookupProvider()
+            return OpenAIWebCompanyLookupProvider(
+                settings_service=self.settings_service
+            )
         if provider_name == "google":
-            return GooglePlacesCompanyLookupProvider()
-        return HybridCompanyLookupProvider()
+            return GooglePlacesCompanyLookupProvider(
+                settings_service=self.settings_service
+            )
+        return HybridCompanyLookupProvider(
+            settings_service=self.settings_service
+        )
 
     def search(self, name: str, *, force_refresh: bool = False) -> list[CompanyLookupResult]:
         query = _validate_query(name)

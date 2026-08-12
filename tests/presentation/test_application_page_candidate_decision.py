@@ -669,7 +669,7 @@ def test_application_page_disables_structured_generation_without_view_model(qapp
 
     assert page.generate_structured_resume_button.text() == "Gerar versão estruturada"
     assert not page.generate_structured_resume_button.isEnabled()
-    assert page.optimize_resume_button.isEnabled()
+    assert not page.optimize_resume_button.isEnabled()
     assert page._structured_resume_generation_view_model is None
 
 

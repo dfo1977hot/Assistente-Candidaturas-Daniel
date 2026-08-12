@@ -6,6 +6,8 @@ from acd.core.logger import logger
 from acd.domain.entities.application import Application
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
 
+_UNCHANGED = object()
+
 
 class ApplicationService:
     """Camada de serviço para regras de negócio das candidaturas."""
@@ -32,7 +34,7 @@ class ApplicationService:
         "Preparando Currículo": {"Preparando Carta", "Pronta para Aplicação"},
         "Preparando Carta": {"Pronta para Aplicação"},
         "Pronta para Aplicação": {"Aplicada", "Encerrada"},
-        "Aplicada": {"Em Triagem", "Rejeitada", "Encerrada"},
+        "Aplicada": {"Pronta para Aplicação", "Em Triagem", "Rejeitada", "Encerrada"},
         "Em Triagem": {"Entrevista RH", "Rejeitada", "Encerrada"},
         "Entrevista RH": {"Teste", "Entrevista Técnica", "Rejeitada", "Encerrada"},
         "Teste": {"Entrevista Técnica", "Rejeitada", "Encerrada"},
@@ -102,7 +104,7 @@ class ApplicationService:
         application_date: str | None = None,
         next_follow_up: str | None = None,
         response_date: str | None = None,
-        interview_date: str | None = None,
+        interview_date: str | None | object = _UNCHANGED,
         salary_expected: float | None = None,
         salary_offered: float | None = None,
         application_channel: str = "",
@@ -128,8 +130,12 @@ class ApplicationService:
         application.application_date = self._parse_optional_date(application_date)
         application.last_update = date.today()
         application.next_follow_up = self._parse_optional_date(next_follow_up)
+        if application.status == "Pronta para Aplicação":
+            application.application_date = None
+            application.next_follow_up = None
         application.response_date = self._parse_optional_date(response_date)
-        application.interview_date = self._parse_optional_date(interview_date)
+        if interview_date is not _UNCHANGED:
+            application.interview_date = self._parse_optional_date(interview_date)
         application.salary_expected = salary_expected
         application.salary_offered = salary_offered
         application.application_channel = application_channel.strip()
@@ -141,6 +147,25 @@ class ApplicationService:
         updated = self.repository.update(application)
         self.repository.add_event(updated.id, "updated", "Candidatura atualizada")
         logger.info("Candidatura atualizada: %s", updated.id)
+        return updated
+
+    def set_interview_date(
+        self, application_id: int, interview_date: date | None
+    ) -> Application | None:
+        """Atualiza a data de entrevista controlada pela agenda de entrevistas."""
+        application = self.repository.get_by_id(application_id)
+        if application is None:
+            return None
+        application.interview_date = interview_date
+        application.last_update = date.today()
+        updated = self.repository.update(application)
+        self.repository.add_event(
+            application_id,
+            "interview_date_synced",
+            "Data de entrevista removida"
+            if interview_date is None
+            else f"Data de entrevista atualizada para {interview_date.isoformat()}",
+        )
         return updated
 
     def delete_application(self, application_id: int, *, delete_linked: bool = False) -> bool:
@@ -185,7 +210,11 @@ class ApplicationService:
         self._validate_status(new_status)
         self._validate_transition(current_status, new_status, administrative=administrative)
 
-        updated = self.repository.change_status(application_id, new_status)
+        updated = self.repository.change_status(
+            application_id,
+            new_status,
+            clear_application_dates=new_status == "Pronta para Aplicação",
+        )
         if updated is not None:
             self.repository.add_event(
                 application_id, "status_changed", f"Status alterado para {new_status}"

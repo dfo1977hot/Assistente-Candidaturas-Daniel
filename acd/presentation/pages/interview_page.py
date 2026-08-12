@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDateTimeEdit,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -45,7 +46,9 @@ class InterviewPage(BasePage):
         self.location_input = QLineEdit()
         self.duration_input = QLineEdit()
         self.notes_input = QTextEdit()
+        self.notes_input.setMaximumHeight(90)
         self.feedback_input = QTextEdit()
+        self.feedback_input.setMaximumHeight(90)
         self.result_combo = QComboBox()
         self.search_input = QLineEdit()
         self.filter_type_combo = QComboBox()
@@ -96,23 +99,35 @@ class InterviewPage(BasePage):
             ["", "Agendada", "Realizada", "Aprovada", "Reprovada", "Cancelada", "Reagendada"]
         )
 
-        form = QFormLayout()
-        form.addRow(QLabel("Candidatura"), self.application_combo)
-        form.addRow(QLabel("Data e hora"), self.datetime_input)
-        form.addRow(QLabel("Tipo"), self.type_combo)
-        form.addRow(QLabel("Entrevistador"), self.interviewer_input)
-        form.addRow(QLabel("E-mail"), self.interviewer_email_input)
-        form.addRow(QLabel("Link"), self.link_input)
-        form.addRow(QLabel("Local"), self.location_input)
-        form.addRow(QLabel("Duração"), self.duration_input)
-        form.addRow(QLabel("Observações"), self.notes_input)
-        form.addRow(QLabel("Feedback"), self.feedback_input)
-        form.addRow(QLabel("Resultado"), self.result_combo)
 
-        actions = QHBoxLayout()
-        actions.addWidget(self.save_button)
-        actions.addWidget(self.delete_button)
-        actions.addStretch()
+        form_columns = QHBoxLayout()
+
+        first_column = QFormLayout()
+        first_column.addRow(QLabel("Candidatura"), self.application_combo)
+        first_column.addRow(QLabel("Data e hora"), self.datetime_input)
+        first_column.addRow(QLabel("Tipo"), self.type_combo)
+        first_column.addRow(QLabel("Resultado"), self.result_combo)
+
+        second_column = QFormLayout()
+        second_column.addRow(QLabel("Entrevistador"), self.interviewer_input)
+        second_column.addRow(QLabel("E-mail"), self.interviewer_email_input)
+        second_column.addRow(QLabel("Duração"), self.duration_input)
+
+        third_column = QFormLayout()
+        third_column.addRow(QLabel("Link"), self.link_input)
+        third_column.addRow(QLabel("Local"), self.location_input)
+
+        form_columns.addLayout(first_column, 1)
+        form_columns.addLayout(second_column, 1)
+        form_columns.addLayout(third_column, 1)
+
+        full_width_fields = QFormLayout()
+        full_width_fields.addRow(QLabel("Observações"), self.notes_input)
+        full_width_fields.addRow(QLabel("Feedback"), self.feedback_input)
+
+        actions = QGridLayout()
+        for index, button in enumerate((self.save_button, self.delete_button)):
+            actions.addWidget(button, index // 3, index % 3)
         self.save_button.clicked.connect(self._save_interview)
         self.delete_button.clicked.connect(self._delete_interview)
 
@@ -128,11 +143,12 @@ class InterviewPage(BasePage):
         filter_layout.addWidget(QLabel("Resultado"))
         filter_layout.addWidget(self.filter_result_combo)
 
-        self.layout.addLayout(form)
-        self.layout.addLayout(actions)
         self.layout.addLayout(search_layout)
         self.layout.addLayout(filter_layout)
         self.layout.addWidget(self.table)
+        self.layout.addLayout(form_columns)
+        self.layout.addLayout(full_width_fields)
+        self.layout.addLayout(actions)
 
     def _load_applications(self) -> None:
         applications = self.application_service.list_applications()

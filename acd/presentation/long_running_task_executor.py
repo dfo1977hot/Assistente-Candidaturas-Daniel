@@ -30,6 +30,7 @@ class _TaskWorker(QObject):
 
     succeeded = Signal(object)
     failed = Signal(object)
+    progress = Signal(object)
     finished = Signal()
 
     def __init__(self, task: Callable[[], object]) -> None:
@@ -55,6 +56,7 @@ class LongRunningTaskExecutor(QObject):
     cancelled = Signal()
     timed_out = Signal()
     finished = Signal()
+    progress = Signal(object)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -115,6 +117,7 @@ class LongRunningTaskExecutor(QObject):
         thread.started.connect(worker.run)
         worker.succeeded.connect(self._handle_success)
         worker.failed.connect(self._handle_failure)
+        worker.progress.connect(self.progress)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(self._complete)
@@ -131,6 +134,21 @@ class LongRunningTaskExecutor(QObject):
         thread.start()
         if timeout_ms is not None:
             self._timeout_timer.start(timeout_ms)
+
+    def execute_with_context(
+        self,
+        task: Callable[[Callable[[object], None], CancellationToken], object],
+        *,
+        timeout_ms: int | None = None,
+    ) -> None:
+        """Run a task that receives a progress emitter and cancellation token."""
+        def contextual_task() -> object:
+            worker = self._worker
+            if worker is None:
+                raise RuntimeError("Task worker is not available.")
+            return task(worker.progress.emit, self._cancellation)
+
+        self.execute(contextual_task, timeout_ms=timeout_ms)
 
     def cancel(self) -> bool:
         """Request cooperative cancellation without terminating the worker thread."""

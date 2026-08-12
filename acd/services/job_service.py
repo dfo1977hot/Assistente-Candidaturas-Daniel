@@ -44,7 +44,9 @@ class JobService:
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
+        application_url: str = "",
         recruiter: str = "",
+        recruiter_email: str = "",
         application_deadline: str | None = None,
         application_date: str | None = None,
         priority: int = 0,
@@ -55,7 +57,8 @@ class JobService:
         self._validate_required_fields(company_id=company_id, title=title)
         self._validate_salary_range(salary_min, salary_max)
         self._validate_status(status)
-        self._validate_url(job_url)
+        self._validate_url(job_url, field_name="URL da vaga")
+        self._validate_url(application_url, field_name="URL da candidatura")
         if job_url.strip() and self.repository.url_exists(job_url):
             raise ValueError("Esta URL já está cadastrada em outra vaga.")
 
@@ -71,7 +74,9 @@ class JobService:
             status=status.strip() or "Nova",
             source=source.strip(),
             job_url=job_url.strip(),
+            application_url=application_url.strip(),
             recruiter=recruiter.strip(),
+            recruiter_email=recruiter_email.strip(),
             application_deadline=self._parse_optional_date(application_deadline),
             application_date=self._parse_optional_date(application_date),
             priority=priority,
@@ -104,7 +109,9 @@ class JobService:
         status: str = "Nova",
         source: str = "",
         job_url: str = "",
+        application_url: str = "",
         recruiter: str = "",
+        recruiter_email: str = "",
         application_deadline: str | None = None,
         application_date: str | None = None,
         priority: int = 0,
@@ -115,7 +122,8 @@ class JobService:
         self._validate_required_fields(company_id=company_id, title=title)
         self._validate_salary_range(salary_min, salary_max)
         self._validate_status(status)
-        self._validate_url(job_url)
+        self._validate_url(job_url, field_name="URL da vaga")
+        self._validate_url(application_url, field_name="URL da candidatura")
         if job_url.strip() and self.repository.url_exists(
             job_url,
             exclude_job_id=job_id,
@@ -138,7 +146,9 @@ class JobService:
         job.status = status.strip() or "Nova"
         job.source = source.strip()
         job.job_url = job_url.strip()
+        job.application_url = application_url.strip()
         job.recruiter = recruiter.strip()
+        job.recruiter_email = recruiter_email.strip()
         job.application_deadline = self._parse_optional_date(application_deadline)
         job.application_date = self._parse_optional_date(application_date)
         job.priority = priority
@@ -168,6 +178,14 @@ class JobService:
     def get_job(self, job_id: int) -> Job | None:
         """Retorna uma vaga pelo ID."""
         return self.repository.get_by_id(job_id)
+
+    def get_job_by_url(self, job_url: str) -> Job | None:
+        """Retorna uma vaga pelo endereço da publicação."""
+        return self.repository.get_by_url(job_url)
+
+    def get_job_by_linkedin_job_id(self, linkedin_job_id: str) -> Job | None:
+        """Retorna uma vaga pelo identificador numérico do LinkedIn."""
+        return self.repository.get_by_linkedin_job_id(linkedin_job_id)
 
     def list_jobs(self) -> list[Job]:
         """Retorna todas as vagas cadastradas."""
@@ -227,8 +245,12 @@ class JobService:
     ) -> None:
         """Valida a faixa salarial."""
 
-        if salary_min is not None and salary_max is not None and salary_min > salary_max:
-            raise ValueError("O salário mínimo não pode ser maior que o salário máximo.")
+        for value, label in (
+            (salary_min, "Remuneração oferecida"),
+            (salary_max, "Remuneração ideal"),
+        ):
+            if value is not None and value < 0:
+                raise ValueError(f"{label} não pode ser negativa.")
 
     def _validate_status(self, status: str) -> None:
         """Valida o status informado."""
@@ -239,16 +261,16 @@ class JobService:
             raise ValueError(f"Status inválido: '{status}'.")
 
     @staticmethod
-    def _validate_url(url: str) -> None:
-        """Valida a URL da vaga."""
+    def _validate_url(url: str, *, field_name: str = "URL") -> None:
+        """Valida uma URL opcional de vaga ou candidatura."""
 
-        if not url:
+        normalized = url.strip()
+        if not normalized:
             return
 
-        parsed = urlparse(url)
-
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError("A URL da vaga deve iniciar com http:// ou https://.")
+        parsed = urlparse(normalized)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError(f"{field_name} deve iniciar com http:// ou https://.")
 
     @staticmethod
     def _parse_optional_date(value: str | None) -> date | None:
