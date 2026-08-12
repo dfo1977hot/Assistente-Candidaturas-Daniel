@@ -160,3 +160,127 @@ def test_cancellation_keeps_execution_history_consistent():
     assert result["status"] == "Cancelada"
     assert repository.execution.current_step == 0
     assert any(log.message.startswith("CANCELADA|") for log in repository.logs)
+
+
+def test_false_condition_skips_step_and_continues():
+    repository = FakeRepository()
+    repository.workflow.definition = json.dumps(
+        {
+            "steps": [
+                {
+                    "name": "Condicional",
+                    "command": "first",
+                    "condition": {
+                        "field": "fit_score",
+                        "operator": ">=",
+                        "value": 75,
+                        "on_false": "Continuar",
+                    },
+                },
+                {"name": "Final", "command": "second"},
+            ]
+        }
+    )
+    calls = []
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={
+            "first": lambda *_args: calls.append("first"),
+            "second": lambda *_args: calls.append("second"),
+        },
+    )
+    result = service.execute_assisted(1, context={"fit_score": 70})
+    assert result["status"] == "Concluída"
+    assert calls == ["second"]
+    assert any(log.message.startswith("CONDICAO|") for log in repository.logs)
+
+
+def test_resume_after_manual_checkpoint_does_not_repeat_completed_steps():
+    repository = FakeRepository()
+    calls = []
+    repository.workflow.definition = json.dumps(
+        {
+            "steps": [
+                {"name": "Primeira", "command": "first"},
+                {"name": "Manual", "command": "manual_submit_application"},
+                {"name": "Terceira", "command": "third"},
+            ]
+        }
+    )
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={
+            "first": lambda *_args: calls.append("first"),
+            "third": lambda *_args: calls.append("third"),
+        },
+    )
+    assert service.execute_assisted(1)["status"] == "Aguardando usuário"
+    assert calls == ["first"]
+    assert service.resume_execution(10)["status"] == "Concluída"
+    assert calls == ["first", "third"]
+
+
+def test_false_condition_can_end_workflow_without_running_later_steps():
+    repository = FakeRepository()
+    calls = []
+    repository.workflow.definition = json.dumps(
+        {
+            "steps": [
+                {
+                    "name": "Limiar",
+                    "command": "first",
+                    "condition": {
+                        "field": "fit_score",
+                        "operator": ">=",
+                        "value": 75,
+                        "on_false": "Encerrar workflow",
+                    },
+                },
+                {"name": "Nunca", "command": "second"},
+            ]
+        }
+    )
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={
+            "first": lambda *_args: calls.append("first"),
+            "second": lambda *_args: calls.append("second"),
+        },
+    )
+    result = service.execute_assisted(1, context={"fit_score": 50})
+    assert result["status"] == "Concluída"
+    assert calls == []
+
+
+def test_resume_from_failure_reexecutes_failed_step_then_continues():
+    repository = FakeRepository()
+    calls = []
+    repository.workflow.definition = json.dumps(
+        {
+            "steps": [
+                {"name": "Falha", "command": "recover"},
+                {"name": "Final", "command": "final"},
+            ]
+        }
+    )
+
+    def recover(*_args):
+        calls.append("recover")
+        if calls.count("recover") == 1:
+            return {"status": "Falhou", "message": "temporária"}
+        return {"status": "Concluída"}
+
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={
+            "recover": recover,
+            "final": lambda *_args: calls.append("final"),
+        },
+    )
+    assert service.execute_assisted(1)["status"] == "Falhou"
+    assert service.resume_execution(10, from_failed_step=True)["status"] == "Concluída"
+    assert calls == ["recover", "recover", "final"]

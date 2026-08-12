@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
+from typing import Any
 from urllib.parse import urlparse
 
 from acd.core.logger import logger
@@ -27,8 +29,18 @@ class JobService:
     )
     VALID_STATUS = frozenset(JOB_STATUSES)
 
-    def __init__(self, repository: JobRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: JobRepository | None = None,
+        event_dispatcher: Callable[[str, dict[str, Any]], object] | None = None,
+    ) -> None:
         self.repository = repository or JobRepository()
+        self._event_dispatcher = event_dispatcher
+
+    def set_event_dispatcher(
+        self, dispatcher: Callable[[str, dict[str, Any]], object] | None
+    ) -> None:
+        self._event_dispatcher = dispatcher
 
     def create_job(
         self,
@@ -51,6 +63,7 @@ class JobService:
         application_date: str | None = None,
         priority: int = 0,
         notes: str = "",
+        imported: bool = False,
     ) -> Job:
         """Valida e cria uma nova vaga."""
 
@@ -84,6 +97,18 @@ class JobService:
         )
 
         created = self.repository.create(job)
+
+        if self._event_dispatcher is not None:
+            event_type = "job.imported" if imported else "job.created"
+            self._event_dispatcher(
+                event_type,
+                {
+                    "entity_id": created.id,
+                    "job_id": created.id,
+                    "company_id": created.company_id,
+                    "occurrence_id": f"job:{created.id}:created",
+                },
+            )
 
         logger.info(
             "CREATE_JOB | id=%s | company=%s | title=%s",

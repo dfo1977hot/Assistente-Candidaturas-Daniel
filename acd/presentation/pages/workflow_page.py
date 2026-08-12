@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -26,10 +26,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from acd.presentation.long_running_task_executor import LongRunningTaskExecutor
 from acd.presentation.pages.base_page import BasePage
 from acd.services.application_service import ApplicationService
 from acd.services.curriculum_service import CurriculumService
 from acd.services.job_service import JobService
+from acd.services.workflow_condition_evaluator import WorkflowConditionEvaluator
+from acd.services.workflow_scheduler_service import WorkflowSchedulerService
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_template_service import WorkflowTemplateService
 
@@ -60,6 +63,7 @@ class WorkflowPage(BasePage):
         job_service: JobService | None = None,
         application_service: ApplicationService | None = None,
         curriculum_service: CurriculumService | None = None,
+        scheduler_service: WorkflowSchedulerService | None = None,
     ) -> None:
         super().__init__("Workflows")
         self.template_service = template_service
@@ -67,11 +71,17 @@ class WorkflowPage(BasePage):
         self.job_service = job_service
         self.application_service = application_service
         self.curriculum_service = curriculum_service
+        self.scheduler_service = scheduler_service
+        self._scheduler_executor = LongRunningTaskExecutor(self)
         self.current_workflow_id: int | None = None
         self._cancel_requested = False
         self._setup_ui()
         self._load_execution_context()
         self._load_workflows()
+        self._scheduler_timer = QTimer(self)
+        self._scheduler_timer.setInterval(60_000)
+        self._scheduler_timer.timeout.connect(self._run_due_schedules)
+        self._scheduler_started = False
 
     def _setup_ui(self) -> None:
         search_row = QHBoxLayout()
@@ -119,6 +129,7 @@ class WorkflowPage(BasePage):
                 "Vaga criada manualmente",
                 "Candidatura criada",
                 "Mudança de status",
+                "Agendado",
             ]
         )
         self.active_check = QCheckBox("Ativo")
@@ -146,6 +157,9 @@ class WorkflowPage(BasePage):
         right.addWidget(QLabel("Etapas"))
         self.steps_list = QListWidget()
         self.steps_list.setAlternatingRowColors(True)
+        self.steps_list.currentItemChanged.connect(
+            lambda current, _previous: self._load_step_condition(current)
+        )
         right.addWidget(self.steps_list)
 
         step_row = QHBoxLayout()
@@ -170,6 +184,25 @@ class WorkflowPage(BasePage):
         order_row.addWidget(self.remove_step_btn)
         order_row.addStretch(1)
         right.addLayout(order_row)
+
+        condition_form = QFormLayout()
+        self.condition_field_combo = QComboBox()
+        self.condition_field_combo.addItem("Sem condição", "")
+        for field in sorted(WorkflowConditionEvaluator.FIELDS):
+            self.condition_field_combo.addItem(field, field)
+        self.condition_operator_combo = QComboBox()
+        self.condition_operator_combo.addItems(WorkflowConditionEvaluator.OPERATORS)
+        self.condition_value_input = QLineEdit()
+        self.condition_false_combo = QComboBox()
+        self.condition_false_combo.addItems(["Continuar", "Encerrar workflow"])
+        self.apply_condition_btn = QPushButton("Aplicar condição à etapa")
+        self.apply_condition_btn.clicked.connect(self._apply_step_condition)
+        condition_form.addRow("SE campo", self.condition_field_combo)
+        condition_form.addRow("Operador", self.condition_operator_combo)
+        condition_form.addRow("Valor", self.condition_value_input)
+        condition_form.addRow("SENÃO", self.condition_false_combo)
+        condition_form.addRow("", self.apply_condition_btn)
+        right.addLayout(condition_form)
         editor_layout.addLayout(right, 1)
 
         self.layout.addWidget(editor)
@@ -183,6 +216,20 @@ class WorkflowPage(BasePage):
         context_row.addRow("Candidatura alvo", self.application_combo)
         context_row.addRow("Currículo alvo", self.curriculum_combo)
         self.layout.addLayout(context_row)
+
+        schedule_form = QFormLayout()
+        self.schedule_at_input = QLineEdit()
+        self.schedule_at_input.setPlaceholderText("AAAA-MM-DD HH:MM")
+        self.recurrence_combo = QComboBox()
+        self.recurrence_combo.addItems(WorkflowSchedulerService.RECURRENCES)
+        self.target_status_combo = QComboBox()
+        self.target_status_combo.addItem("Qualquer status", "")
+        for status in sorted(ApplicationService.VALID_STATUSES):
+            self.target_status_combo.addItem(status, status)
+        schedule_form.addRow("Data e hora", self.schedule_at_input)
+        schedule_form.addRow("Recorrência", self.recurrence_combo)
+        schedule_form.addRow("Status alvo", self.target_status_combo)
+        self.layout.addLayout(schedule_form)
 
         progress_row = QHBoxLayout()
         self.progress_bar = QProgressBar()
@@ -265,6 +312,12 @@ class WorkflowPage(BasePage):
         self.active_check.setChecked(workflow.active)
         self.trigger_combo.setCurrentText(definition["trigger"])
         self._set_steps(definition["steps"])
+        schedule = definition.get("schedule") or {}
+        self.schedule_at_input.setText(str(schedule.get("scheduled_at") or ""))
+        self.recurrence_combo.setCurrentText(
+            str(schedule.get("recurrence") or "Uma vez")
+        )
+        self.target_status_combo.setCurrentText(definition.get("target_status") or "Qualquer status")
 
     def _set_steps(self, steps: list[dict[str, Any]]) -> None:
         self.steps_list.clear()
@@ -325,14 +378,20 @@ class WorkflowPage(BasePage):
         if not name:
             QMessageBox.warning(self, "Workflows", "Informe o nome do workflow.")
             return
-        workflow = self.workflow_service.save_workflow(
-            self.current_workflow_id,
-            name=name,
-            description=self.description_input.toPlainText().strip(),
-            trigger=self.trigger_combo.currentText(),
-            steps=self._steps(),
-            active=self.active_check.isChecked(),
-        )
+        try:
+            workflow = self.workflow_service.save_workflow(
+                self.current_workflow_id,
+                name=name,
+                description=self.description_input.toPlainText().strip(),
+                trigger=self.trigger_combo.currentText(),
+                steps=self._steps(),
+                active=self.active_check.isChecked(),
+                schedule=self._schedule_definition(),
+                target_status=str(self.target_status_combo.currentData() or ""),
+            )
+        except (TypeError, ValueError) as error:
+            QMessageBox.warning(self, "Workflows", str(error))
+            return
         self.current_workflow_id = workflow.id
         self._load_workflows()
         self._select_workflow_row(workflow.id)
@@ -463,7 +522,11 @@ class WorkflowPage(BasePage):
 
         actions = QHBoxLayout()
         retry = QPushButton("Reexecutar etapa que falhou")
+        resume = QPushButton("Retomar workflow")
+        resume_failed = QPushButton("Retomar a partir da falha")
         actions.addWidget(retry)
+        actions.addWidget(resume)
+        actions.addWidget(resume_failed)
         actions.addStretch(1)
         layout.addLayout(actions)
 
@@ -485,6 +548,25 @@ class WorkflowPage(BasePage):
             load_logs()
 
         retry.clicked.connect(retry_failed)
+
+        def resume_execution(*, from_failed_step: bool = False) -> None:
+            rows = table.selectionModel().selectedRows()
+            if not rows:
+                return
+            execution_id = int(table.item(rows[0].row(), 0).text())
+            try:
+                result = self.workflow_service.resume_execution(
+                    execution_id, from_failed_step=from_failed_step
+                )
+            except Exception as error:
+                QMessageBox.warning(dialog, "Retomar workflow", str(error))
+                return
+            QMessageBox.information(dialog, "Retomar workflow", str(result["status"]))
+
+        resume.clicked.connect(lambda: resume_execution())
+        resume_failed.clicked.connect(
+            lambda: resume_execution(from_failed_step=True)
+        )
 
         close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close_buttons.rejected.connect(dialog.reject)
@@ -567,3 +649,66 @@ class WorkflowPage(BasePage):
         self.steps_list.clear()
         self.progress_bar.setValue(0)
         self.progress_label.setText("Pronto")
+
+    def _apply_step_condition(self) -> None:
+        item = self.steps_list.currentItem()
+        if item is None:
+            return
+        data = dict(item.data(Qt.ItemDataRole.UserRole) or {})
+        field = str(self.condition_field_combo.currentData() or "")
+        if field:
+            data["condition"] = {
+                "field": field,
+                "operator": self.condition_operator_combo.currentText(),
+                "value": self.condition_value_input.text(),
+                "on_false": self.condition_false_combo.currentText(),
+            }
+        else:
+            data.pop("condition", None)
+        item.setData(Qt.ItemDataRole.UserRole, data)
+
+    def _load_step_condition(self, item: QListWidgetItem | None) -> None:
+        data = dict(item.data(Qt.ItemDataRole.UserRole) or {}) if item else {}
+        condition = data.get("condition") or {}
+        field_index = self.condition_field_combo.findData(condition.get("field", ""))
+        self.condition_field_combo.setCurrentIndex(max(0, field_index))
+        self.condition_operator_combo.setCurrentText(
+            str(condition.get("operator") or "==")
+        )
+        self.condition_value_input.setText(str(condition.get("value") or ""))
+        self.condition_false_combo.setCurrentText(
+            str(condition.get("on_false") or "Continuar")
+        )
+
+    def _schedule_definition(self) -> dict[str, Any] | None:
+        if self.trigger_combo.currentText() != "Agendado":
+            return None
+        scheduled_at = self.schedule_at_input.text().strip().replace(" ", "T")
+        if not scheduled_at:
+            raise ValueError("Informe data e hora para o workflow agendado.")
+        return {
+            "scheduled_at": scheduled_at,
+            "recurrence": self.recurrence_combo.currentText(),
+            "active": True,
+            "last_run_at": None,
+            "next_run_at": scheduled_at,
+        }
+
+    def _run_due_schedules(self) -> None:
+        if self.scheduler_service is None or self._scheduler_executor.is_running:
+            return
+        if not self.scheduler_service.due_schedules():
+            return
+        self._scheduler_executor.execute(self.scheduler_service.run_due)
+
+    def start_scheduler(self) -> None:
+        if self._scheduler_started:
+            return
+        self._scheduler_started = True
+        self._scheduler_timer.start()
+        self._run_due_schedules()
+
+    def on_enter(self) -> None:
+        self._load_execution_context()
+        self._load_workflows()
+        self.start_scheduler()

@@ -10,6 +10,7 @@ from acd.domain.entities.workflow import Workflow
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
 from acd.infrastructure.workflow.workflow_event_bus import EventBus
 from acd.infrastructure.workflow.workflow_runner import WorkflowRunner
+from acd.services.workflow_condition_evaluator import WorkflowConditionEvaluator
 from acd.services.workflow_step_registry import WorkflowStepRegistry
 
 StepHandler = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any] | None]
@@ -37,20 +38,29 @@ class WorkflowService:
         event_bus: EventBus | None = None,
         step_handlers: dict[str, StepHandler] | None = None,
         step_registry: WorkflowStepRegistry | None = None,
+        condition_evaluator: WorkflowConditionEvaluator | None = None,
     ) -> None:
         self.repository = repository or WorkflowRepository()
         self.event_bus = event_bus or EventBus()
         self.runner = runner or WorkflowRunner(self.repository, self.event_bus)
         self.step_registry = step_registry or WorkflowStepRegistry(step_handlers)
+        self.condition_evaluator = condition_evaluator or WorkflowConditionEvaluator()
 
     @staticmethod
     def _definition(
         steps: list[dict[str, Any]],
         *,
         trigger: str = "Execução manual",
+        schedule: dict[str, Any] | None = None,
+        target_status: str = "",
     ) -> str:
+        payload: dict[str, Any] = {"trigger": trigger, "steps": steps}
+        if schedule is not None:
+            payload["schedule"] = schedule
+        if target_status:
+            payload["target_status"] = target_status
         return json.dumps(
-            {"trigger": trigger, "steps": steps},
+            payload,
             ensure_ascii=False,
         )
 
@@ -66,6 +76,8 @@ class WorkflowService:
         return {
             "trigger": str(value.get("trigger") or "Execução manual"),
             "steps": steps,
+            "schedule": value.get("schedule"),
+            "target_status": str(value.get("target_status") or ""),
         }
 
     def create_workflow(
@@ -77,11 +89,15 @@ class WorkflowService:
         version: str = "1",
         trigger: str = "Execução manual",
         active: bool = True,
+        schedule: dict[str, Any] | None = None,
+        target_status: str = "",
     ) -> Workflow:
         workflow = self.repository.create_workflow(
             name,
             description,
-            self._definition(steps, trigger=trigger),
+            self._definition(
+                steps, trigger=trigger, schedule=schedule, target_status=target_status
+            ),
             version=version,
         )
         if getattr(workflow, "active", True) != active:
@@ -105,6 +121,8 @@ class WorkflowService:
         steps: list[dict[str, Any]],
         active: bool,
         version: str = "1",
+        schedule: dict[str, Any] | None = None,
+        target_status: str = "",
     ) -> Workflow:
         if workflow_id is None:
             return self.create_workflow(
@@ -114,12 +132,16 @@ class WorkflowService:
                 version=version,
                 trigger=trigger,
                 active=active,
+                schedule=schedule,
+                target_status=target_status,
             )
         return self.repository.update_workflow(
             workflow_id,
             name=name,
             description=description,
-            definition=self._definition(steps, trigger=trigger),
+            definition=self._definition(
+                steps, trigger=trigger, schedule=schedule, target_status=target_status
+            ),
             active=active,
             version=version,
         )
@@ -136,6 +158,8 @@ class WorkflowService:
             version=source.version,
             trigger=definition["trigger"],
             active=False,
+            schedule=definition.get("schedule"),
+            target_status=definition.get("target_status", ""),
         )
 
     def delete_workflow(self, workflow_id: int) -> bool:
@@ -157,6 +181,8 @@ class WorkflowService:
         context: dict[str, Any] | None = None,
         progress: ProgressCallback | None = None,
         cancel_requested: CancelCallback | None = None,
+        execution_id: int | None = None,
+        start_index: int = 1,
     ) -> dict[str, Any]:
         """Run a Sprint 1 workflow step-by-step with progress and history."""
         workflow = self.get_workflow(workflow_id)
@@ -167,13 +193,26 @@ class WorkflowService:
 
         definition = self.parse_definition(workflow)
         steps = definition["steps"]
-        execution = self.repository.create_execution(workflow_id)
+        execution = (
+            self.repository.get_execution(execution_id)
+            if execution_id is not None
+            else self.repository.create_execution(workflow_id)
+        )
+        if execution is None:
+            raise ValueError("Execução não encontrada.")
         execution.status = "Em execução"
         execution.started_at = datetime.now(UTC).replace(tzinfo=None)
-        execution_context = dict(context or {})
+        if context is None and execution.context:
+            execution_context = json.loads(execution.context)
+        else:
+            execution_context = dict(context or {})
         execution.context = json.dumps(execution_context, ensure_ascii=False)
         execution = self.repository.update_execution(execution)
-        self.repository.create_log(execution.id, "info", "Workflow iniciado.")
+        origin = str(execution_context.get("trigger_origin") or "manual")
+        trigger = str(execution_context.get("trigger") or definition["trigger"])
+        self.repository.create_log(
+            execution.id, "info", f"Workflow iniciado.|origin={origin}|trigger={trigger}"
+        )
 
         if not steps:
             execution.status = "Concluída"
@@ -184,9 +223,33 @@ class WorkflowService:
         started = datetime.now(UTC)
         total = len(steps)
 
-        for index, step in enumerate(steps, start=1):
+        for index in range(start_index, total + 1):
+            step = steps[index - 1]
             name = str(step.get("name") or f"Etapa {index}")
             command = str(step.get("command") or "")
+            condition = step.get("condition")
+            if isinstance(condition, dict) and condition.get("field"):
+                evaluated = self.condition_evaluator.evaluate(condition, execution_context)
+                self.repository.create_log(
+                    execution.id,
+                    "info",
+                    "CONDICAO|"
+                    f"{index}|{evaluated.field}|{evaluated.operator}|"
+                    f"expected={evaluated.expected}|observed={evaluated.observed}|"
+                    f"matched={evaluated.matched}",
+                )
+                if not evaluated.matched:
+                    execution.current_step = index
+                    execution.result = "Etapa ignorada por condição falsa."
+                    self.repository.create_log(
+                        execution.id,
+                        "info",
+                        f"IGNORADA|{index}|{command}|condição falsa",
+                    )
+                    if condition.get("on_false") == "Encerrar workflow":
+                        execution.status = "Concluída"
+                        break
+                    continue
             if cancel_requested is not None and cancel_requested():
                 execution.status = "Cancelada"
                 execution.current_step = index - 1
@@ -361,6 +424,50 @@ class WorkflowService:
             f"{step.get('name', '')}|{result.get('message', '')}",
         )
         return result
+
+    def resume_execution(
+        self,
+        execution_id: int,
+        *,
+        from_failed_step: bool = False,
+        progress: ProgressCallback | None = None,
+        cancel_requested: CancelCallback | None = None,
+    ) -> dict[str, Any]:
+        execution = self.repository.get_execution(execution_id)
+        if execution is None:
+            raise ValueError("Execução não encontrada.")
+        allowed = {"Aguardando usuário", "Falhou"}
+        if execution.status not in allowed:
+            raise ValueError("A execução não está aguardando usuário nem com falha.")
+        start_index = execution.current_step if from_failed_step else execution.current_step + 1
+        return self.execute_assisted(
+            execution.workflow_id,
+            execution_id=execution.id,
+            start_index=start_index,
+            progress=progress,
+            cancel_requested=cancel_requested,
+        )
+
+    def has_idempotency_key(self, key: str) -> bool:
+        for execution in self.list_executions(limit=1000):
+            try:
+                context = json.loads(execution.context or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if context.get("idempotency_key") == key:
+                return True
+        return False
+
+    def dashboard_summary(self) -> dict[str, Any]:
+        executions = self.list_executions(limit=200)
+        return {
+            "active_workflows": sum(1 for item in self.list_workflows() if item.active),
+            "running": sum(1 for item in executions if item.status == "Em execução"),
+            "recent_failures": [item for item in executions if item.status == "Falhou"][:10],
+            "awaiting_user": [
+                item for item in executions if item.status == "Aguardando usuário"
+            ][:10],
+        }
 
     def get_workflow(self, workflow_id: int) -> Workflow | None:
         return self.repository.get_workflow(workflow_id)

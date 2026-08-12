@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -7,9 +8,12 @@ from typing import Any
 
 from acd.domain.entities.cover_letter_version import CoverLetterVersion
 from acd.infrastructure.repositories.cover_letter_repository import CoverLetterRepository
+from acd.resilience import CancellationToken
 from acd.services.curriculum_service import CurriculumService
 from acd.services.job_service import JobService
 from acd.services.settings_service import SettingsService
+
+ProgressCallback = Callable[[tuple[int, str]], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,8 +182,38 @@ class CoverLetterService:
         language: str,
         tone: str,
         length: str,
+        progress: ProgressCallback | None = None,
+        cancellation: CancellationToken | None = None,
     ) -> CoverLetterVersion:
+        emit = progress or (lambda _update: None)
+        token = cancellation or CancellationToken()
+        emit((5, "Preparando contexto"))
+        token.raise_if_cancelled()
+
+        emit((15, "Carregando vaga"))
+        token.raise_if_cancelled()
+        job = self.job_service.get_job(job_id)
+        if job is None:
+            raise ValueError("Selecione uma vaga válida.")
+
+        emit((25, "Carregando currículo"))
+        token.raise_if_cancelled()
+        curriculum = self.curriculum_service.repository.get_by_id(curriculum_id)
+        if curriculum is None:
+            raise ValueError("Selecione um currículo válido.")
+
         context = self.build_context(job_id=job_id, curriculum_id=curriculum_id)
+        if not context.job_notes.strip():
+            raise ValueError(
+                "A vaga não possui descrição ou observações suficientes para gerar a carta."
+            )
+        if not context.curriculum_content.strip():
+            raise ValueError(
+                "O currículo selecionado não possui conteúdo suficiente para gerar a carta."
+            )
+
+        emit((40, "Montando prompt"))
+        token.raise_if_cancelled()
         client = self._client or self._create_client()
         prompt = self._build_prompt(
             context=context,
@@ -188,10 +222,14 @@ class CoverLetterService:
             tone=tone,
             length=length,
         )
+        emit((55, "Gerando conteúdo"))
+        token.raise_if_cancelled()
         response = client.responses.create(
             model="gpt-5-mini",
             input=prompt,
         )
+        emit((75, "Validando resposta"))
+        token.raise_if_cancelled()
         content = str(getattr(response, "output_text", "") or "").strip()
         if not content:
             raise RuntimeError("A IA não retornou conteúdo para a carta.")
@@ -201,6 +239,8 @@ class CoverLetterService:
             context=context,
             letter_type=letter_type,
         )
+        emit((90, "Salvando nova versão"))
+        token.raise_if_cancelled()
         entity = CoverLetterVersion(
             job_id=job_id,
             application_id=self.repository.latest_application_id_for_job(job_id),
@@ -218,7 +258,9 @@ class CoverLetterService:
                 "Gerada com base na vaga, empresa, recrutador e currículo selecionado."
             ),
         )
-        return self.repository.create(entity)
+        created = self.repository.create(entity)
+        emit((100, "Concluído"))
+        return created
 
     def export_docx(self, letter_id: int, destination: str | Path) -> Path:
         letter = self._require_letter(letter_id)

@@ -216,6 +216,7 @@ class LinkedInSavedJobsImportService:
                         imported_job.notes_text(),
                         imported_job.benefits,
                     ),
+                    imported=True,
                 )
                 imported += 1
             except Exception as exc:

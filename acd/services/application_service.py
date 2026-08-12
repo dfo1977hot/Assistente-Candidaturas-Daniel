@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
+from typing import Any
+from uuid import uuid4
 
 from acd.core.logger import logger
 from acd.domain.entities.application import Application
@@ -46,8 +49,18 @@ class ApplicationService:
         "Encerrada": set(),
     }
 
-    def __init__(self, repository: ApplicationRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: ApplicationRepository | None = None,
+        event_dispatcher: Callable[[str, dict[str, Any]], object] | None = None,
+    ) -> None:
         self.repository = repository or ApplicationRepository()
+        self._event_dispatcher = event_dispatcher
+
+    def set_event_dispatcher(
+        self, dispatcher: Callable[[str, dict[str, Any]], object] | None
+    ) -> None:
+        self._event_dispatcher = dispatcher
 
     def create_application(
         self,
@@ -92,6 +105,18 @@ class ApplicationService:
         created = self.repository.create(application)
         self.repository.add_event(created.id, "created", "Candidatura criada")
         logger.info("Nova candidatura criada: %s", created.id)
+        if self._event_dispatcher is not None:
+            self._event_dispatcher(
+                "application.created",
+                {
+                    "entity_id": created.id,
+                    "application_id": created.id,
+                    "job_id": created.job_id,
+                    "company_id": created.company_id,
+                    "application_status": created.status,
+                    "occurrence_id": f"application:{created.id}:created",
+                },
+            )
         return created
 
     def update_application(
@@ -220,6 +245,18 @@ class ApplicationService:
                 application_id, "status_changed", f"Status alterado para {new_status}"
             )
             logger.info("Status alterado: %s", new_status)
+            if self._event_dispatcher is not None:
+                self._event_dispatcher(
+                    "application.status_changed",
+                    {
+                        "entity_id": updated.id,
+                        "application_id": updated.id,
+                        "job_id": updated.job_id,
+                        "company_id": updated.company_id,
+                        "application_status": updated.status,
+                        "occurrence_id": str(uuid4()),
+                    },
+                )
         return updated
 
     def get_followups(self, application_id: int) -> list[object]:

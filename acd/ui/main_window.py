@@ -77,6 +77,12 @@ class MainWindow(QMainWindow):
         status.showMessage(f"ACD v{get_version()}")
         self.setStatusBar(status)
 
+    def showEvent(self, event: object) -> None:
+        super().showEvent(event)
+        start_scheduler = getattr(self.workflow_page, "start_scheduler", None)
+        if callable(start_scheduler):
+            start_scheduler()
+
     def _on_sidebar_item_clicked(self, item: object) -> None:
         label = item.text()
         destinations = (

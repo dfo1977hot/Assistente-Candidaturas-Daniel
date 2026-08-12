@@ -20,7 +20,16 @@ class WorkflowTemplateService:
                 {"name": "Buscar dados da empresa", "command": "enrich_company"},
                 {"name": "Pesquisar remuneração", "command": "research_salary"},
                 {"name": "Analisar aderência", "command": "analyze_fit"},
-                {"name": "Selecionar currículo", "command": "select_resume"},
+                {
+                    "name": "Selecionar currículo",
+                    "command": "select_resume",
+                    "condition": {
+                        "field": "fit_score",
+                        "operator": ">=",
+                        "value": 75,
+                        "on_false": "Continuar",
+                    },
+                },
                 {"name": "Gerar currículo otimizado", "command": "generate_resume"},
                 {"name": "Gerar carta", "command": "generate_cover_letter"},
                 {"name": "Criar/atualizar candidatura", "command": "register_application"},

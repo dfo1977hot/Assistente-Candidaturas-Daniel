@@ -54,9 +54,11 @@ from acd.services.recruiter_email_research_service import RecruiterEmailResearch
 from acd.services.resume_match_service import ResumeMatchService
 from acd.services.salary_research_service import SalaryResearchService
 from acd.services.settings_service import SettingsService
+from acd.services.workflow_scheduler_service import WorkflowSchedulerService
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_step_registry import ProductiveWorkflowHandlers
 from acd.services.workflow_template_service import WorkflowTemplateService
+from acd.services.workflow_trigger_dispatcher import WorkflowTriggerDispatcher
 from acd.ui.dashboard import Dashboard
 from acd.ui.main_window import MainWindow
 from acd.ui.sidebar import Sidebar
@@ -133,6 +135,10 @@ class DesktopCompositionRoot:
             ),
         )
         workflow_service = WorkflowService(step_registry=workflow_handlers.registry())
+        workflow_trigger_dispatcher = WorkflowTriggerDispatcher(workflow_service)
+        workflow_scheduler_service = WorkflowSchedulerService(workflow_service)
+        job_service.set_event_dispatcher(workflow_trigger_dispatcher.dispatch)
+        application_service.set_event_dispatcher(workflow_trigger_dispatcher.dispatch)
         workflow_template_service = WorkflowTemplateService(workflow_service)
         assisted_application_service = AssistedApplicationService(
             PlaywrightApplicationBrowser(
@@ -195,6 +201,7 @@ class DesktopCompositionRoot:
                 job_service,
                 application_service,
                 curriculum_service,
+                workflow_scheduler_service,
             ),
             "analytics": AnalyticsPage(analytics_service),
             "career": CareerPage(career_service, gap_service),

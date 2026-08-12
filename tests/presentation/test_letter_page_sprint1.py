@@ -24,4 +24,5 @@ def test_letter_page_preserves_selected_record_after_save_and_generation() -> No
         encoding="utf-8"
     )
     assert "self._select_row(saved.id)" in source
-    assert "self._select_row(generated.id)" in source
+    assert "self.current_letter_id = int(letter_id)" in source
+    assert "self._select_row(self.current_letter_id)" in source

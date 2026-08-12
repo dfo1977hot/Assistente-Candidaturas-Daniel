@@ -13,12 +13,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
 )
 
+from acd.presentation.long_running_task_executor import LongRunningTaskExecutor
 from acd.presentation.pages.base_page import BasePage
 from acd.services.cover_letter_service import CoverLetterService
 from acd.services.curriculum_service import CurriculumService
@@ -40,6 +42,12 @@ class LetterPage(BasePage):
         self.job_service = job_service
         self.curriculum_service = curriculum_service
         self.current_letter_id: int | None = None
+        self._generation_executor = LongRunningTaskExecutor(self)
+        self._generation_executor.progress.connect(self._on_generation_progress)
+        self._generation_executor.succeeded.connect(self._on_generation_succeeded)
+        self._generation_executor.failed.connect(self._on_generation_failed)
+        self._generation_executor.cancelled.connect(self._on_generation_cancelled)
+        self._generation_executor.finished.connect(self._on_generation_finished)
 
         self.search_input = QLineEdit()
         self.search_button = QPushButton("Filtrar")
@@ -80,6 +88,12 @@ class LetterPage(BasePage):
         self.copy_button = QPushButton("Copiar")
         self.docx_button = QPushButton("Exportar DOCX")
         self.pdf_button = QPushButton("Exportar PDF")
+        self.cancel_button = QPushButton("Cancelar")
+        self.cancel_button.setEnabled(False)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_label = QLabel("Pronto")
 
         self._setup()
         self.refresh_reference_data()
@@ -134,6 +148,7 @@ class LetterPage(BasePage):
                 self.copy_button,
                 self.docx_button,
                 self.pdf_button,
+                self.cancel_button,
             )
         ):
             actions.addWidget(button, 0, index)
@@ -142,6 +157,10 @@ class LetterPage(BasePage):
         self.layout.addWidget(self.table)
         self.layout.addLayout(columns)
         self.layout.addLayout(long_fields)
+        progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.progress_bar, 1)
+        progress_layout.addWidget(self.progress_label)
+        self.layout.addLayout(progress_layout)
         self.layout.addLayout(actions)
 
         self.search_button.clicked.connect(self._filter)
@@ -154,6 +173,7 @@ class LetterPage(BasePage):
         self.copy_button.clicked.connect(self._copy)
         self.docx_button.clicked.connect(self._export_docx)
         self.pdf_button.clicked.connect(self._export_pdf)
+        self.cancel_button.clicked.connect(self._cancel_generation)
 
     def refresh_reference_data(self) -> None:
         selected_job = self.job_combo.currentData()
@@ -315,23 +335,88 @@ class LetterPage(BasePage):
                 "Selecione a vaga e o currículo antes de gerar.",
             )
             return
-        try:
-            generated = self.letter_service.generate_letter(
+        if self._generation_executor.is_running:
+            return
+        letter_type = self.type_combo.currentText()
+        language = self.language_combo.currentText()
+        tone = self.tone_combo.currentText()
+        length = self.length_combo.currentText()
+        self.progress_bar.setValue(0)
+        self.progress_label.setText("Preparando contexto")
+        self._set_generation_running(True)
+
+        def generation_task(emit_progress, cancellation_token):
+            return self.letter_service.generate_letter(
                 job_id=job_id,
                 curriculum_id=curriculum_id,
-                letter_type=self.type_combo.currentText(),
-                language=self.language_combo.currentText(),
-                tone=self.tone_combo.currentText(),
-                length=self.length_combo.currentText(),
+                letter_type=letter_type,
+                language=language,
+                tone=tone,
+                length=length,
+                progress=emit_progress,
+                cancellation=cancellation_token,
             )
-        except Exception as exc:
-            QMessageBox.warning(self, "Gerar carta", str(exc))
-            return
 
-        self.current_letter_id = generated.id
+        self._generation_executor.execute_with_context(generation_task)
+
+    def _on_generation_progress(self, update: object) -> None:
+        if not isinstance(update, tuple) or len(update) != 2:
+            return
+        value, message = update
+        self.progress_bar.setValue(int(value))
+        self.progress_label.setText(str(message))
+
+    def _on_generation_succeeded(self, generated: object) -> None:
+        letter_id = getattr(generated, "id", None)
+        if letter_id is None:
+            self._on_generation_failed("A geração não retornou uma carta válida.")
+            return
+        self.current_letter_id = int(letter_id)
         self._load_letters()
-        self._select_row(generated.id)
+        self._select_row(self.current_letter_id)
         self._on_row_selected()
+        self.progress_bar.setValue(100)
+        self.progress_label.setText("Concluído")
+
+    def _on_generation_failed(self, error: object) -> None:
+        self.progress_label.setText("Falha na geração")
+        QMessageBox.warning(self, "Gerar carta", str(error))
+
+    def _cancel_generation(self) -> None:
+        if self._generation_executor.cancel():
+            self.progress_label.setText(
+                "Cancelamento solicitado. Aguardando a etapa atual encerrar..."
+            )
+            self.cancel_button.setEnabled(False)
+
+    def _on_generation_cancelled(self) -> None:
+        self._load_letters()
+        self.progress_label.setText(
+            "Geração cancelada. Se a persistência já havia terminado, "
+            "a versão válida foi preservada."
+        )
+
+    def _on_generation_finished(self) -> None:
+        self._set_generation_running(False)
+
+    def _set_generation_running(self, running: bool) -> None:
+        for control in (
+            self.save_button,
+            self.delete_button,
+            self.generate_button,
+            self.copy_button,
+            self.docx_button,
+            self.pdf_button,
+            self.job_combo,
+            self.curriculum_combo,
+            self.type_combo,
+            self.language_combo,
+            self.tone_combo,
+            self.length_combo,
+            self.table,
+        ):
+            control.setEnabled(not running)
+        self.cancel_button.setEnabled(running)
 
     def _delete(self) -> None:
         if self.current_letter_id is None:
