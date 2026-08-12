@@ -55,6 +55,7 @@ from acd.services.resume_match_service import ResumeMatchService
 from acd.services.salary_research_service import SalaryResearchService
 from acd.services.settings_service import SettingsService
 from acd.services.workflow_service import WorkflowService
+from acd.services.workflow_step_registry import ProductiveWorkflowHandlers
 from acd.services.workflow_template_service import WorkflowTemplateService
 from acd.ui.dashboard import Dashboard
 from acd.ui.main_window import MainWindow
@@ -114,10 +115,25 @@ class DesktopCompositionRoot:
         analytics_service = AnalyticsService()
         career_service = CareerPlanningService()
         gap_service = GapAnalysisService()
-        workflow_service = WorkflowService()
-        workflow_template_service = WorkflowTemplateService(workflow_service)
         ats_service = ATSService(ats_repository)
         resume_match_service = ResumeMatchService()
+        workflow_handlers = ProductiveWorkflowHandlers(
+            job_service=job_service,
+            application_service=application_service,
+            company_service=company_service,
+            company_lookup_service=CompanyLookupService(
+                settings_service=settings_service,
+            ),
+            salary_research_service=salary_research_service,
+            resume_match_service=resume_match_service,
+            curriculum_service=curriculum_service,
+            cover_letter_service=cover_letter_service,
+            application_url_resolver=PlaywrightApplicationBrowser(
+                linkedin_headless=settings_service.browser_headless,
+            ),
+        )
+        workflow_service = WorkflowService(step_registry=workflow_handlers.registry())
+        workflow_template_service = WorkflowTemplateService(workflow_service)
         assisted_application_service = AssistedApplicationService(
             PlaywrightApplicationBrowser(
                 linkedin_headless=settings_service.browser_headless,
@@ -173,7 +189,13 @@ class DesktopCompositionRoot:
             "applications": application_page,
             "interviews": InterviewPage(interview_service, application_service),
             "curricula": curriculum_page,
-            "workflows": WorkflowPage(workflow_template_service, workflow_service),
+            "workflows": WorkflowPage(
+                workflow_template_service,
+                workflow_service,
+                job_service,
+                application_service,
+                curriculum_service,
+            ),
             "analytics": AnalyticsPage(analytics_service),
             "career": CareerPage(career_service, gap_service),
             "assistant": self._build_assistant_page(),

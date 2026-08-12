@@ -50,6 +50,9 @@ class FakeRepository:
         self.execution.workflow_id = workflow_id
         return self.execution
 
+    def get_execution(self, execution_id):
+        return self.execution if execution_id == self.execution.id else None
+
     def update_execution(self, execution):
         return execution
 
@@ -86,3 +89,74 @@ def test_definition_exposes_trigger_and_steps():
     definition = service.parse_definition(repository.workflow)
     assert definition["trigger"] == "Execução manual"
     assert len(definition["steps"]) == 2
+
+
+def test_assisted_execution_persists_context_updates():
+    repository = FakeRepository()
+    repository.workflow.definition = json.dumps(
+        {"steps": [{"name": "Atualizar", "command": "update"}]}
+    )
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={
+            "update": lambda _step, _context: {
+                "status": "Concluída",
+                "message": "Atualizado",
+                "context_updates": {"curriculum_id": 42},
+            }
+        },
+    )
+    service.execute_assisted(1, context={"job_id": 7})
+    assert json.loads(repository.execution.context) == {
+        "job_id": 7,
+        "curriculum_id": 42,
+    }
+
+
+def test_missing_job_context_stops_dependent_step():
+    repository = FakeRepository()
+    repository.workflow.definition = json.dumps(
+        {"steps": [{"name": "Vaga", "command": "verify_job"}]}
+    )
+    service = WorkflowService(repository=repository, runner=FakeRunner())
+    result = service.execute_assisted(1)
+    assert result["status"] == "Falhou"
+    assert "Selecione uma vaga" in result["result"]
+
+
+def test_structured_failure_stops_following_steps_and_can_be_retried():
+    repository = FakeRepository()
+    repository.workflow.definition = json.dumps(
+        {
+            "steps": [
+                {"name": "Falha", "command": "fail"},
+                {"name": "Não executar", "command": "next"},
+            ]
+        }
+    )
+    calls = []
+
+    def fail(_step, _context):
+        calls.append("fail")
+        return {"status": "Falhou", "message": "indisponível"}
+
+    service = WorkflowService(
+        repository=repository,
+        runner=FakeRunner(),
+        step_handlers={"fail": fail, "next": lambda *_args: calls.append("next")},
+    )
+    result = service.execute_assisted(1)
+    assert result["status"] == "Falhou"
+    assert calls == ["fail"]
+    assert service.retry_failed_step(10)["status"] == "Falhou"
+    assert calls == ["fail", "fail"]
+
+
+def test_cancellation_keeps_execution_history_consistent():
+    repository = FakeRepository()
+    service = WorkflowService(repository=repository, runner=FakeRunner())
+    result = service.execute_assisted(1, cancel_requested=lambda: True)
+    assert result["status"] == "Cancelada"
+    assert repository.execution.current_step == 0
+    assert any(log.message.startswith("CANCELADA|") for log in repository.logs)

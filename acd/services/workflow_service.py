@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 import json
+from time import monotonic
 from typing import Any
 
 from acd.domain.entities.workflow import Workflow
 from acd.infrastructure.repositories.workflow_repository import WorkflowRepository
 from acd.infrastructure.workflow.workflow_event_bus import EventBus
 from acd.infrastructure.workflow.workflow_runner import WorkflowRunner
+from acd.services.workflow_step_registry import WorkflowStepRegistry
 
 StepHandler = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any] | None]
 ProgressCallback = Callable[[int, str, str], None]
@@ -34,11 +36,12 @@ class WorkflowService:
         runner: WorkflowRunner | None = None,
         event_bus: EventBus | None = None,
         step_handlers: dict[str, StepHandler] | None = None,
+        step_registry: WorkflowStepRegistry | None = None,
     ) -> None:
         self.repository = repository or WorkflowRepository()
         self.event_bus = event_bus or EventBus()
         self.runner = runner or WorkflowRunner(self.repository, self.event_bus)
-        self.step_handlers = dict(step_handlers or {})
+        self.step_registry = step_registry or WorkflowStepRegistry(step_handlers)
 
     @staticmethod
     def _definition(
@@ -167,7 +170,8 @@ class WorkflowService:
         execution = self.repository.create_execution(workflow_id)
         execution.status = "Em execução"
         execution.started_at = datetime.now(UTC).replace(tzinfo=None)
-        execution.context = json.dumps(context or {}, ensure_ascii=False)
+        execution_context = dict(context or {})
+        execution.context = json.dumps(execution_context, ensure_ascii=False)
         execution = self.repository.update_execution(execution)
         self.repository.create_log(execution.id, "info", "Workflow iniciado.")
 
@@ -204,8 +208,9 @@ class WorkflowService:
                 f"INICIADA|{index}|{command}|{name}",
             )
 
+            step_started = monotonic()
             try:
-                result = self._execute_step(step, context or {})
+                result = self._execute_step(step, execution_context)
             except Exception as error:
                 execution.status = "Falhou"
                 execution.result = f"{name}: {error}"
@@ -220,14 +225,38 @@ class WorkflowService:
 
             status = str((result or {}).get("status") or "Concluída")
             message = str((result or {}).get("message") or "")
+            context_updates = (result or {}).get("context_updates") or {}
+            if not isinstance(context_updates, dict):
+                raise TypeError("context_updates deve ser um objeto serializável.")
+            execution_context.update(context_updates)
+            execution.context = json.dumps(execution_context, ensure_ascii=False)
+            execution = self.repository.update_execution(execution)
+            duration_ms = int((monotonic() - step_started) * 1000)
+            targets = ",".join(
+                f"{key}={execution_context[key]}"
+                for key in ("job_id", "application_id", "curriculum_id")
+                if execution_context.get(key) is not None
+            )
+            summary = f"{message}|targets={targets}|duration_ms={duration_ms}"
             normalized = status.casefold()
+            if normalized in {"falhou", "failed"}:
+                execution.status = "Falhou"
+                execution.result = message or f"Falha em: {name}"
+                self.repository.create_log(
+                    execution.id,
+                    "error",
+                    f"FALHOU|{index}|{command}|{name}|{summary}",
+                )
+                if progress is not None:
+                    progress(int((index / total) * 100), name, "Falhou")
+                break
             if normalized in {"aguardando usuário", "awaiting_user", "awaiting user"}:
                 execution.status = "Aguardando usuário"
                 execution.result = message or f"Aguardando usuário em: {name}"
                 self.repository.create_log(
                     execution.id,
                     "info",
-                    f"AGUARDANDO|{index}|{command}|{name}|{message}",
+                    f"AGUARDANDO|{index}|{command}|{name}|{summary}",
                 )
                 if progress is not None:
                     progress(int((index / total) * 100), name, "Aguardando usuário")
@@ -236,13 +265,13 @@ class WorkflowService:
                 self.repository.create_log(
                     execution.id,
                     "info",
-                    f"IGNORADA|{index}|{command}|{name}|{message}",
+                    f"IGNORADA|{index}|{command}|{name}|{summary}",
                 )
             else:
                 self.repository.create_log(
                     execution.id,
                     "info",
-                    f"CONCLUIDA|{index}|{command}|{name}|{message}",
+                    f"CONCLUIDA|{index}|{command}|{name}|{summary}",
                 )
             if progress is not None:
                 progress(int((index / total) * 100), name, "Concluída")
@@ -272,13 +301,19 @@ class WorkflowService:
                 "status": "Aguardando usuário",
                 "message": "Intervenção manual necessária.",
             }
-        handler = self.step_handlers.get(command)
+        if self.step_registry.requires_job(command) and not context.get("job_id"):
+            raise ValueError("Selecione uma vaga antes de executar esta etapa.")
+        handler = self.step_registry.resolve(command)
         if handler is None:
             return {
-                "status": "Concluída",
-                "message": "Etapa preparada no orquestrador Sprint 1.",
+                "status": "Ignorada",
+                "message": "Esta etapa ainda não possui integração produtiva.",
+                "context_updates": {},
             }
-        return handler(step, context) or {"status": "Concluída"}
+        return handler(step, context) or {
+            "status": "Concluída",
+            "context_updates": {},
+        }
 
     def retry_failed_step(
         self,
@@ -308,7 +343,17 @@ class WorkflowService:
             raise ValueError("A etapa com falha não existe mais no workflow.")
 
         step = steps[failed_index - 1]
-        result = self._execute_step(step, context or {})
+        if context is None:
+            try:
+                stored_context = json.loads(execution.context or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                stored_context = {}
+        else:
+            stored_context = dict(context)
+        result = self._execute_step(step, stored_context)
+        stored_context.update(result.get("context_updates") or {})
+        execution.context = json.dumps(stored_context, ensure_ascii=False)
+        self.repository.update_execution(execution)
         self.repository.create_log(
             execution_id,
             "info",

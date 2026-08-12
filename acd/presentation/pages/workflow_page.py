@@ -27,6 +27,9 @@ from PySide6.QtWidgets import (
 )
 
 from acd.presentation.pages.base_page import BasePage
+from acd.services.application_service import ApplicationService
+from acd.services.curriculum_service import CurriculumService
+from acd.services.job_service import JobService
 from acd.services.workflow_service import WorkflowService
 from acd.services.workflow_template_service import WorkflowTemplateService
 
@@ -54,13 +57,20 @@ class WorkflowPage(BasePage):
         self,
         template_service: WorkflowTemplateService,
         workflow_service: WorkflowService,
+        job_service: JobService | None = None,
+        application_service: ApplicationService | None = None,
+        curriculum_service: CurriculumService | None = None,
     ) -> None:
         super().__init__("Workflows")
         self.template_service = template_service
         self.workflow_service = workflow_service
+        self.job_service = job_service
+        self.application_service = application_service
+        self.curriculum_service = curriculum_service
         self.current_workflow_id: int | None = None
         self._cancel_requested = False
         self._setup_ui()
+        self._load_execution_context()
         self._load_workflows()
 
     def _setup_ui(self) -> None:
@@ -164,6 +174,16 @@ class WorkflowPage(BasePage):
 
         self.layout.addWidget(editor)
 
+        context_row = QFormLayout()
+        self.job_combo = QComboBox()
+        self.application_combo = QComboBox()
+        self.curriculum_combo = QComboBox()
+        self.job_combo.currentIndexChanged.connect(self._filter_applications)
+        context_row.addRow("Vaga alvo", self.job_combo)
+        context_row.addRow("Candidatura alvo", self.application_combo)
+        context_row.addRow("Currículo alvo", self.curriculum_combo)
+        self.layout.addLayout(context_row)
+
         progress_row = QHBoxLayout()
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -197,6 +217,7 @@ class WorkflowPage(BasePage):
             buttons.addWidget(button)
         buttons.addStretch(1)
         self.layout.addLayout(buttons)
+        self.cancel_btn.setEnabled(False)
 
     def _load_workflows(self) -> None:
         query = self.search_input.text().strip().casefold()
@@ -348,15 +369,19 @@ class WorkflowPage(BasePage):
         self._cancel_requested = False
         self.progress_bar.setValue(0)
         self.progress_label.setText("Iniciando...")
+        self._set_execution_controls(True)
         try:
             result = self.workflow_service.execute_assisted(
                 self.current_workflow_id,
+                context=self._execution_context(),
                 progress=self._on_progress,
                 cancel_requested=lambda: self._cancel_requested,
             )
         except Exception as error:
             QMessageBox.critical(self, "Workflows", str(error))
             return
+        finally:
+            self._set_execution_controls(False)
         self._load_workflows()
         self._select_workflow_row(self.current_workflow_id)
         self.progress_label.setText(str(result.get("status") or "Concluída"))
@@ -465,6 +490,64 @@ class WorkflowPage(BasePage):
         close_buttons.rejected.connect(dialog.reject)
         layout.addWidget(close_buttons)
         dialog.exec()
+        self._select_workflow_row(self.current_workflow_id)
+
+    def _load_execution_context(self) -> None:
+        self.job_combo.clear()
+        self.job_combo.addItem("Selecione uma vaga", None)
+        if self.job_service is not None:
+            for job in self.job_service.list_jobs():
+                self.job_combo.addItem(f"{job.title} (#{job.id})", job.id)
+
+        self.curriculum_combo.clear()
+        self.curriculum_combo.addItem("Seleção automática", None)
+        if self.curriculum_service is not None:
+            for curriculum in self.curriculum_service.list_curricula():
+                self.curriculum_combo.addItem(
+                    f"{curriculum.name} — {curriculum.version}", curriculum.id
+                )
+        self._filter_applications()
+
+    def _filter_applications(self) -> None:
+        selected = self.application_combo.currentData()
+        job_id = self.job_combo.currentData()
+        self.application_combo.clear()
+        self.application_combo.addItem("Nenhuma / localizar automaticamente", None)
+        if self.application_service is not None and job_id is not None:
+            for application in self.application_service.list_applications():
+                if application.job_id == int(job_id):
+                    self.application_combo.addItem(
+                        f"Candidatura #{application.id} — {application.status}",
+                        application.id,
+                    )
+        index = self.application_combo.findData(selected)
+        if index >= 0:
+            self.application_combo.setCurrentIndex(index)
+
+    def _execution_context(self) -> dict[str, int]:
+        context = {}
+        for key, combo in (
+            ("job_id", self.job_combo),
+            ("application_id", self.application_combo),
+            ("curriculum_id", self.curriculum_combo),
+        ):
+            if combo.currentData() is not None:
+                context[key] = int(combo.currentData())
+        return context
+
+    def _set_execution_controls(self, running: bool) -> None:
+        for control in (
+            self.save_btn,
+            self.duplicate_btn,
+            self.delete_btn,
+            self.execute_btn,
+            self.history_btn,
+            self.job_combo,
+            self.application_combo,
+            self.curriculum_combo,
+        ):
+            control.setEnabled(not running)
+        self.cancel_btn.setEnabled(running)
 
     def _select_workflow_row(self, workflow_id: int | None) -> None:
         if workflow_id is None:
