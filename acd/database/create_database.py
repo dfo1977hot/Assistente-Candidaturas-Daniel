@@ -27,6 +27,7 @@ def create_database(target_engine: Engine | None = None) -> None:
     DatabaseBootstrap().initialize(selected_engine)
     _ensure_companies_columns(selected_engine)
     _ensure_application_resume_version_selection(selected_engine)
+    _ensure_application_follow_up_columns(selected_engine)
     _ensure_structured_resume_snapshot_columns(selected_engine)
     _ensure_curriculum_document_columns(selected_engine)
     _ensure_job_application_url_column(selected_engine)
@@ -91,6 +92,36 @@ def _ensure_application_resume_version_selection(target_engine: Engine | None = 
             "CREATE INDEX IF NOT EXISTS ix_applications_selected_resume_version_id "
             "ON applications(selected_resume_version_id)"
         )
+
+
+def _ensure_application_follow_up_columns(target_engine: Engine | None = None) -> None:
+    """Add the non-destructive follow-up metadata required by Sprint 1.0."""
+
+    selected_engine = target_engine or engine
+    required = {
+        "applications": {
+            "next_action": "TEXT NOT NULL DEFAULT ''",
+            "follow_up_time": "TEXT NOT NULL DEFAULT ''",
+            "follow_up_priority": "TEXT NOT NULL DEFAULT 'Normal'",
+            "follow_up_note": "TEXT NOT NULL DEFAULT ''",
+        },
+        "timeline_events": {
+            "origin": "TEXT NOT NULL DEFAULT 'manual'",
+            "reference_type": "TEXT NOT NULL DEFAULT ''",
+            "reference_id": "INTEGER",
+        },
+    }
+    with selected_engine.begin() as connection:
+        for table, columns in required.items():
+            existing = {
+                row[1]
+                for row in connection.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            }
+            for name, definition in columns.items():
+                if name not in existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {name} {definition}"
+                    )
 
 
 def _ensure_structured_resume_snapshot_columns(target_engine: Engine | None = None) -> Path | None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -156,7 +156,7 @@ class ApplicationRepository:
             stmt = (
                 select(TimelineEvent)
                 .where(TimelineEvent.application_id == application_id)
-                .order_by(TimelineEvent.created_at.desc())
+                .order_by(TimelineEvent.created_at.desc(), TimelineEvent.id.desc())
             )
             return list(session.scalars(stmt).all())
 
@@ -174,10 +174,26 @@ class ApplicationRepository:
         with database_module.SessionLocal() as session:
             return session.query(Application).count()
 
-    def add_event(self, application_id: int, event_type: str, description: str) -> TimelineEvent:
+    def add_event(
+        self,
+        application_id: int,
+        event_type: str,
+        description: str,
+        *,
+        origin: str = "manual",
+        reference_type: str = "",
+        reference_id: int | None = None,
+        created_at: datetime | None = None,
+    ) -> TimelineEvent:
         with database_module.SessionLocal() as session:
             event = TimelineEvent(
-                application_id=application_id, event_type=event_type, description=description
+                application_id=application_id,
+                event_type=event_type,
+                description=description,
+                origin=origin,
+                reference_type=reference_type,
+                reference_id=reference_id,
+                **({"created_at": created_at} if created_at is not None else {}),
             )
             session.add(event)
             session.commit()

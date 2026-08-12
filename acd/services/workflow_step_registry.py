@@ -5,6 +5,7 @@ from dataclasses import asdict
 from types import SimpleNamespace
 from typing import Any
 
+from acd.services.application_follow_up_service import ApplicationFollowUpService
 from acd.services.application_service import ApplicationService
 from acd.services.company_lookup_service import CompanyLookupService
 from acd.services.company_service import CompanyService
@@ -77,6 +78,7 @@ class ProductiveWorkflowHandlers:
         curriculum_service: CurriculumService,
         cover_letter_service: CoverLetterService,
         application_url_resolver: LinkedInApplicationResolver,
+        application_follow_up_service: ApplicationFollowUpService | None = None,
     ) -> None:
         self.job_service = job_service
         self.application_service = application_service
@@ -87,10 +89,10 @@ class ProductiveWorkflowHandlers:
         self.curriculum_service = curriculum_service
         self.cover_letter_service = cover_letter_service
         self.application_url_resolver = application_url_resolver
+        self.application_follow_up_service = application_follow_up_service
 
     def registry(self) -> WorkflowStepRegistry:
-        return WorkflowStepRegistry(
-            {
+        handlers: dict[str, WorkflowStepHandler] = {
                 "verify_job": self.verify_job,
                 "detect_application_url": self.detect_application_url,
                 "enrich_company": self.enrich_company,
@@ -101,7 +103,14 @@ class ProductiveWorkflowHandlers:
                 "generate_cover_letter": self.generate_cover_letter,
                 "register_application": self.register_application,
             }
-        )
+        if self.application_follow_up_service is not None:
+            handlers.update(
+                {
+                    "review_application": self.review_application,
+                    "check_follow_up": self.check_follow_up,
+                }
+            )
+        return WorkflowStepRegistry(handlers)
 
     def verify_job(self, _step: WorkflowStep, context: WorkflowContext) -> WorkflowStepResult:
         job = self._job(context)
@@ -315,6 +324,47 @@ class ProductiveWorkflowHandlers:
                 curriculum_id=int(curriculum_id),
             )
         return self._completed(message, application_id=application.id)
+
+    def review_application(
+        self, _step: WorkflowStep, context: WorkflowContext
+    ) -> WorkflowStepResult:
+        application_id = self._application_id(context)
+        state = self.application_follow_up_service.get_state(application_id)
+        return self._completed(
+            "Acompanhamento da candidatura revisado.",
+            application_id=application_id,
+            follow_up_required=state.follow_up_required,
+            attention_reasons=list(state.attention_reasons),
+            next_action=state.next_action,
+        )
+
+    def check_follow_up(
+        self, _step: WorkflowStep, context: WorkflowContext
+    ) -> WorkflowStepResult:
+        application_id = self._application_id(context)
+        state = self.application_follow_up_service.get_state(application_id)
+        if "follow_up_overdue" not in state.attention_reasons:
+            return self._completed(
+                "Nenhum follow-up vencido; nenhuma ação foi criada.",
+                application_id=application_id,
+                follow_up_required=state.follow_up_required,
+            )
+        return {
+            "status": "Aguardando usuário",
+            "message": "Follow-up vencido requer ação explícita do usuário.",
+            "context_updates": {
+                "application_id": application_id,
+                "follow_up_required": True,
+            },
+        }
+
+    def _application_id(self, context: WorkflowContext) -> int:
+        application_id = context.get("application_id")
+        if not application_id:
+            raise ValueError("Selecione uma candidatura antes de executar esta etapa.")
+        if self.application_follow_up_service is None:
+            raise RuntimeError("Serviço de acompanhamento não configurado.")
+        return int(application_id)
 
     def _job(self, context: WorkflowContext) -> Any:
         job_id = context.get("job_id")

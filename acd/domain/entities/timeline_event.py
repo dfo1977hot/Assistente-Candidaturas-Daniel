@@ -18,6 +18,9 @@ class TimelineEvent(Base):
     application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
+    origin: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
+    reference_type: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
     def __repr__(self) -> str:

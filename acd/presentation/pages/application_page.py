@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -89,6 +90,19 @@ class _ApplicationData(Protocol):
     def create_application(self, **data: object) -> object: ...
     def update_application(self, application_id: int, **data: object) -> object | None: ...
     def delete_application(self, application_id: int, *, delete_linked: bool = False) -> bool: ...
+
+
+class _FollowUpData(Protocol):
+    ACTION_TYPES: tuple[str, ...]
+    INTERACTION_TYPES: tuple[str, ...]
+    PRIORITIES: tuple[str, ...]
+
+    def get_state(self, application_id: int) -> object: ...
+    def get_timeline(self, application_id: int) -> tuple[object, ...]: ...
+    def set_next_action(self, application_id: int, **data: object) -> object: ...
+    def register_interaction(self, application_id: int, **data: object) -> object: ...
+    def complete_follow_up(self, application_id: int, *, note: str = "") -> object: ...
+    def postpone_follow_up(self, application_id: int, new_date: object, *, note: str = "") -> object: ...
 
 
 class _CompanyData(Protocol):
@@ -173,6 +187,7 @@ class ApplicationPage(BasePage):
         effective_structured_resume_docx_export_view_model: EffectiveStructuredResumeDocxExportViewModel | None = None,
         structured_resume_quality_validation_view_model: StructuredResumeQualityValidationViewModel | None = None,
         application_service: _ApplicationData | None = None,
+        application_follow_up_service: _FollowUpData | None = None,
         company_service: _CompanyData | None = None,
         job_service: _JobData | None = None,
         curriculum_service: _CurriculumData | None = None,
@@ -219,6 +234,7 @@ class ApplicationPage(BasePage):
         # The desktop root always injects real dependencies. The empty boundary
         # permits isolated ViewModel tests without reintroducing service creation.
         self.application_service = application_service or _EmptyApplicationData()
+        self.application_follow_up_service = application_follow_up_service
         self.company_service = company_service or _EmptyApplicationData()
         self.job_service = job_service or _EmptyApplicationData()
         self.curriculum_service = curriculum_service or _EmptyApplicationData()
@@ -239,7 +255,18 @@ class ApplicationPage(BasePage):
         self.status_combo = QComboBox()
         self.application_date_input = QDateEdit()
         self.next_follow_up_input = QDateEdit()
+        self.next_action_combo = QComboBox()
+        self.follow_up_priority_combo = QComboBox()
+        self.follow_up_time_input = QLineEdit()
+        self.follow_up_time_input.setPlaceholderText("HH:MM (opcional)")
+        self.follow_up_note_input = QLineEdit()
+        self.last_interaction_label = QLabel("Nenhuma interação registrada")
+        self.register_interaction_button = QPushButton("Registrar interação")
+        self.complete_follow_up_button = QPushButton("Concluir follow-up")
+        self.postpone_follow_up_button = QPushButton("Adiar follow-up")
+        self.timeline_button = QPushButton("Ver timeline")
         self.response_date_input = QDateEdit()
+        self.response_date_input.setReadOnly(True)
         self.interview_date_input = QDateEdit()
         self.salary_expected_input = QLineEdit()
         self.salary_offered_input = QLineEdit()
@@ -345,6 +372,12 @@ class ApplicationPage(BasePage):
                     break
 
     def _setup_controls(self) -> None:
+        if self.application_follow_up_service is not None:
+            self.next_action_combo.addItem("")
+            self.next_action_combo.addItems(self.application_follow_up_service.ACTION_TYPES)
+            self.follow_up_priority_combo.addItems(
+                self.application_follow_up_service.PRIORITIES
+            )
         for date_input in (
             self.application_date_input,
             self.next_follow_up_input,
@@ -424,6 +457,31 @@ class ApplicationPage(BasePage):
         full_width_fields.addRow(QLabel("Feedback"), self.feedback_input)
         full_width_fields.addRow(QLabel("Observações"), self.notes_input)
 
+        follow_up_layout = QGridLayout()
+        follow_up_layout.addWidget(QLabel("Próxima ação"), 0, 0)
+        follow_up_layout.addWidget(self.next_action_combo, 0, 1)
+        follow_up_layout.addWidget(QLabel("Prioridade"), 0, 2)
+        follow_up_layout.addWidget(self.follow_up_priority_combo, 0, 3)
+        follow_up_layout.addWidget(QLabel("Horário"), 1, 0)
+        follow_up_layout.addWidget(self.follow_up_time_input, 1, 1)
+        follow_up_layout.addWidget(QLabel("Observação de acompanhamento"), 2, 0)
+        follow_up_layout.addWidget(self.follow_up_note_input, 2, 1, 1, 3)
+        follow_up_layout.addWidget(QLabel("Última interação"), 3, 0)
+        follow_up_layout.addWidget(self.last_interaction_label, 3, 1, 1, 3)
+        for column, button in enumerate(
+            (
+                self.register_interaction_button,
+                self.complete_follow_up_button,
+                self.postpone_follow_up_button,
+                self.timeline_button,
+            )
+        ):
+            follow_up_layout.addWidget(button, 4, column)
+        self.register_interaction_button.clicked.connect(self._register_interaction)
+        self.complete_follow_up_button.clicked.connect(self._complete_follow_up)
+        self.postpone_follow_up_button.clicked.connect(self._postpone_follow_up)
+        self.timeline_button.clicked.connect(self._show_timeline)
+
         actions = QGridLayout()
         action_buttons = (
             self.save_button,
@@ -465,6 +523,7 @@ class ApplicationPage(BasePage):
         self.content_layout.addWidget(self.table)
         self.content_layout.addLayout(form_columns)
         self.content_layout.addLayout(full_width_fields)
+        self.content_layout.addLayout(follow_up_layout)
         self.content_layout.addWidget(self.resume_match_label)
         self.content_layout.addWidget(self.resume_match_details)
         self.content_layout.addWidget(self.structured_resume_quality_label)
@@ -663,7 +722,7 @@ class ApplicationPage(BasePage):
             job_id_value = int(job_id)
 
             if self.current_application_id is None:
-                self.application_service.create_application(
+                saved_application = self.application_service.create_application(
                     job_id=job_id_value,
                     company_id=company_id_value,
                     status=status,
@@ -680,7 +739,7 @@ class ApplicationPage(BasePage):
                     notes=notes,
                 )
             else:
-                self.application_service.update_application(
+                saved_application = self.application_service.update_application(
                     self.current_application_id,
                     job_id=job_id_value,
                     company_id=company_id_value,
@@ -698,12 +757,116 @@ class ApplicationPage(BasePage):
                     notes=notes,
                 )
 
+            if saved_application is not None:
+                self._save_follow_up_state(int(saved_application.id))
+
             self._clear_form()
             self._load_applications()
         except ValueError as exc:
             QMessageBox.warning(self, "Dados inválidos", str(exc))
         except Exception as exc:  # pragma: no cover - defensive UI handling
             QMessageBox.critical(self, "Erro", str(exc))
+
+    def _require_follow_up(self) -> tuple[int, _FollowUpData]:
+        if self.current_application_id is None:
+            raise ValueError("Selecione uma candidatura.")
+        if self.application_follow_up_service is None:
+            raise ValueError("Acompanhamento não configurado.")
+        return self.current_application_id, self.application_follow_up_service
+
+    def _register_interaction(self) -> None:
+        try:
+            application_id, service = self._require_follow_up()
+            interaction_type, accepted = QInputDialog.getItem(
+                self,
+                "Registrar interação",
+                "Tipo",
+                service.INTERACTION_TYPES,
+                editable=False,
+            )
+            if not accepted:
+                return
+            summary, accepted = QInputDialog.getText(
+                self, "Registrar interação", "Resumo do evento real"
+            )
+            if not accepted:
+                return
+            service.register_interaction(
+                application_id,
+                interaction_type=interaction_type,
+                summary=summary,
+            )
+            self._load_follow_up_state(application_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Acompanhamento", str(exc))
+
+    def _complete_follow_up(self) -> None:
+        try:
+            application_id, service = self._require_follow_up()
+            service.complete_follow_up(application_id)
+            self._load_follow_up_state(application_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Acompanhamento", str(exc))
+
+    def _postpone_follow_up(self) -> None:
+        try:
+            application_id, service = self._require_follow_up()
+            selected = self.next_follow_up_input.date().toPython()
+            service.postpone_follow_up(application_id, selected)
+            self._load_follow_up_state(application_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Acompanhamento", str(exc))
+
+    def _show_timeline(self) -> None:
+        try:
+            application_id, service = self._require_follow_up()
+            timeline = service.get_timeline(application_id)
+            text = "\n".join(
+                f"{item.occurred_at:%d/%m/%Y %H:%M} · {item.interaction_type} · "
+                f"{item.summary} · {item.origin}"
+                for item in timeline
+            )
+            QMessageBox.information(
+                self, "Timeline da candidatura", text or "Nenhum evento registrado."
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Acompanhamento", str(exc))
+
+    def _load_follow_up_state(self, application_id: int) -> None:
+        if self.application_follow_up_service is None:
+            return
+        state = self.application_follow_up_service.get_state(application_id)
+        action_index = self.next_action_combo.findText(state.next_action)
+        if action_index >= 0:
+            self.next_action_combo.setCurrentIndex(action_index)
+        priority_index = self.follow_up_priority_combo.findText(state.priority)
+        if priority_index >= 0:
+            self.follow_up_priority_combo.setCurrentIndex(priority_index)
+        self.follow_up_note_input.setText(state.note)
+        self.follow_up_time_input.setText(state.follow_up_time)
+        if state.last_interaction_at is None:
+            self.last_interaction_label.setText("Nenhuma interação registrada")
+        else:
+            self.last_interaction_label.setText(
+                f"{state.last_interaction_type} · "
+                f"{state.last_interaction_at:%d/%m/%Y %H:%M}"
+            )
+
+    def _save_follow_up_state(self, application_id: int) -> None:
+        if self.application_follow_up_service is None:
+            return
+        if not self.next_action_combo.currentText():
+            return
+        self.application_follow_up_service.set_next_action(
+            application_id,
+            action=self.next_action_combo.currentText(),
+            follow_up_date=self.next_follow_up_input.date().toPython()
+            if self.next_follow_up_input.text().strip()
+            else None,
+            priority=self.follow_up_priority_combo.currentText(),
+            follow_up_time=self.follow_up_time_input.text().strip(),
+            note=self.follow_up_note_input.text(),
+        )
 
     def _delete_application(self) -> None:
         if self.current_application_id is None:
@@ -919,6 +1082,7 @@ class ApplicationPage(BasePage):
             self.current_application_id
         )
         if application is not None:
+            self._load_follow_up_state(self.current_application_id)
             company_index = self.company_combo.findData(application.company_id)
             if company_index >= 0:
                 self.company_combo.setCurrentIndex(company_index)

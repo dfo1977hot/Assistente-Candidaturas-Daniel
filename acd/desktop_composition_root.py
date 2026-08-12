@@ -37,6 +37,7 @@ from acd.presentation.pages.settings_page import SettingsPage
 from acd.presentation.pages.workflow_page import WorkflowPage
 from acd.services.analytics_export_service import AnalyticsExportService
 from acd.services.analytics_service import AnalyticsService
+from acd.services.application_follow_up_service import ApplicationFollowUpService
 from acd.services.application_service import ApplicationService
 from acd.services.assisted_application_service import AssistedApplicationService
 from acd.services.ats_service import ATSService
@@ -107,6 +108,7 @@ class DesktopCompositionRoot:
             closed_jobs_registry,
         )
         application_service = ApplicationService(application_repository)
+        application_follow_up_service = ApplicationFollowUpService(application_repository)
         interview_service = InterviewService(interview_repository)
         curriculum_service = CurriculumService(curriculum_repository)
         cover_letter_service = CoverLetterService(
@@ -135,6 +137,7 @@ class DesktopCompositionRoot:
             application_url_resolver=PlaywrightApplicationBrowser(
                 linkedin_headless=settings_service.browser_headless,
             ),
+            application_follow_up_service=application_follow_up_service,
         )
         workflow_service = WorkflowService(step_registry=workflow_handlers.registry())
         workflow_trigger_dispatcher = WorkflowTriggerDispatcher(
@@ -169,6 +172,7 @@ class DesktopCompositionRoot:
             resume_version_review_view_model=application_view_models["resume_review"],
             optimized_resume_evaluation_view_model=application_view_models["optimized_evaluation"],
             application_service=application_service,
+            application_follow_up_service=application_follow_up_service,
             company_service=company_service,
             job_service=job_service,
             curriculum_service=curriculum_service,

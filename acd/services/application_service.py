@@ -91,7 +91,7 @@ class ApplicationService:
             application_date=self._parse_optional_date(application_date),
             last_update=date.today(),
             next_follow_up=self._parse_optional_date(next_follow_up),
-            response_date=self._parse_optional_date(response_date),
+            response_date=None,
             interview_date=self._parse_optional_date(interview_date),
             salary_expected=salary_expected,
             salary_offered=salary_offered,
@@ -158,7 +158,8 @@ class ApplicationService:
         if application.status == "Pronta para Aplicação":
             application.application_date = None
             application.next_follow_up = None
-        application.response_date = self._parse_optional_date(response_date)
+        # Response dates are owned by ApplicationFollowUpService and are only
+        # written after an explicitly recorded real response interaction.
         if interview_date is not _UNCHANGED:
             application.interview_date = self._parse_optional_date(interview_date)
         application.salary_expected = salary_expected

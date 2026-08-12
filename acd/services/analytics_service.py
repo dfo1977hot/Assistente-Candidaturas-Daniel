@@ -412,6 +412,20 @@ class AnalyticsService:
             and (row["last_update"] or cls._naive(row["updated_at"]).date()) < stale_limit
             for row in applications
         )
+        follow_up_overdue = sum(
+            row["status"] not in cls.TERMINAL_APPLICATION_STATUSES
+            and row.get("next_follow_up") is not None
+            and row["next_follow_up"] < current.date()
+            for row in applications
+        )
+        upcoming_interviews = sum(
+            row["status"] not in cls.TERMINAL_APPLICATION_STATUSES
+            and row.get("interview_date") is not None
+            and current.date()
+            <= row["interview_date"]
+            <= current.date() + timedelta(days=7)
+            for row in applications
+        )
         application_job_ids = {row["job_id"] for row in applications}
         pending_jobs = sum(
             row["status"] not in cls.CLOSED_JOB_STATUSES and row["id"] not in application_job_ids
@@ -427,6 +441,8 @@ class AnalyticsService:
             ("awaiting_user", awaiting, "Workflows aguardando intervenção do usuário"),
             ("workflow_failure", failures, "Falhas de workflow nos últimos 7 dias"),
             ("stale_application", stale, f"Candidaturas sem atualização há {cls.STALE_APPLICATION_DAYS} dias"),
+            ("follow_up_overdue", follow_up_overdue, "Follow-ups vencidos"),
+            ("upcoming_interview", upcoming_interviews, "Entrevistas nos próximos 7 dias"),
             ("pending_application", pending_jobs, "Vagas ativas sem candidatura"),
             ("overdue_schedule", overdue, "Agendamentos de workflow vencidos"),
         ):

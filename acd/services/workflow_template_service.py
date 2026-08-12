@@ -52,7 +52,7 @@ class WorkflowTemplateService:
             ],
         },
         {
-            "name": "Acompanhamento",
+            "name": "Acompanhamento de candidatura",
             "description": "Organiza o acompanhamento de candidaturas e pontos de atenção.",
             "trigger": "Execução manual",
             "steps": [
