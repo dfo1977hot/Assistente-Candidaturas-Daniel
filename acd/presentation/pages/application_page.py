@@ -106,6 +106,15 @@ class _FollowUpData(Protocol):
 
 
 
+class _CommunicationsData(Protocol):
+    def sync_application(
+        self,
+        application_id: int,
+        *,
+        progress: Callable[[tuple[int, str]], None] | None = None,
+    ) -> object: ...
+
+
 class _CompanyData(Protocol):
     def list_companies(self) -> list[object]: ...
 
@@ -189,6 +198,7 @@ class ApplicationPage(BasePage):
         structured_resume_quality_validation_view_model: StructuredResumeQualityValidationViewModel | None = None,
         application_service: _ApplicationData | None = None,
         application_follow_up_service: _FollowUpData | None = None,
+        communications_service: _CommunicationsData | None = None,
         company_service: _CompanyData | None = None,
         job_service: _JobData | None = None,
         curriculum_service: _CurriculumData | None = None,
@@ -236,6 +246,7 @@ class ApplicationPage(BasePage):
         # permits isolated ViewModel tests without reintroducing service creation.
         self.application_service = application_service or _EmptyApplicationData()
         self.application_follow_up_service = application_follow_up_service
+        self.communications_service = communications_service
         self.company_service = company_service or _EmptyApplicationData()
         self.job_service = job_service or _EmptyApplicationData()
         self.curriculum_service = curriculum_service or _EmptyApplicationData()
@@ -250,6 +261,12 @@ class ApplicationPage(BasePage):
         if assisted_progress is not None:
             assisted_progress.connect(self._on_assisted_application_progress)
         self._assisted_application_progress: QProgressDialog | None = None
+        self._communications_executor = LongRunningTaskExecutor(self)
+        self._communications_executor.succeeded.connect(self._on_outlook_sync_succeeded)
+        self._communications_executor.failed.connect(self._on_outlook_sync_failed)
+        self._communications_executor.finished.connect(self._on_outlook_sync_finished)
+        self._communications_executor.progress.connect(self._on_outlook_sync_progress)
+        self._outlook_sync_progress: QProgressDialog | None = None
 
         self.company_combo = QComboBox()
         self.job_combo = QComboBox()
@@ -266,6 +283,12 @@ class ApplicationPage(BasePage):
         self.complete_follow_up_button = QPushButton("Concluir follow-up")
         self.postpone_follow_up_button = QPushButton("Adiar follow-up")
         self.timeline_button = QPushButton("Ver timeline")
+        self.outlook_sync_button = QPushButton("Sincronizar Outlook Classic")
+        self.outlook_sync_button.setEnabled(False)
+        self.outlook_sync_button.setToolTip(
+            "Lê respostas recebidas no Outlook Classic sem enviar, excluir, mover "
+            "ou marcar mensagens como lidas."
+        )
         self.response_date_input = QDateEdit()
         self.response_date_input.setReadOnly(True)
         self.interview_date_input = QDateEdit()
@@ -482,6 +505,8 @@ class ApplicationPage(BasePage):
         self.complete_follow_up_button.clicked.connect(self._complete_follow_up)
         self.postpone_follow_up_button.clicked.connect(self._postpone_follow_up)
         self.timeline_button.clicked.connect(self._show_timeline)
+        follow_up_layout.addWidget(self.outlook_sync_button, 5, 0, 1, 4)
+        self.outlook_sync_button.clicked.connect(self._sync_outlook_classic)
 
         actions = QGridLayout()
         action_buttons = (
@@ -777,6 +802,74 @@ class ApplicationPage(BasePage):
         if self.application_follow_up_service is None:
             raise ValueError("Acompanhamento não configurado.")
         return self.current_application_id, self.application_follow_up_service
+
+    def _sync_outlook_classic(self) -> None:
+        if self.current_application_id is None:
+            QMessageBox.information(
+                self, "Outlook Classic", "Selecione uma candidatura para sincronizar."
+            )
+            return
+        if self.communications_service is None:
+            QMessageBox.warning(
+                self, "Outlook Classic", "Integração com Outlook Classic não configurada."
+            )
+            return
+        if self._communications_executor.is_running:
+            return
+
+        application_id = self.current_application_id
+        dialog = QProgressDialog("Preparando Outlook Classic...", "", 0, 100, self)
+        dialog.setWindowTitle("Sincronizando Outlook Classic")
+        dialog.setCancelButton(None)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setValue(0)
+        self._outlook_sync_progress = dialog
+        self.outlook_sync_button.setEnabled(False)
+        dialog.show()
+
+        self._communications_executor.execute_with_context(
+            lambda emit, _token: self.communications_service.sync_application(
+                application_id,
+                progress=emit,
+            )
+        )
+
+    def _on_outlook_sync_progress(self, payload: object) -> None:
+        dialog = self._outlook_sync_progress
+        if dialog is None:
+            return
+        if isinstance(payload, tuple) and len(payload) == 2:
+            value, message = payload
+            dialog.setValue(int(value))
+            dialog.setLabelText(str(message))
+
+    def _on_outlook_sync_succeeded(self, result: object) -> None:
+        if self.current_application_id is not None:
+            self._load_follow_up_state(self.current_application_id)
+
+        imported = int(getattr(result, "imported_messages", 0))
+        skipped = int(getattr(result, "skipped_duplicates", 0))
+        matched = int(getattr(result, "matched_messages", 0))
+
+        QMessageBox.information(
+            self,
+            "Outlook Classic",
+            f"Sincronização concluída. Encontradas: {matched} | "
+            f"Importadas: {imported} | Já registradas: {skipped}.",
+        )
+
+    def _on_outlook_sync_failed(self, error: object) -> None:
+        QMessageBox.warning(self, "Outlook Classic", str(error))
+
+    def _on_outlook_sync_finished(self) -> None:
+        dialog = self._outlook_sync_progress
+        if dialog is not None:
+            dialog.close()
+        self._outlook_sync_progress = None
+        self.outlook_sync_button.setEnabled(
+            self.current_application_id is not None and self.communications_service is not None
+        )
 
     def _register_interaction(self) -> None:
         try:
@@ -1109,6 +1202,7 @@ class ApplicationPage(BasePage):
             self.analyze_resume_button.setEnabled(False)
             self.optimize_resume_button.setEnabled(False)
             self.assisted_application_button.setEnabled(False)
+            self.outlook_sync_button.setEnabled(False)
             self.generate_structured_resume_button.setEnabled(False)
             self.candidate_decision_panel.show_empty_state()
             self.candidate_decision_panel.render_actions(())
@@ -1119,6 +1213,7 @@ class ApplicationPage(BasePage):
         self.current_application_id = int(self.table.item(row, 0).text())
         self.select_curriculum_button.setEnabled(True)
         self.assisted_application_button.setEnabled(self.assisted_application_service is not None)
+        self.outlook_sync_button.setEnabled(self.communications_service is not None)
         self.analyze_resume_button.setEnabled(False)
         self.optimize_resume_button.setEnabled(False)
         self.generate_structured_resume_button.setEnabled(
@@ -1824,6 +1919,7 @@ class ApplicationPage(BasePage):
 
     def _clear_form(self) -> None:
         self.current_application_id = None
+        self.outlook_sync_button.setEnabled(False)
         self.optimize_resume_button.setEnabled(False)
         self.generate_structured_resume_button.setEnabled(False)
         self.candidate_decision_panel.show_empty_state()

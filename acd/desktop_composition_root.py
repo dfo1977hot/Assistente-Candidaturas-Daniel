@@ -7,6 +7,7 @@ from acd.database.create_database import create_database
 from acd.infrastructure.application_automation.playwright_application_browser import (
     PlaywrightApplicationBrowser,
 )
+from acd.infrastructure.email.classic_outlook_mail_reader import ClassicOutlookMailReader
 from acd.infrastructure.linkedin.linkedin_saved_jobs_browser import LinkedInSavedJobsBrowser
 from acd.infrastructure.repositories.analytics_repository import AnalyticsRepository
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
@@ -43,6 +44,7 @@ from acd.services.assisted_application_service import AssistedApplicationService
 from acd.services.ats_service import ATSService
 from acd.services.career_planning_service import CareerPlanningService
 from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
+from acd.services.communications_service import CommunicationsService
 from acd.services.company_lookup_service import CompanyLookupService
 from acd.services.company_service import CompanyService
 from acd.services.cover_letter_service import CoverLetterService
@@ -109,6 +111,11 @@ class DesktopCompositionRoot:
         )
         application_service = ApplicationService(application_repository)
         application_follow_up_service = ApplicationFollowUpService(application_repository)
+        communications_service = CommunicationsService(
+            application_service,
+            application_follow_up_service,
+            ClassicOutlookMailReader(),
+        )
 
         interview_service = InterviewService(interview_repository)
         curriculum_service = CurriculumService(curriculum_repository)
@@ -174,6 +181,7 @@ class DesktopCompositionRoot:
             optimized_resume_evaluation_view_model=application_view_models["optimized_evaluation"],
             application_service=application_service,
             application_follow_up_service=application_follow_up_service,
+            communications_service=communications_service,
             company_service=company_service,
             job_service=job_service,
             curriculum_service=curriculum_service,
