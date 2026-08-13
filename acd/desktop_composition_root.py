@@ -109,6 +109,7 @@ class DesktopCompositionRoot:
         )
         application_service = ApplicationService(application_repository)
         application_follow_up_service = ApplicationFollowUpService(application_repository)
+
         interview_service = InterviewService(interview_repository)
         curriculum_service = CurriculumService(curriculum_repository)
         cover_letter_service = CoverLetterService(

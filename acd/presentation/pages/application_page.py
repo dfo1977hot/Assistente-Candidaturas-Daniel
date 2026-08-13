@@ -105,6 +105,7 @@ class _FollowUpData(Protocol):
     def postpone_follow_up(self, application_id: int, new_date: object, *, note: str = "") -> object: ...
 
 
+
 class _CompanyData(Protocol):
     def list_companies(self) -> list[object]: ...
 
@@ -802,6 +803,7 @@ class ApplicationPage(BasePage):
             self._load_follow_up_state(application_id)
         except ValueError as exc:
             QMessageBox.warning(self, "Acompanhamento", str(exc))
+
 
     def _complete_follow_up(self) -> None:
         try:

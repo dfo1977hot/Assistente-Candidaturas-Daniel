@@ -26,6 +26,7 @@ class SettingsService:
     APP_KEYRING_SERVICE = "ACD - Assistente de Candidaturas"
     OPENAI_KEY = "api:openai"
     GOOGLE_KEY = "api:google"
+    MICROSOFT_TOKEN_CACHE = "oauth:microsoft:token-cache"
 
     def __init__(self, settings_path: Path | None = None) -> None:
         default_path = Path.home() / ".acd" / "settings.json"
@@ -55,6 +56,29 @@ class SettingsService:
     def set_browser_headless(self, enabled: bool) -> None:
         self._data["browser_headless"] = bool(enabled)
         self._save()
+
+    def microsoft_graph_client_id(self) -> str:
+        """Return the public Microsoft Graph application client ID."""
+        for credential in self.list_logins():
+            if credential.service.casefold() in {
+                "microsoft graph",
+                "microsoft outlook",
+                "outlook",
+            } and credential.username.strip():
+                return credential.username.strip()
+        return read_setting("MICROSOFT_GRAPH_CLIENT_ID").strip()
+
+    def microsoft_token_cache(self) -> str:
+        """Read the serialized MSAL cache from the operating-system credential vault."""
+        return self._get_secret(self.MICROSOFT_TOKEN_CACHE)
+
+    def set_microsoft_token_cache(self, serialized_cache: str) -> None:
+        """Persist or clear the serialized MSAL cache in the credential vault."""
+        value = serialized_cache.strip()
+        if value:
+            self._set_secret(self.MICROSOFT_TOKEN_CACHE, value)
+        else:
+            self._delete_secret(self.MICROSOFT_TOKEN_CACHE)
 
     def get_api_key(self, provider: str) -> str:
         provider = provider.strip().lower()
@@ -149,6 +173,9 @@ class SettingsService:
             "Navegador LinkedIn": "Segundo plano" if self.browser_headless() else "Visível",
             "OpenAI": "Configurada" if self.get_api_key("openai") else "Não configurada",
             "Google": "Configurada" if self.get_api_key("google") else "Não configurada",
+            "Microsoft Graph": (
+                "Cliente configurado" if self.microsoft_graph_client_id() else "Não configurado"
+            ),
             "Logins cadastrados": str(len(self.list_logins())),
         }
 
