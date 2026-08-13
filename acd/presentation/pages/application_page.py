@@ -758,10 +758,13 @@ class ApplicationPage(BasePage):
                 )
 
             if saved_application is not None:
-                self._save_follow_up_state(int(saved_application.id))
-
-            self._clear_form()
-            self._load_applications()
+                saved_application_id = int(saved_application.id)
+                self.current_application_id = saved_application_id
+                self._save_follow_up_state(saved_application_id)
+                self._load_applications()
+                self._select_application_row(saved_application_id)
+            else:
+                self._load_applications()
         except ValueError as exc:
             QMessageBox.warning(self, "Dados inválidos", str(exc))
         except Exception as exc:  # pragma: no cover - defensive UI handling
@@ -821,16 +824,66 @@ class ApplicationPage(BasePage):
         try:
             application_id, service = self._require_follow_up()
             timeline = service.get_timeline(application_id)
-            text = "\n".join(
-                f"{item.occurred_at:%d/%m/%Y %H:%M} · {item.interaction_type} · "
-                f"{item.summary} · {item.origin}"
-                for item in timeline
-            )
-            QMessageBox.information(
-                self, "Timeline da candidatura", text or "Nenhum evento registrado."
-            )
         except ValueError as exc:
             QMessageBox.warning(self, "Acompanhamento", str(exc))
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Timeline da candidatura")
+        dialog.resize(920, 520)
+        layout = QVBoxLayout(dialog)
+
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Tipo"))
+        type_filter = QComboBox()
+        type_filter.addItem("Todos")
+        event_types = sorted(
+            {str(item.interaction_type) for item in timeline},
+            key=str.casefold,
+        )
+        type_filter.addItems(event_types)
+        filter_row.addWidget(type_filter)
+        counter = QLabel()
+        filter_row.addStretch(1)
+        filter_row.addWidget(counter)
+        layout.addLayout(filter_row)
+
+        table = QTableWidget(0, 6)
+        table.setHorizontalHeaderLabels(
+            ["Data/Hora", "Tipo", "Resumo", "Origem", "Referência", "ID"]
+        )
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        layout.addWidget(table)
+
+        def render(selected_type: str = "Todos") -> None:
+            filtered = [
+                item
+                for item in timeline
+                if selected_type == "Todos"
+                or str(item.interaction_type) == selected_type
+            ]
+            table.setRowCount(len(filtered))
+            for row, item in enumerate(filtered):
+                reference = str(item.reference_type or "")
+                reference_id = "" if item.reference_id is None else str(item.reference_id)
+                values = (
+                    f"{item.occurred_at:%d/%m/%Y %H:%M}",
+                    str(item.interaction_type),
+                    str(item.summary),
+                    str(item.origin),
+                    reference,
+                    reference_id,
+                )
+                for column, value in enumerate(values):
+                    table.setItem(row, column, QTableWidgetItem(value))
+            counter.setText(f"{len(filtered)} evento(s)")
+
+        type_filter.currentTextChanged.connect(render)
+        render()
+        dialog.exec()
 
     def _load_follow_up_state(self, application_id: int) -> None:
         if self.application_follow_up_service is None:
@@ -1759,6 +1812,13 @@ class ApplicationPage(BasePage):
                 ),
             )
         self.table.resizeColumnsToContents()
+
+    def _select_application_row(self, application_id: int) -> None:
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None and int(item.text()) == application_id:
+                self.table.selectRow(row)
+                return
 
     def _clear_form(self) -> None:
         self.current_application_id = None

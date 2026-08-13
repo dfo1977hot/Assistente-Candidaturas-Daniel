@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+import re
 from typing import Any, Protocol
+
+from acd.core.datetime_utils import utc_now
 
 
 class ApplicationFollowUpRepository(Protocol):
@@ -137,7 +140,7 @@ class ApplicationFollowUpService:
         if not summary.strip():
             raise ValueError("Informe um resumo da interação real.")
         application = self._application(application_id)
-        timestamp = occurred_at or datetime.now()
+        timestamp = occurred_at or utc_now()
         event = self.repository.add_event(
             application_id,
             interaction_type,
@@ -240,7 +243,10 @@ class ApplicationFollowUpService:
         reasons = []
         if application.next_follow_up and application.next_follow_up < current:
             reasons.append("follow_up_overdue")
-        last_update = application.last_update or application.updated_at.date()
+        updated_at = getattr(application, "updated_at", None)
+        last_update = application.last_update or (
+            updated_at.date() if updated_at is not None else current
+        )
         if last_update < current - timedelta(days=self.STALE_DAYS):
             reasons.append("stale_application")
         if application.interview_date and current <= application.interview_date <= (
@@ -263,6 +269,8 @@ class ApplicationFollowUpService:
 
     @staticmethod
     def _valid_time(value: str) -> bool:
+        if re.fullmatch(r"\d{2}:\d{2}", value) is None:
+            return False
         try:
             datetime.strptime(value, "%H:%M")
         except ValueError:
