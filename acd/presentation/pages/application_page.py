@@ -265,7 +265,11 @@ class ApplicationPage(BasePage):
         self._communications_executor.succeeded.connect(self._on_outlook_sync_succeeded)
         self._communications_executor.failed.connect(self._on_outlook_sync_failed)
         self._communications_executor.finished.connect(self._on_outlook_sync_finished)
-        self._communications_executor.progress.connect(self._on_outlook_sync_progress)
+
+        communications_progress = getattr(self._communications_executor, "progress", None)
+        if communications_progress is not None:
+            communications_progress.connect(self._on_outlook_sync_progress)
+
         self._outlook_sync_progress: QProgressDialog | None = None
 
         self.company_combo = QComboBox()
