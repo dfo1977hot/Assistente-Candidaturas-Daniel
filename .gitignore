@@ -104,3 +104,5 @@ data/settings/candidate_profile.json
 *.h2d-bak
 *.h2d-bak2
 *_atual.txt
+data/assisted_application_profile.json
+data/resume_match_results.json
