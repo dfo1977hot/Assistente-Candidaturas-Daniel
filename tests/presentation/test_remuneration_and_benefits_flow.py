@@ -30,13 +30,13 @@ def test_application_uses_ideal_remuneration_as_expected_salary() -> None:
     method = source.split("    def _populate_salary_from_job", 1)[1].split(
         "    def _save_application", 1
     )[0]
-    assert 'f"{ideal:.2f}" if ideal is not None else ""' in method
+    assert 'self._format_brl_currency(ideal) if ideal is not None else ""' in method
     assert "max(candidates)" not in method
-    assert 'else "A combinar"' in method
+    assert 'else ""' in method
 
 
 def test_linkedin_import_researches_ideal_and_keeps_advertised_value() -> None:
     source = _read("acd/services/linkedin_saved_jobs_import_service.py")
     assert "offered = max(advertised) if advertised else None" in source
-    assert "salary_max=result.salary_max" in source
+    assert "salary_max=result.median_salary" in source
     assert "_notes_with_benefits" in source

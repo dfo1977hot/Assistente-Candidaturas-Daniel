@@ -4,10 +4,9 @@ from dataclasses import dataclass
 import json
 import re
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
 
+from acd.infrastructure.ai.providers import AIProvider, SettingsConfiguredAIProvider
 from acd.security.secret_provider import read_setting
 from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
 from acd.services.settings_service import SettingsService
@@ -72,9 +71,7 @@ class ImportedLinkedInJob:
 
 
 class LinkedInJobImportService:
-    """Importa dados públicos de uma vaga do LinkedIn usando OpenAI web search."""
-
-    RESPONSES_URL = "https://api.openai.com/v1/responses"
+    """Importa dados públicos de uma vaga usando a ordem global de IA."""
 
     def __init__(
         self,
@@ -83,8 +80,14 @@ class LinkedInJobImportService:
         model: str | None = None,
         timeout: float | None = None,
         closed_jobs_registry: ClosedLinkedInJobsRegistry | None = None,
+        settings_service: SettingsService | None = None,
+        ai_provider: AIProvider | None = None,
     ) -> None:
         self._api_key = (api_key or "").strip()
+        self._settings_service = settings_service or SettingsService()
+        self._ai_provider = ai_provider or SettingsConfiguredAIProvider(
+            self._settings_service
+        )
         self._closed_jobs_registry = (
             closed_jobs_registry or ClosedLinkedInJobsRegistry()
         )
@@ -104,52 +107,18 @@ class LinkedInJobImportService:
                 accepting_applications=False,
             )
 
-        api_key = self._api_key or SettingsService().get_api_key("openai").strip()
-        if not api_key:
-            raise LinkedInJobImportError(
-                "A chave da OpenAI não está configurada. Cadastre e teste a chave "
-                "na página Configurações."
-            )
-
-        payload = {
-            "model": self._model,
-            "tools": [{"type": "web_search"}],
-            "input": self._build_prompt(normalized_url),
-            "store": False,
-        }
-        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        request = Request(
-            self.RESPONSES_URL,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json; charset=utf-8",
-                "Accept": "application/json",
-                "User-Agent": "ACD-LinkedIn-Job-Importer/0.1",
-            },
-            method="POST",
-        )
-
         try:
-            with urlopen(request, timeout=self._timeout) as response:
-                response_data = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            details = exc.read().decode("utf-8", errors="replace")
-            raise LinkedInJobImportError(self._http_error_message(exc.code, details)) from exc
-        except TimeoutError as exc:
+            output_text = self._ai_provider.generate_text(
+                prompt=self._build_prompt(normalized_url),
+                model="linkedin-job-import",
+                temperature=0.0,
+                max_tokens=5000,
+                language="pt-BR",
+            )
+        except Exception as exc:
             raise LinkedInJobImportError(
-                "A importação excedeu o tempo limite. Tente novamente em alguns instantes."
+                f"Nenhum provedor de IA conseguiu importar a vaga: {exc}"
             ) from exc
-        except URLError as exc:
-            raise LinkedInJobImportError(
-                f"Não foi possível acessar a OpenAI API: {exc.reason}"
-            ) from exc
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise LinkedInJobImportError(
-                "A OpenAI API retornou uma resposta que não pôde ser interpretada."
-            ) from exc
-
-        output_text = self._extract_output_text(response_data)
         structured_data = self._parse_structured_json(output_text)
         result = self._to_result(structured_data, normalized_url)
         if result.accepting_applications is False:
@@ -242,7 +211,7 @@ Regras:
                             parts.append(text.strip())
         if not parts:
             raise LinkedInJobImportError(
-                "A OpenAI não retornou conteúdo suficiente para preencher a vaga."
+                "A IA não retornou conteúdo suficiente para preencher a vaga."
             )
         return "\n".join(parts)
 

@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.infrastructure.repositories.skill_repository import SkillRepository
@@ -8,9 +5,9 @@ from acd.services.knowledge_service import KnowledgeService
 
 
 @pytest.fixture
-def knowledge_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-knowledge-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd.db")
+def knowledge_setup(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

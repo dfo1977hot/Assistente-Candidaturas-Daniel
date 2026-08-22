@@ -154,6 +154,7 @@ def build_acceptance_runtime(
         "agent_console": BasePage("Agentes"),
         "cover_letters": BasePage("Cartas"),
         "crm": BasePage("CRM"),
+        "candidate_profile": BasePage("Perfil do Candidato"),
         "settings": BasePage("Configuracoes"),
     }
     settings_service = SettingsService(workspace / "settings.json")

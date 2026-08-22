@@ -489,14 +489,14 @@ def test_application_page_populates_salary_and_clears_defaults(qapp) -> None:
     )
     qapp.processEvents()
 
-    assert page.salary_expected_input.text() == "12000.00"
-    assert page.salary_offered_input.text() == "9000.00"
+    assert page.salary_expected_input.text() == "R$ 12.000,00"
+    assert page.salary_offered_input.text() == "R$ 9.000,00"
 
     page.job_combo.setCurrentIndex(0)
     qapp.processEvents()
 
     assert page.salary_expected_input.text() == ""
-    assert page.salary_offered_input.text() == "A combinar"
+    assert page.salary_offered_input.text() == ""
 
 
 def test_application_page_curriculum_selection_and_match(

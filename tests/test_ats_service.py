@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.domain.ats_evaluation import ATSEvaluationInput
@@ -21,9 +18,9 @@ from acd.services.knowledge_service import RuleBasedSimilarityEngine
 
 
 @pytest.fixture
-def ats_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-ats-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd.db")
+def ats_setup(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

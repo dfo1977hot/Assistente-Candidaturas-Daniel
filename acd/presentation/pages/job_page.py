@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QDate, QLocale
 from PySide6.QtWidgets import (
     QComboBox,
@@ -54,6 +56,22 @@ from acd.services.salary_research_service import (
 )
 
 
+class _SortableTableWidgetItem(QTableWidgetItem):
+    """Item de tabela que ordena pela chave tipada, não apenas pelo texto."""
+
+    def __init__(self, text: str, sort_key: object | None = None) -> None:
+        super().__init__(text)
+        self._sort_key = text.casefold() if sort_key is None else sort_key
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        if isinstance(other, _SortableTableWidgetItem):
+            try:
+                return self._sort_key < other._sort_key
+            except TypeError:
+                return str(self._sort_key).casefold() < str(other._sort_key).casefold()
+        return super().__lt__(other)
+
+
 class JobPage(BasePage):
     """Página de cadastro e gerenciamento de vagas."""
 
@@ -66,11 +84,13 @@ class JobPage(BasePage):
         salary_research_service: SalaryResearchService | None = None,
         recruiter_email_research_service: RecruiterEmailResearchService | None = None,
         application_url_resolver: LinkedInApplicationResolver | None = None,
+        on_apply_job: Callable[[int], None] | None = None,
     ) -> None:
         super().__init__("Vagas")
 
         self.job_service = job_service
         self.company_service = company_service
+        self._on_apply_job = on_apply_job
         self.current_job_id: int | None = None
         self._import_executor = LongRunningTaskExecutor(self)
         self._import_executor.succeeded.connect(self._on_linkedin_import_succeeded)
@@ -115,6 +135,7 @@ class JobPage(BasePage):
         self._salary_research_executor.finished.connect(
             self._on_salary_research_finished
         )
+        self._salary_research_job_id: int | None = None
         self._saved_jobs_dialog: LinkedInSavedJobsProgressDialog | None = None
         self._saved_jobs_executor = LongRunningTaskExecutor(self)
         self._saved_jobs_executor.progress.connect(self._on_saved_jobs_progress)
@@ -194,9 +215,9 @@ class JobPage(BasePage):
         self.save_button = QPushButton("Salvar")
         self.delete_button = QPushButton("Excluir")
         self.salary_research_button = QPushButton("Pesquisar média salarial com IA")
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Empresa", "Cargo", "Status", "Cidade", "Cadastro"]
+            ["ID", "Empresa", "Cargo", "Status", "Cidade", "Cadastro", "Ação"]
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
@@ -208,6 +229,7 @@ class JobPage(BasePage):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self._on_row_selected)
         self._setup_controls()
         self._load_companies()
@@ -770,6 +792,7 @@ class JobPage(BasePage):
             location=self.location_input.text().strip(),
             work_model=self.work_model_combo.currentText().strip(),
             employment_type=self.employment_type_combo.currentText().strip(),
+            company=self.company_combo.currentText().strip(),
         )
         try:
             SalaryResearchService._validate_request(request)
@@ -785,8 +808,10 @@ class JobPage(BasePage):
             )
             return
 
+        self._salary_research_job_id = self.current_job_id
         self.salary_research_button.setEnabled(False)
         self.salary_research_button.setText("Pesquisando salários...")
+        self.table.setEnabled(False)
         service = self._salary_research_service
         self._salary_research_executor.execute(
             lambda: service.research(request, force_refresh=True),
@@ -807,7 +832,12 @@ class JobPage(BasePage):
             self.currency_input.setCurrentIndex(currency_index)
         self.salary_max_input.setValue(result.salary_max)
         self._update_currency_symbol()
+        selected_job_id = self._salary_research_job_id or self.current_job_id
         if self._save_job(clear_after=False, show_success=False):
+            # _save_job recarrega a tabela. Reaplica os filtros visíveis e
+            # reposiciona explicitamente a vaga que iniciou a pesquisa.
+            self._filter_jobs()
+            self._select_job_row_by_id(selected_job_id)
             self.import_status_label.setText(
                 "Remuneração ideal atualizada pela IA e vaga salva."
             )
@@ -824,8 +854,12 @@ class JobPage(BasePage):
         )
 
     def _on_salary_research_finished(self) -> None:
+        selected_job_id = self._salary_research_job_id
         self.salary_research_button.setEnabled(True)
         self.salary_research_button.setText("Pesquisar média salarial com IA")
+        self.table.setEnabled(True)
+        self._select_job_row_by_id(selected_job_id)
+        self._salary_research_job_id = None
 
     def _save_current_job(self) -> None:
         """Salva e permanece no registro atual, confirmando ao usuário."""
@@ -1091,19 +1125,49 @@ class JobPage(BasePage):
         self._render_jobs(jobs)
 
     def _render_jobs(self, jobs: list) -> None:
+        sorting_enabled = self.table.isSortingEnabled()
+        header = self.table.horizontalHeader()
+        sort_column = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(jobs))
         for row, job in enumerate(jobs):
-            self.table.setItem(row, 0, QTableWidgetItem(str(job.id)))
-            self.table.setItem(row, 1, QTableWidgetItem(job.company.name if job.company else ""))
-            self.table.setItem(row, 2, QTableWidgetItem(job.title))
-            self.table.setItem(row, 3, QTableWidgetItem(job.status or ""))
-            self.table.setItem(row, 4, QTableWidgetItem(job.location or ""))
+            company_name = job.company.name if job.company else ""
+            created_text = job.created_at.strftime("%d/%m/%Y") if job.created_at else ""
+            created_key = job.created_at.timestamp() if job.created_at else 0.0
+
             self.table.setItem(
-                row,
-                5,
-                QTableWidgetItem(job.created_at.strftime("%d/%m/%Y") if job.created_at else ""),
+                row, 0, _SortableTableWidgetItem(str(job.id), int(job.id))
             )
+            self.table.setItem(row, 1, _SortableTableWidgetItem(company_name))
+            self.table.setItem(row, 2, _SortableTableWidgetItem(job.title))
+            self.table.setItem(row, 3, _SortableTableWidgetItem(job.status or ""))
+            self.table.setItem(row, 4, _SortableTableWidgetItem(job.location or ""))
+            self.table.setItem(
+                row, 5, _SortableTableWidgetItem(created_text, created_key)
+            )
+            apply_button = QPushButton("Candidatar-se")
+            apply_button.setEnabled(self._on_apply_job is not None)
+            apply_button.clicked.connect(
+                lambda _checked=False, job_id=int(job.id): self._apply_to_job(job_id)
+            )
+            self.table.setCellWidget(row, 6, apply_button)
+
+        self.table.setSortingEnabled(sorting_enabled)
+        if sorting_enabled and 0 <= sort_column < 6:
+            self.table.sortItems(sort_column, sort_order)
         self.table.resizeColumnsToContents()
+
+    def _apply_to_job(self, job_id: int) -> None:
+        """Abre o fluxo de candidatura da vaga selecionada."""
+        if self._on_apply_job is None:
+            QMessageBox.warning(
+                self,
+                "Candidatura",
+                "O fluxo de candidatura não está disponível.",
+            )
+            return
+        self._on_apply_job(job_id)
 
     def _select_job_row_by_id(self, job_id: int | None) -> None:
         """Mantém a seleção da tabela no registro atualmente editado."""

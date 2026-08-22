@@ -204,14 +204,9 @@ class SalaryResearch:
     def research(self, request):
         self.requests.append(request)
         return SalaryResearchResult(
-            salary_min=8500,
-            salary_max=10500,
+            median_salary=10500,
             currency="BRL",
             period="mensal",
-            confidence="média",
-            geographic_scope="cidade",
-            summary="",
-            sources=(),
         )
 
 
@@ -329,8 +324,7 @@ class ParallelSalaryResearch:
             self.thread_names.add(current_thread().name)
         self.barrier.wait(timeout=3)
         return SalaryResearchResult(
-            salary_min=7000,
-            salary_max=9000,
+            median_salary=9000,
             currency="BRL",
         )
 

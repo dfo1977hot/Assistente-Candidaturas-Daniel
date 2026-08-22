@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.infrastructure.repositories.profile_repository import ProfileRepository
@@ -10,9 +7,9 @@ from acd.services.profile_service import ProfileAggregate, ProfileCompletionServ
 
 
 @pytest.fixture
-def profile_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-profile-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_profile.db")
+def profile_setup(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd_profile.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

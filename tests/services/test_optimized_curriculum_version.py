@@ -52,6 +52,13 @@ class _PromptRepository:
 
 
 class _DocumentService:
+    def versioned_original_name(
+        self,
+        original_name: str,
+        version: str,
+    ) -> str:
+        return f"{original_name}_{version}"
+
     def duplicate_document(self, source, created) -> None:
         raise AssertionError("Não deveria duplicar documento sem arquivo anexado")
 
@@ -77,11 +84,11 @@ def test_create_optimized_curriculum_preserves_original_and_increments_version()
     assert created is not None
     assert created.id == 2
     assert created.name == "Currículo Logística"
-    assert created.version == "V.1.1"
+    assert created.version == "v2.0"
     assert created.description == "Conteúdo otimizado para a vaga"
     assert repository.source.description == "Conteúdo original"
     assert repository.source.version == "V.1.0"
-    assert repository.created_versions[0].version == "V.1.1"
+    assert repository.created_versions[0].version == "v2.0"
 
 
 def test_create_optimized_curriculum_is_idempotent_for_same_next_version() -> None:

@@ -6,7 +6,7 @@ def test_expected_salary_uses_only_job_ideal_remuneration() -> None:
         encoding="utf-8"
     )
     assert 'ideal = float(job.salary_max) if job.salary_max is not None else None' in source
-    assert 'f"{ideal:.2f}" if ideal is not None else ""' in source
+    assert 'self._format_brl_currency(ideal) if ideal is not None else ""' in source
     assert "max(candidates)" not in source
 
 

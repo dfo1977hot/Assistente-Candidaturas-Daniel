@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from typing import Any
 
 import pytest
@@ -28,7 +26,7 @@ from acd.services.workflow_template_service import (
 
 
 @pytest.fixture
-def workflow_setup(monkeypatch):
+def workflow_setup(monkeypatch, tmp_path):
     """
     Cria um banco SQLite temporário para os testes de Workflow.
 
@@ -36,8 +34,8 @@ def workflow_setup(monkeypatch):
     ao final do teste.
     """
 
-    temp_dir = tempfile.mkdtemp(prefix="acd-workflow-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_workflow.db")
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd_workflow.db")
 
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",

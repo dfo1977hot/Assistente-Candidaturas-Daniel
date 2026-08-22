@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.infrastructure.repositories.application_repository import ApplicationRepository
@@ -14,9 +11,9 @@ from acd.services.job_service import JobService
 
 
 @pytest.fixture
-def curriculum_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-curriculum-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd.db")
+def curriculum_setup(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

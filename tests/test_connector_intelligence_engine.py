@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.infrastructure.connectors.plugin_registry import PluginRegistry
@@ -14,9 +11,9 @@ from acd.services.schema_service import SchemaService
 
 
 @pytest.fixture
-def connector_setup(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-connectors-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_connectors.db")
+def connector_setup(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd_connectors.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

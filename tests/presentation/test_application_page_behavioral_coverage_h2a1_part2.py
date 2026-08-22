@@ -461,7 +461,7 @@ def test_optimization_requires_selected_curriculum(
     page._optimize_resume()
 
     assert messages == [
-        "Selecione e associe um currículo antes de iniciar a otimização."
+        "Selecione um currículo no campo Currículo antes de continuar."
     ]
     assert view_model.calls == []
 

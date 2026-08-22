@@ -212,10 +212,8 @@ class _SalaryService:
         )
 
         return SalaryResearchResult(
-            salary_min=10000,
-            salary_max=14000,
+            median_salary=12000,
             currency="BRL",
-            confidence="alta",
         )
 
 
@@ -1097,8 +1095,7 @@ def test_salary_research_success_updates_and_saves(
     )
 
     result = SalaryResearchResult(
-        salary_min=10000,
-        salary_max=15000,
+        median_salary=15000,
         currency="BRL",
     )
 
@@ -1131,8 +1128,7 @@ def test_salary_research_success_handles_save_failure(
 
     page._on_salary_research_succeeded(
         SalaryResearchResult(
-            salary_min=10000,
-            salary_max=15000,
+            median_salary=15000,
             currency="BRL",
         )
     )

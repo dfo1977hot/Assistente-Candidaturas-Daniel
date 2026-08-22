@@ -30,14 +30,9 @@ class _Client:
 def test_research_uses_title_location_model_and_employment_type(tmp_path) -> None:
     client = _Client(
         {
-            "salary_min": 9000,
-            "salary_max": 12000,
-            "currency": "BRL",
-            "period": "mensal",
-            "confidence": "média",
-            "geographic_scope": "cidade",
-            "summary": "Faixa estimada.",
-            "sources": ["https://example.com/salarios"],
+        "median_salary": 10500,
+        "currency": "BRL",
+        "period": "mensal",
         }
     )
     service = SalaryResearchService(
@@ -61,8 +56,9 @@ def test_research_uses_title_location_model_and_employment_type(tmp_path) -> Non
     assert "Presencial" in prompt
     assert "CLT" in prompt
     assert client.responses.last_kwargs["tools"] == [{"type": "web_search"}]
-    assert result.salary_min == 9000
-    assert result.salary_max == 12000
+    assert result.median_salary == 10500
+    assert result.salary_min == 10500
+    assert result.salary_max == 10500
     assert result.currency == "BRL"
 
 
@@ -96,7 +92,7 @@ def test_research_requires_all_salary_context_fields(
         service.research(SalaryResearchRequest(**values))
 
 
-def test_research_rejects_inconsistent_range(tmp_path) -> None:
+def test_research_rejects_payload_without_median_salary(tmp_path) -> None:
     service = SalaryResearchService(
         client=_Client(
             {
@@ -108,7 +104,10 @@ def test_research_rejects_inconsistent_range(tmp_path) -> None:
         cache_path=tmp_path / "cache.json",
     )
 
-    with pytest.raises(RuntimeError, match="inconsistente"):
+    with pytest.raises(
+        RuntimeError,
+        match="não encontrou valores monetários comparáveis",
+    ):
         service.research(
             SalaryResearchRequest(
                 title="Gerente",
@@ -122,9 +121,9 @@ def test_research_rejects_inconsistent_range(tmp_path) -> None:
 def test_research_reuses_cache_for_equivalent_title_within_30_days(tmp_path) -> None:
     client = _Client(
         {
-            "salary_min": 8000,
-            "salary_max": 10000,
+            "median_salary": 9000,
             "currency": "BRL",
+            "period": "mensal",
         }
     )
     service = SalaryResearchService(
@@ -157,9 +156,9 @@ def test_research_reuses_cache_for_equivalent_title_within_30_days(tmp_path) -> 
 def test_force_refresh_ignores_cached_salary(tmp_path) -> None:
     client = _Client(
         {
-            "salary_min": 8000,
-            "salary_max": 10000,
+            "median_salary": 9000,
             "currency": "BRL",
+            "period": "mensal",
         }
     )
     service = SalaryResearchService(
@@ -184,9 +183,9 @@ def test_force_refresh_ignores_cached_salary(tmp_path) -> None:
 def test_concurrent_equivalent_requests_share_one_api_call(tmp_path) -> None:
     client = _Client(
         {
-            "salary_min": 7500,
-            "salary_max": 9500,
+            "median_salary": 8500,
             "currency": "BRL",
+            "period": "mensal",
         }
     )
     service = SalaryResearchService(
@@ -218,4 +217,6 @@ def test_concurrent_equivalent_requests_share_one_api_call(tmp_path) -> None:
         results = list(executor.map(service.research, requests))
 
     assert client.responses.calls == 1
-    assert all(result.salary_min == 7500 for result in results)
+    assert all(result.median_salary == 8500 for result in results)
+    assert all(result.salary_min == 8500 for result in results)
+    assert all(result.salary_max == 8500 for result in results)

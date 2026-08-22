@@ -6,7 +6,7 @@ def test_main_window_initializes_from_composed_dependencies(qapp):
 
     assert window.windowTitle() == "Assistente de Candidaturas do Daniel"
     assert window.sidebar is not None
-    assert window.stack.count() == 14
+    assert window.stack.count() == 15
 
 
 def test_main_window_routes_candidate_decision_action(qapp, monkeypatch):

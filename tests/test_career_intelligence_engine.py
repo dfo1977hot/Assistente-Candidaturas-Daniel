@@ -1,6 +1,4 @@
 from datetime import UTC, datetime, timedelta
-import os
-import tempfile
 
 import pytest
 
@@ -14,10 +12,10 @@ from acd.services.gap_analysis_service import GapAnalysisService
 
 
 @pytest.fixture
-def temp_database(monkeypatch):
+def temp_database(monkeypatch, tmp_path):
     """Create a temporary database for testing."""
-    temp_dir = tempfile.mkdtemp(prefix="acd-career-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_career.db")
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd_career.db")
     monkeypatch.setattr("acd.database.database.DATABASE_URL", f"sqlite:///{db_path}")
 
     # Import all entities FIRST to register ORM metadata

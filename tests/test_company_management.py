@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 
 from acd.infrastructure.repositories.company_repository import CompanyRepository
@@ -8,9 +5,9 @@ from acd.services.company_service import CompanyService
 
 
 @pytest.fixture
-def temp_db(monkeypatch):
-    temp_dir = tempfile.mkdtemp(prefix="acd-test-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd.db")
+def temp_db(monkeypatch, tmp_path):
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd.db")
     monkeypatch.setattr(
         "acd.database.database.DATABASE_URL",
         f"sqlite:///{db_path}",

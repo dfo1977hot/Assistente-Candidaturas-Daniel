@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from acd.core.router import Router
 from acd.database.create_database import create_database
+from acd.infrastructure.ai.providers import SettingsConfiguredAIProvider
 from acd.infrastructure.application_automation.playwright_application_browser import (
     PlaywrightApplicationBrowser,
 )
@@ -23,6 +24,7 @@ from acd.presentation.pages.application_page import ApplicationPage
 from acd.presentation.pages.assistant_page import AssistantPage
 from acd.presentation.pages.ats_page import ATSPage
 from acd.presentation.pages.candidate_decision_view_model import CandidateDecisionViewModel
+from acd.presentation.pages.candidate_profile_page import CandidateProfilePage
 from acd.presentation.pages.career_page import CareerPage
 from acd.presentation.pages.company_page import CompanyPage
 from acd.presentation.pages.curriculum_page import CurriculumPage
@@ -42,7 +44,9 @@ from acd.services.application_follow_up_service import ApplicationFollowUpServic
 from acd.services.application_service import ApplicationService
 from acd.services.assisted_application_service import AssistedApplicationService
 from acd.services.ats_service import ATSService
+from acd.services.candidate_profile_service import CandidateProfileService
 from acd.services.career_planning_service import CareerPlanningService
+from acd.services.chrome_profile_service import ChromeProfileService
 from acd.services.closed_linkedin_jobs_registry import ClosedLinkedInJobsRegistry
 from acd.services.communications_service import CommunicationsService
 from acd.services.company_lookup_service import CompanyLookupService
@@ -90,14 +94,23 @@ class DesktopCompositionRoot:
 
         company_service = CompanyService(company_repository)
         job_service = JobService(job_repository)
+        settings_service = SettingsService()
+        ai_provider = SettingsConfiguredAIProvider(settings_service)
         closed_jobs_registry = ClosedLinkedInJobsRegistry()
         job_import_service = LinkedInJobImportService(
-            closed_jobs_registry=closed_jobs_registry
+            closed_jobs_registry=closed_jobs_registry,
+            settings_service=settings_service,
+            ai_provider=ai_provider,
         )
-        settings_service = SettingsService()
-        salary_research_service = SalaryResearchService(settings_service=settings_service)
+        candidate_profile_service = CandidateProfileService()
+        chrome_profile_service = ChromeProfileService()
+        salary_research_service = SalaryResearchService(
+            settings_service=settings_service,
+            ai_provider=ai_provider,
+        )
         recruiter_email_research_service = RecruiterEmailResearchService(
-            settings_service=settings_service
+            settings_service=settings_service,
+            ai_provider=ai_provider,
         )
         saved_jobs_import_service = LinkedInSavedJobsImportService(
             LinkedInSavedJobsBrowser(headless=settings_service.browser_headless),
@@ -124,6 +137,7 @@ class DesktopCompositionRoot:
             job_service,
             curriculum_service,
             settings_service,
+            ai_provider=ai_provider,
         )
         analytics_service = AnalyticsService(AnalyticsRepository())
         analytics_export_service = AnalyticsExportService()
@@ -143,6 +157,7 @@ class DesktopCompositionRoot:
             curriculum_service=curriculum_service,
             cover_letter_service=cover_letter_service,
             application_url_resolver=PlaywrightApplicationBrowser(
+                settings_service=settings_service,
                 linkedin_headless=settings_service.browser_headless,
             ),
             application_follow_up_service=application_follow_up_service,
@@ -157,13 +172,19 @@ class DesktopCompositionRoot:
         workflow_template_service = WorkflowTemplateService(workflow_service)
         assisted_application_service = AssistedApplicationService(
             PlaywrightApplicationBrowser(
+                settings_service=settings_service,
                 linkedin_headless=settings_service.browser_headless,
             )
         )
 
         application_view_models = self._build_application_view_models(
-            application_repository, curriculum_repository, company_repository,
-            job_repository, ats_repository, interview_repository,
+            application_repository,
+            curriculum_repository,
+            company_repository,
+            job_repository,
+            ats_repository,
+            interview_repository,
+            settings_service,
         )
         router = Router()
         curriculum_page = CurriculumPage(curriculum_service)
@@ -188,6 +209,7 @@ class DesktopCompositionRoot:
             resume_match_service=resume_match_service,
             ats_service=ats_service,
             assisted_application_service=assisted_application_service,
+            candidate_profile_service=candidate_profile_service,
         )
 
         def navigate_to_analytics_record(entity_type: str, _entity_id: int) -> None:
@@ -212,6 +234,10 @@ class DesktopCompositionRoot:
             analytics_export_service,
             navigate_to_analytics_record,
         )
+        def open_job_application(job_id: int) -> None:
+            application_page.open_job_for_application(job_id)
+            router.navigate("applications")
+
         pages = {
             "dashboard": dashboard,
             "companies": CompanyPage(
@@ -229,8 +255,10 @@ class DesktopCompositionRoot:
                 salary_research_service,
                 recruiter_email_research_service,
                 PlaywrightApplicationBrowser(
+                    settings_service=settings_service,
                     linkedin_headless=settings_service.browser_headless,
                 ),
+                on_apply_job=open_job_application,
             ),
             "applications": application_page,
             "interviews": InterviewPage(interview_service, application_service),
@@ -253,6 +281,10 @@ class DesktopCompositionRoot:
                 curriculum_service,
             ),
             "crm": ATSPage(ats_service),
+            "candidate_profile": CandidateProfilePage(
+                candidate_profile_service,
+                chrome_profile_service,
+            ),
             "settings": SettingsPage(settings_service),
         }
         return MainWindow(sidebar=Sidebar(), router=router, pages=pages, settings_service=settings_service)
@@ -265,6 +297,7 @@ class DesktopCompositionRoot:
         job_repository: JobRepository,
         ats_repository: ATSRepository,
         interview_repository: InterviewRepository,
+        settings_service: SettingsService,
     ) -> dict[str, object]:
         """Wire the established resume/candidate flow directly, without a container."""
         from acd.application.candidate_decision_service import CandidateDecisionService
@@ -320,7 +353,18 @@ class DesktopCompositionRoot:
         version_query = GeneratedResumeVersionQueryAdapter()
         return {
             "candidate_decision": CandidateDecisionViewModel(CandidateDecisionUseCase(CandidateDecisionService(interview_context))),
-            "resume_optimization": ResumeOptimizationViewModel(ResumeOptimizationUseCase(workflow, ResumeGenerationService())),
+
+            "resume_optimization": ResumeOptimizationViewModel(
+                ResumeOptimizationUseCase(
+                    workflow,
+                    ResumeGenerationService(
+                        provider=SettingsConfiguredAIProvider(
+                            settings_service=settings_service,
+                        ),
+                    ),
+                )
+            ),
+
             "resume_review": ResumeVersionReviewViewModel(ResumeVersionReviewUseCase(application_context, resume_context, version_query)),
             "optimized_evaluation": OptimizedResumeEvaluationViewModel(
                 OptimizedResumeEvaluationUseCase(

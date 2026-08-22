@@ -1,8 +1,5 @@
 """Tests for multi-agent platform."""
 
-import os
-import tempfile
-
 import pytest
 
 from acd.application.multi_agent.session import (
@@ -27,10 +24,10 @@ from acd.services.agents.supervisor_service import SupervisorService
 
 
 @pytest.fixture
-def temp_database(monkeypatch):
+def temp_database(monkeypatch, tmp_path):
     """Create a temporary database for testing."""
-    temp_dir = tempfile.mkdtemp(prefix="acd-multiagent-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd_multiagent.db")
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd_multiagent.db")
     monkeypatch.setattr("acd.database.database.DATABASE_URL", f"sqlite:///{db_path}")
 
     import acd.database.database as database_module

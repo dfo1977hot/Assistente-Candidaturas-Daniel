@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         self.agent_console_page = pages["agent_console"]
         self.cover_letters_page = pages["cover_letters"]
         self.crm_page = pages["crm"]
+        self.candidate_profile_page = pages["candidate_profile"]
         self.settings_page = pages["settings"]
 
         self.sidebar.itemClicked.connect(self._on_sidebar_item_clicked)
@@ -97,7 +98,7 @@ class MainWindow(QMainWindow):
             ("Análise", "analytics"), ("Analytics", "analytics"), ("Planejamento", "career"),
             ("Carreira", "career"), ("Assistente", "assistant"), ("IA", "assistant"),
             ("Agentes", "agent_console"), ("Cartas", "cover_letters"), ("CRM", "crm"),
-            ("Config", "settings"), ("Dashboard", "dashboard"),
+            ("Perfil do Candidato", "candidate_profile"), ("Config", "settings"), ("Dashboard", "dashboard"),
         )
         for text, destination in destinations:
             if text in label:

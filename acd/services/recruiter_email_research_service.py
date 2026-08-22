@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 import re
 
+from acd.infrastructure.ai.providers import AIProvider, SettingsConfiguredAIProvider
 from acd.services.settings_service import SettingsService
 
 
@@ -20,17 +21,18 @@ class RecruiterEmailResearchRequest:
 class RecruiterEmailResearchService:
     """Find only publicly disclosed professional contact e-mails."""
 
-    def __init__(self, settings_service: SettingsService | None = None) -> None:
+    def __init__(
+        self,
+        settings_service: SettingsService | None = None,
+        ai_provider: AIProvider | None = None,
+    ) -> None:
         self._settings_service = settings_service or SettingsService()
+        self._ai_provider = ai_provider or SettingsConfiguredAIProvider(
+            self._settings_service
+        )
 
     def research(self, request: RecruiterEmailResearchRequest) -> str:
-        key = self._settings_service.get_api_key("openai").strip()
-        if not key or not request.company_name.strip():
-            return ""
-
-        try:
-            from openai import OpenAI
-        except ImportError:
+        if not request.company_name.strip():
             return ""
 
         prompt = (
@@ -47,12 +49,13 @@ class RecruiterEmailResearchService:
         )
 
         try:
-            response = OpenAI(api_key=key).responses.create(
-                model="gpt-5-mini",
-                tools=[{"type": "web_search"}],
-                input=prompt,
-            )
-            raw = response.output_text.strip()
+            raw = self._ai_provider.generate_text(
+                prompt=prompt,
+                model="recruiter-email-research",
+                temperature=0.0,
+                max_tokens=500,
+                language="pt-BR",
+            ).strip()
         except Exception:
             return ""
 

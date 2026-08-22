@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from acd.infrastructure.ai.providers import AIProvider, SettingsConfiguredAIProvider
 from acd.security.secret_provider import EnvironmentSecretProvider, read_setting
 from acd.services.settings_service import SettingsService
 
@@ -534,6 +535,93 @@ class GooglePlacesCompanyLookupProvider:
         )
 
 
+class ConfiguredAICompanyLookupProvider:
+    """Pesquisa textual usando a ordem global de provedores de IA."""
+
+    def __init__(
+        self,
+        *,
+        settings_service: SettingsService | None = None,
+        ai_provider: AIProvider | None = None,
+    ) -> None:
+        self.settings_service = settings_service or SettingsService()
+        self.ai_provider = ai_provider or SettingsConfiguredAIProvider(
+            self.settings_service
+        )
+
+    def search(self, name: str, *, limit: int = 8) -> list[CompanyLookupResult]:
+        query = _validate_query(name)
+        maximum = max(1, min(limit, 8))
+        prompt = (
+            "Pesquise empresas que correspondam ao nome informado. "
+            "Use apenas informações que você consiga sustentar; não invente dados. "
+            "Quando um campo não puder ser confirmado, use string vazia. "
+            "Responda SOMENTE JSON válido, sem Markdown, no formato "
+            '{"companies":[{"name":"","legal_name":"","tax_id":"",'
+            '"registration_status":"","segment":"","address":"",'
+            '"city":"","state":"","postal_code":"","country":"",'
+            '"phone":"","website":"","confidence":0.0,"sources":[]}]}. '
+            f"Nome pesquisado: {query!r}. Máximo de resultados: {maximum}."
+        )
+        try:
+            raw = self.ai_provider.generate_text(
+                prompt=prompt,
+                model="company-lookup",
+                temperature=0.0,
+                max_tokens=3000,
+                language="pt-BR",
+            )
+            candidate = raw.strip()
+            if candidate.startswith("```"):
+                candidate = re.sub(
+                    r"^```(?:json)?\s*", "", candidate, flags=re.IGNORECASE
+                )
+                candidate = re.sub(r"\s*```$", "", candidate)
+            payload = json.loads(candidate)
+        except Exception as exc:
+            raise CompanyLookupError(f"Busca por IA não concluída: {exc}") from exc
+
+        companies = payload.get("companies", []) if isinstance(payload, dict) else []
+        if not isinstance(companies, list):
+            raise CompanyLookupError("A IA não retornou uma lista válida de empresas.")
+
+        retrieved_at = datetime.now(UTC).replace(tzinfo=None)
+        results: list[CompanyLookupResult] = []
+        for item in companies[:maximum]:
+            if not isinstance(item, dict):
+                continue
+            company_name = str(item.get("name", "")).strip()
+            if not company_name:
+                continue
+            raw_sources = item.get("sources", [])
+            sources = (
+                [str(value).strip() for value in raw_sources if str(value).strip()]
+                if isinstance(raw_sources, list)
+                else []
+            )
+            results.append(
+                CompanyLookupResult(
+                    name=company_name,
+                    legal_name=str(item.get("legal_name", "")).strip(),
+                    tax_id=str(item.get("tax_id", "")).strip(),
+                    registration_status=str(item.get("registration_status", "")).strip(),
+                    segment=str(item.get("segment", "")).strip(),
+                    address=str(item.get("address", "")).strip(),
+                    city=str(item.get("city", "")).strip(),
+                    state=str(item.get("state", "")).strip(),
+                    postal_code=str(item.get("postal_code", "")).strip(),
+                    country=str(item.get("country", "")).strip(),
+                    phone=str(item.get("phone", "")).strip(),
+                    website=str(item.get("website", "")).strip(),
+                    source="IA configurada",
+                    source_reference=" | ".join(sources[:5]),
+                    confidence=_clamp_confidence(item.get("confidence", 0.0)),
+                    retrieved_at=retrieved_at,
+                )
+            )
+        return results
+
+
 class HybridCompanyLookupProvider:
     """OpenAI como fonte principal, ReceitaWS para confirmação e Google como contingência."""
 
@@ -546,7 +634,7 @@ class HybridCompanyLookupProvider:
         settings_service: SettingsService | None = None,
     ) -> None:
         settings = settings_service or SettingsService()
-        self.openai_provider = openai_provider or OpenAIWebCompanyLookupProvider(
+        self.openai_provider = openai_provider or ConfiguredAICompanyLookupProvider(
             settings_service=settings
         )
         self.receita_enricher = receita_enricher or ReceitaWSCompanyEnricher()
@@ -593,7 +681,7 @@ class CompanyLookupService:
 
     def _build_provider(self, provider_name: str) -> CompanyLookupProvider:
         if provider_name == "openai":
-            return OpenAIWebCompanyLookupProvider(
+            return ConfiguredAICompanyLookupProvider(
                 settings_service=self.settings_service
             )
         if provider_name == "google":

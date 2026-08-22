@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from acd.domain.entities.cover_letter_version import CoverLetterVersion
+from acd.infrastructure.ai.providers import AIProvider, SettingsConfiguredAIProvider
 from acd.infrastructure.repositories.cover_letter_repository import CoverLetterRepository
 from acd.resilience import CancellationToken
 from acd.services.curriculum_service import CurriculumService
@@ -52,12 +53,16 @@ class CoverLetterService:
         curriculum_service: CurriculumService | None = None,
         settings_service: SettingsService | None = None,
         client: Any | None = None,
+        ai_provider: AIProvider | None = None,
     ) -> None:
         self.repository = repository or CoverLetterRepository()
         self.job_service = job_service or JobService()
         self.curriculum_service = curriculum_service or CurriculumService()
         self.settings_service = settings_service or SettingsService()
         self._client = client
+        self._ai_provider = ai_provider or SettingsConfiguredAIProvider(
+            self.settings_service
+        )
 
     def list_letters(self) -> list[CoverLetterVersion]:
         return self.repository.get_all()
@@ -214,7 +219,6 @@ class CoverLetterService:
 
         emit((40, "Montando prompt"))
         token.raise_if_cancelled()
-        client = self._client or self._create_client()
         prompt = self._build_prompt(
             context=context,
             letter_type=letter_type,
@@ -224,13 +228,22 @@ class CoverLetterService:
         )
         emit((55, "Gerando conteúdo"))
         token.raise_if_cancelled()
-        response = client.responses.create(
-            model="gpt-5-mini",
-            input=prompt,
-        )
+        if self._client is not None:
+            response = self._client.responses.create(
+                model="gpt-5-mini",
+                input=prompt,
+            )
+            content = str(getattr(response, "output_text", "") or "").strip()
+        else:
+            content = self._ai_provider.generate_text(
+                prompt=prompt,
+                model="cover-letter",
+                temperature=0.2,
+                max_tokens=1600,
+                language=language,
+            ).strip()
         emit((75, "Validando resposta"))
         token.raise_if_cancelled()
-        content = str(getattr(response, "output_text", "") or "").strip()
         if not content:
             raise RuntimeError("A IA não retornou conteúdo para a carta.")
 
@@ -303,20 +316,6 @@ class CoverLetterService:
             story.extend([Paragraph(safe or " ", styles["BodyText"]), Spacer(1, 8)])
         SimpleDocTemplate(str(path), pagesize=A4).build(story)
         return path
-
-    def _create_client(self) -> Any:
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise RuntimeError(
-                "A biblioteca openai não está instalada no ambiente."
-            ) from exc
-        api_key = self.settings_service.get_api_key("openai")
-        if not api_key:
-            raise RuntimeError(
-                "Configure a chave da OpenAI na página Configurações."
-            )
-        return OpenAI(api_key=api_key)
 
     @staticmethod
     def _build_prompt(

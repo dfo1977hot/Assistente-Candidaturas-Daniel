@@ -347,7 +347,7 @@ class LinkedInSavedJobsImportService:
         return self._clone_imported_job(
             prepared,
             salary_min=prepared.salary_min,
-            salary_max=result.salary_max,
+            salary_max=result.median_salary,
             currency=prepared.currency or result.currency,
         )
 

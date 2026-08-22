@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
-import tempfile
 
 import pytest
 from sqlalchemy import create_engine
@@ -24,9 +23,9 @@ from acd.models.base import Base
 
 
 @pytest.fixture
-def ats_adapter_database(monkeypatch):
+def ats_adapter_database(monkeypatch, tmp_path):
     """Provide an isolated database for persisted ATS read projections."""
-    temp_dir = tempfile.mkdtemp(prefix="acd-ats-adapter-", dir=".")
+    temp_dir = tmp_path
     engine = create_engine(f"sqlite:///{temp_dir}/ats_adapter.db", future=True)
     session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     monkeypatch.setattr(database_module, "engine", engine)

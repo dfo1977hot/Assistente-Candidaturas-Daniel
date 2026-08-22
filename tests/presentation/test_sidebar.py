@@ -30,6 +30,8 @@ def _expected_widget(window, label: str):
         return window.assistant_page
     if "Agentes" in label:
         return window.agent_console_page
+    if "Perfil do Candidato" in label:
+        return window.candidate_profile_page
     if "Config" in label:
         return window.settings_page
     return None

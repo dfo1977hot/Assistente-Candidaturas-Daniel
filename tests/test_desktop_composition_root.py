@@ -32,7 +32,7 @@ def test_desktop_composition_root_builds_the_official_runtime(qapp) -> None:
     window = DesktopCompositionRoot().build_main_window()
 
     assert isinstance(window, MainWindow)
-    assert window.stack.count() == 14
+    assert window.stack.count() == 15
     assert window.router.pages["applications"] is window.application_page
     assert "new_application" not in window.router.pages
     assert "applications/new" not in window.router.pages

@@ -4,21 +4,22 @@ from __future__ import annotations
 def test_mvp_first_run_opens_dashboard_and_routes(acceptance_runtime) -> None:
     window = acceptance_runtime.window
 
-    assert window.stack.count() == 14
+    assert acceptance_runtime.window.stack.count() == 15
     assert [window.sidebar.item(index).text() for index in range(window.sidebar.count())] == [
         "🏠 Dashboard",
-        "💼 Vagas",
         "🏢 Empresas",
-        "🎯 Candidaturas",
-        "🗣️ Entrevistas",
+        "💼 Vagas",
         "📄 Currículos",
         "✉️ Cartas",
-        "⚙️ Workflows",
+        "🎯 Candidaturas",
+        "🗣️ Entrevistas",
         "📊 CRM",
+        "⚙️ Workflows",
         "📈 Análise",
         "🎯 Planejamento de Carreira",
         "🤖 Assistente IA",
         "🦾 Agentes",
+        "\U0001F464 Perfil do Candidato",
         "⚙ Configurações",
     ]
     assert "applications/new" not in window.router.pages

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
 
 from acd.database import database as database_module
@@ -11,13 +8,13 @@ from acd.models.base import Base
 
 
 @pytest.fixture(scope="function")
-def db_engine(monkeypatch):
+def db_engine(monkeypatch, tmp_path):
     """
     Cria um banco SQLite temporário para cada teste.
     """
 
-    temp_dir = tempfile.mkdtemp(prefix="acd-test-", dir=".")
-    db_path = os.path.join(temp_dir, "test_acd.db")
+    temp_dir = tmp_path
+    db_path = str(temp_dir / "test_acd.db")
     ensure_non_productive_database_path(db_path)
 
     monkeypatch.setattr(
