@@ -186,6 +186,8 @@ class _ResumeMatchService:
         self.result = SimpleNamespace(
             has_vacancy_description=True,
             score=82.0,
+            overall_score=82.0,
+            classification="Alta aderência",
             ats_score=70.0,
             adapted_ats_score=88.0,
             adapted_score=91.0,
@@ -193,6 +195,60 @@ class _ResumeMatchService:
             interview_probability_max=45.0,
             adapted_interview_probability_min=55.0,
             adapted_interview_probability_max=70.0,
+            requirements=(
+                SimpleNamespace(
+                    category="Melhoria Contínua",
+                    requirement="Experiência com Lean",
+                    evidence="Experiência comprovada com Lean",
+                    score=100.0,
+                    status="Atende",
+                ),
+                SimpleNamespace(
+                    category="Planejamento",
+                    requirement="Experiência com PCP",
+                    evidence="Experiência comprovada com PCP",
+                    score=100.0,
+                    status="Atende",
+                ),
+                SimpleNamespace(
+                    category="Sistemas",
+                    requirement="Conhecimento em SAP",
+                    evidence="Não evidenciado no currículo",
+                    score=0.0,
+                    status="Gap",
+                ),
+            ),
+            dimension_scores=(
+                SimpleNamespace(
+                    name="Experiência profissional",
+                    score=85.0,
+                ),
+                SimpleNamespace(
+                    name="Competências técnicas",
+                    score=80.0,
+                ),
+            ),
+            strengths=(
+                "Experiência com Lean",
+                "Experiência com PCP",
+                "Vivência em logística",
+            ),
+            gaps=(
+                "SAP não evidenciado",
+                "Power BI não evidenciado",
+            ),
+            differentials=(
+                "Experiência em melhoria contínua",
+            ),
+            recommendation=(
+                "Currículo apresenta boa aderência à vaga e deve destacar "
+                "as experiências diretamente relacionadas aos requisitos."
+            ),
+            adaptation_strategy=(
+                "Priorizar experiências aderentes aos requisitos da vaga.",
+                "Destacar resultados mensuráveis já existentes no currículo.",
+                "Reforçar palavras-chave verdadeiras sem criar competências.",
+            ),
             matched_keywords=(
                 "Lean",
                 "PCP",
@@ -501,6 +557,7 @@ def test_application_page_populates_salary_and_clears_defaults(qapp) -> None:
 
 def test_application_page_curriculum_selection_and_match(
     qapp,
+    qtbot,
     monkeypatch,
 ) -> None:
     (
@@ -553,6 +610,12 @@ def test_application_page_curriculum_selection_and_match(
 
     page._analyze_resume_match()
 
+    qtbot.waitUntil(
+        lambda: not page._resume_match_executor.is_running,
+        timeout=5000,
+    )
+    qapp.processEvents()
+
     assert len(resume_match.calls) == 1
     assert ats.calls
     assert ats.calls[0]["application_id"] == 300
@@ -565,6 +628,7 @@ def test_application_page_curriculum_selection_and_match(
 
 def test_application_page_handles_missing_vacancy_description(
     qapp,
+    qtbot,
     monkeypatch,
 ) -> None:
     (
@@ -596,6 +660,12 @@ def test_application_page_handles_missing_vacancy_description(
     resume_match.result.has_vacancy_description = False
 
     page._analyze_resume_match()
+
+    qtbot.waitUntil(
+        lambda: not page._resume_match_executor.is_running,
+        timeout=5000,
+    )
+    qapp.processEvents()
 
     assert messages
     assert "não possui descrição" in messages[-1]

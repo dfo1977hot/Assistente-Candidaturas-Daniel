@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+from html import escape
 from typing import Protocol
 
 from PySide6.QtCore import QDate, Qt
@@ -257,6 +258,20 @@ class ApplicationPage(BasePage):
         self.job_service = job_service or _EmptyApplicationData()
         self.curriculum_service = curriculum_service or _EmptyApplicationData()
         self.resume_match_service = resume_match_service or _EmptyResumeMatchData()
+
+        self._resume_match_executor = LongRunningTaskExecutor(self)
+        self._resume_match_executor.succeeded.connect(
+            self._on_resume_match_succeeded
+        )
+        self._resume_match_executor.failed.connect(
+            self._on_resume_match_failed
+        )
+        self._resume_match_executor.finished.connect(
+            self._on_resume_match_finished
+        )
+        self._resume_match_application: object | None = None
+        self._resume_match_curriculum: object | None = None
+
         self.ats_service = ats_service
         self.assisted_application_service = assisted_application_service
         self.candidate_profile_service = candidate_profile_service
@@ -673,8 +688,13 @@ class ApplicationPage(BasePage):
 
     def _analyze_resume_match(self) -> None:
         if self.current_application_id is None:
-            QMessageBox.information(self, "Aderência", "Selecione uma candidatura.")
+            QMessageBox.information(
+                self,
+                "Aderência",
+                "Selecione uma candidatura.",
+            )
             return
+
         if self.curriculum_combo.currentData() in (None, ""):
             QMessageBox.warning(
                 self,
@@ -682,8 +702,15 @@ class ApplicationPage(BasePage):
                 "Selecione um currículo no campo Currículo antes de continuar.",
             )
             return
+
+        if self._resume_match_executor.is_running:
+            return
+
         curriculum = self._associate_selected_curriculum()
-        application = self.application_service.get_application(self.current_application_id)
+        application = self.application_service.get_application(
+            self.current_application_id
+        )
+
         if application is None or curriculum is None:
             QMessageBox.warning(
                 self,
@@ -691,12 +718,49 @@ class ApplicationPage(BasePage):
                 "Não foi possível usar o currículo selecionado nesta candidatura.",
             )
             return
-        result = self.resume_match_service.analyze(application=application, curriculum=curriculum)
-        if not result.has_vacancy_description:
+
+        self._resume_match_application = application
+        self._resume_match_curriculum = curriculum
+
+        self.analyze_resume_button.setEnabled(False)
+        self.analyze_resume_button.setText("Analisando aderência...")
+        self.optimize_resume_button.setEnabled(False)
+
+        try:
+            semantic_analyzer = getattr(
+                self.resume_match_service,
+                "analyze_semantic",
+                None,
+            )
+            analyzer = (
+                semantic_analyzer
+                if callable(semantic_analyzer)
+                else self.resume_match_service.analyze
+            )
+
+            self._resume_match_executor.execute(
+                lambda: analyzer(
+                    application=application,
+                    curriculum=curriculum,
+                )
+            )
+        except Exception as error:
+            self._on_resume_match_failed(error)
+            self._on_resume_match_finished()
+
+    def _on_resume_match_succeeded(self, result: object) -> None:
+        application = self._resume_match_application
+        curriculum = self._resume_match_curriculum
+
+        if application is None or curriculum is None:
+            return
+
+        if not getattr(result, "has_vacancy_description", False):
             QMessageBox.warning(
                 self,
                 "Aderência",
-                "A vaga vinculada não possui descrição no campo Observações da página Vagas.",
+                "A vaga vinculada não possui descrição no campo "
+                "Observações da página Vagas.",
             )
             self.resume_match_label.setText(
                 f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
@@ -705,6 +769,7 @@ class ApplicationPage(BasePage):
             self.resume_match_details.clear()
             self.optimize_resume_button.setEnabled(False)
             return
+
         self._persist_resume_match_as_ats(
             application=application,
             curriculum=curriculum,
@@ -712,6 +777,28 @@ class ApplicationPage(BasePage):
         )
         self._render_resume_match(result)
 
+    def _on_resume_match_failed(self, error: object) -> None:
+        QMessageBox.critical(
+            self,
+            "Análise de aderência",
+            "Não foi possível concluir a análise de aderência.\n\n"
+            f"{error}",
+        )
+
+    def _on_resume_match_finished(self) -> None:
+        self._resume_match_application = None
+        self._resume_match_curriculum = None
+
+        self.analyze_resume_button.setText("Analisar aderência")
+
+        has_application = self.current_application_id is not None
+        has_curriculum = self.curriculum_combo.currentData() not in (None, "")
+
+        self.analyze_resume_button.setEnabled(
+            has_application
+            and has_curriculum
+            and not self._resume_match_executor.is_running
+        )
     def _persist_resume_match_as_ats(
         self,
         *,
@@ -735,32 +822,218 @@ class ApplicationPage(BasePage):
     def _render_resume_match(self, result: ResumeMatchResult) -> None:
         self.resume_match_label.setText(
             f"Currículo selecionado: {self.curriculum_combo.currentText()} | "
-            f"Aderência técnica atual: {result.score:.0f}%"
+            f"Aderência: {result.overall_score:.0f}% — {result.classification}"
         )
-        matched = ", ".join(result.matched_keywords[:12]) or "Nenhuma identificada"
-        missing = ", ".join(result.missing_keywords[:12]) or "Nenhuma lacuna prioritária"
+
+        def safe(value: object) -> str:
+            return escape(str(value or ""))
+
+        requirement_rows = "".join(
+            (
+                "<tr>"
+                f"<td>{safe(requirement.category)}</td>"
+                f"<td>{safe(requirement.requirement)}</td>"
+                f"<td>{safe(requirement.evidence)}</td>"
+                f'<td align="center">{requirement.score:.0f}%</td>'
+                f'<td align="center"><b>{safe(requirement.status)}</b></td>'
+                "</tr>"
+            )
+            for requirement in result.requirements
+        )
+
+        if not requirement_rows:
+            requirement_rows = (
+                "<tr>"
+                '<td colspan="5" align="center">'
+                "Nenhum requisito estruturado disponível."
+                "</td>"
+                "</tr>"
+            )
+
+        dimension_rows = "".join(
+            (
+                "<tr>"
+                f"<td>{safe(dimension.name)}</td>"
+                f'<td align="center">{dimension.score:.0f}%</td>'
+                "</tr>"
+            )
+            for dimension in result.dimension_scores
+        )
+
+        if not dimension_rows:
+            dimension_rows = (
+                "<tr>"
+                '<td colspan="2" align="center">'
+                "Nenhuma dimensão calculada."
+                "</td>"
+                "</tr>"
+            )
+
+        strengths = (
+            "<ul>"
+            + "".join(
+                f"<li>{safe(item)}</li>"
+                for item in result.strengths
+            )
+            + "</ul>"
+            if result.strengths
+            else "<p>Nenhum ponto forte específico identificado.</p>"
+        )
+
+        gaps = (
+            "<ul>"
+            + "".join(
+                f"<li>{safe(item)}</li>"
+                for item in result.gaps
+            )
+            + "</ul>"
+            if result.gaps
+            else "<p>Nenhum gap prioritário identificado.</p>"
+        )
+
+        differentials = (
+            "<ul>"
+            + "".join(
+                f"<li>{safe(item)}</li>"
+                for item in result.differentials
+            )
+            + "</ul>"
+            if result.differentials
+            else "<p>Nenhum diferencial adicional identificado.</p>"
+        )
+
+        adaptation_strategy = (
+            "<ul>"
+            + "".join(
+                f"<li>{safe(item)}</li>"
+                for item in result.adaptation_strategy
+            )
+            + "</ul>"
+            if result.adaptation_strategy
+            else "<p>Nenhuma estratégia adicional necessária.</p>"
+        )
+
+        matched = ", ".join(result.matched_keywords[:20])
+        missing = ", ".join(result.missing_keywords[:20])
+
         html = f"""
-        <table cellspacing="0" cellpadding="6" border="1" width="100%">
-          <tr><th align="left">Critério</th><th>Atual</th><th>Adaptado</th></tr>
-          <tr><td>Compatibilidade ATS</td><td align="center">{result.ats_score:.0f}%</td>
-              <td align="center"><b>{result.adapted_ats_score:.0f}%</b></td></tr>
-          <tr><td>Aderência técnica</td><td align="center">{result.score:.0f}%</td>
-              <td align="center"><b>{result.adapted_score:.0f}%</b></td></tr>
-          <tr><td>Probabilidade estimada de entrevista</td>
-              <td align="center">{result.interview_probability_min:.0f}–{result.interview_probability_max:.0f}%</td>
-              <td align="center"><b>{result.adapted_interview_probability_min:.0f}–{result.adapted_interview_probability_max:.0f}%</b></td></tr>
+        <h2>Análise de aderência Currículo × Vaga</h2>
+
+        <table cellspacing="0" cellpadding="7" border="1" width="100%">
+          <tr>
+            <th align="left">Indicador</th>
+            <th>Atual</th>
+            <th>Após adaptação</th>
+          </tr>
+          <tr>
+            <td><b>Aderência geral</b></td>
+            <td align="center">{result.overall_score:.0f}%</td>
+            <td align="center"><b>{result.adapted_score:.0f}%</b></td>
+          </tr>
+          <tr>
+            <td><b>Classificação</b></td>
+            <td align="center">{safe(result.classification)}</td>
+            <td align="center">—</td>
+          </tr>
+          <tr>
+            <td>Compatibilidade ATS</td>
+            <td align="center">{result.ats_score:.0f}%</td>
+            <td align="center"><b>{result.adapted_ats_score:.0f}%</b></td>
+          </tr>
+          <tr>
+            <td>Probabilidade estimada de entrevista</td>
+            <td align="center">
+              {result.interview_probability_min:.0f}–{result.interview_probability_max:.0f}%
+            </td>
+            <td align="center">
+              <b>
+                {result.adapted_interview_probability_min:.0f}–{result.adapted_interview_probability_max:.0f}%
+              </b>
+            </td>
+          </tr>
         </table>
-        <p><b>Pontos aderentes:</b> {matched}</p>
-        <p><b>Lacunas prioritárias:</b> {missing}</p>
-        <p><i>O resultado adaptado é uma projeção após reorganizar e destacar informações verdadeiras.
-        A probabilidade de entrevista é apenas um indicador comparativo e não representa garantia.</i></p>
+
+        <br>
+
+        <h3>Aderência por requisito</h3>
+
+        <table cellspacing="0" cellpadding="6" border="1" width="100%">
+          <tr>
+            <th align="left">Categoria</th>
+            <th align="left">Requisito da vaga</th>
+            <th align="left">Evidência no currículo</th>
+            <th>Aderência</th>
+            <th>Status</th>
+          </tr>
+          {requirement_rows}
+        </table>
+
+        <br>
+
+        <h3>Aderência por dimensão</h3>
+
+        <table cellspacing="0" cellpadding="6" border="1" width="65%">
+          <tr>
+            <th align="left">Dimensão</th>
+            <th>Aderência</th>
+          </tr>
+          {dimension_rows}
+        </table>
+
+        <br>
+
+        <table cellspacing="0" cellpadding="8" border="0" width="100%">
+          <tr>
+            <td width="50%" valign="top">
+              <h3>Pontos fortes</h3>
+              {strengths}
+            </td>
+            <td width="50%" valign="top">
+              <h3>Gaps</h3>
+              {gaps}
+            </td>
+          </tr>
+        </table>
+
+        <h3>Diferenciais</h3>
+        {differentials}
+
+        <h3>Recomendação</h3>
+        <p>{safe(result.recommendation)}</p>
+
+        <h3>Estratégia de adaptação do currículo</h3>
+        {adaptation_strategy}
+
+        <h3>Palavras-chave</h3>
+
+        <p>
+          <b>Identificadas no currículo:</b>
+          {safe(matched or "Nenhuma identificada")}
+        </p>
+
+        <p>
+          <b>Ausentes ou não evidenciadas:</b>
+          {safe(missing or "Nenhuma lacuna prioritária")}
+        </p>
+
+        <p>
+          <i>
+            A análise compara exclusivamente informações existentes na vaga
+            e no currículo. A adaptação pode reorganizar e destacar
+            experiências verdadeiras, mas não deve criar competências,
+            certificações ou experiências inexistentes.
+            A probabilidade de entrevista é apenas um indicador comparativo
+            e não representa garantia de convocação.
+          </i>
+        </p>
         """
+
         self.resume_match_details.setHtml(html)
+
         self.optimize_resume_button.setEnabled(
             self._resume_optimization_view_model is not None
             and not self._resume_optimization_executor.is_running
         )
-
     def _load_companies(self) -> None:
         companies = self.company_service.list_companies()
         self.company_combo.clear()

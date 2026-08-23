@@ -163,6 +163,8 @@ class _ResumeMatchService:
         self.cached = SimpleNamespace(
             has_vacancy_description=True,
             score=82.0,
+            overall_score=82.0,
+            classification="Alta",
             ats_score=70.0,
             adapted_ats_score=88.0,
             adapted_score=91.0,
@@ -170,6 +172,57 @@ class _ResumeMatchService:
             interview_probability_max=45.0,
             adapted_interview_probability_min=55.0,
             adapted_interview_probability_max=70.0,
+            requirements=(
+                SimpleNamespace(
+                    category="Metodologias / Qualidade",
+                    requirement="Experiência com Lean",
+                    evidence="Experiência comprovada com Lean",
+                    score=100.0,
+                    status="Forte",
+                ),
+                SimpleNamespace(
+                    category="Experiência",
+                    requirement="Experiência com PCP",
+                    evidence="Experiência comprovada com PCP",
+                    score=100.0,
+                    status="Forte",
+                ),
+                SimpleNamespace(
+                    category="Sistemas e ferramentas",
+                    requirement="Conhecimento em SAP",
+                    evidence="Não evidenciado no currículo.",
+                    score=0.0,
+                    status="Gap",
+                ),
+            ),
+            dimension_scores=(
+                SimpleNamespace(
+                    name="Metodologias / Qualidade",
+                    score=100.0,
+                ),
+                SimpleNamespace(
+                    name="Sistemas e ferramentas",
+                    score=0.0,
+                ),
+            ),
+            strengths=(
+                "Experiência com Lean",
+                "Experiência com PCP",
+            ),
+            gaps=(
+                "Conhecimento em SAP",
+            ),
+            differentials=(
+                "Experiência em melhoria contínua",
+            ),
+            recommendation=(
+                "Aderência alta. Recomenda-se a candidatura com adaptação "
+                "direcionada do currículo."
+            ),
+            adaptation_strategy=(
+                "Priorizar experiências aderentes aos requisitos da vaga.",
+                "Reforçar palavras-chave verdadeiras sem criar competências.",
+            ),
             matched_keywords=(
                 "Lean",
                 "PCP",
