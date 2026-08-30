@@ -240,6 +240,26 @@ def test_update_application_invalid_transition() -> None:
         )
 
 
+def test_update_application_allows_draft_to_applied() -> None:
+    service = create_service()
+
+    application = service.create_application(
+        job_id=1,
+        company_id=1,
+    )
+
+    updated = service.update_application(
+        application.id,
+        job_id=1,
+        company_id=1,
+        status="Aplicada",
+        application_date="2026-08-22",
+    )
+
+    assert updated is not None
+    assert updated.status == "Aplicada"
+    assert updated.application_date == date(2026, 8, 22)
+
 def test_update_application_same_status() -> None:
     service = create_service()
 

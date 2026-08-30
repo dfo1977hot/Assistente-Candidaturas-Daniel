@@ -33,7 +33,7 @@ class ApplicationService:
     }
 
     VALID_STATUS_TRANSITIONS = {
-        "Rascunho": {"Preparando Currículo", "Preparando Carta", "Pronta para Aplicação"},
+        "Rascunho": {"Preparando Currículo", "Preparando Carta", "Pronta para Aplicação", "Aplicada"},
         "Preparando Currículo": {"Preparando Carta", "Pronta para Aplicação"},
         "Preparando Carta": {"Pronta para Aplicação"},
         "Pronta para Aplicação": {"Aplicada", "Encerrada"},
